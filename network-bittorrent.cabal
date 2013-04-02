@@ -1,0 +1,99 @@
+name:                  network-bittorrent
+version:               0.1.0.0
+synopsis:              Straightforward and incomplete implementation of bittorrent protocol.
+description:           Straightforward and incomplete implementation of bittorrent protocol.
+license:               MIT
+license-file:          LICENSE
+author:                Sam T.
+maintainer:            Sam T. <pxqr.sta@gmail.com>
+copyright:             (c) 2013, Sam T.
+category:              Network
+build-type:            Simple
+cabal-version:         >= 1.8
+
+source-repository head
+  type:                git
+  location:            https://github.com/fmap/network-bittorrent.git
+
+
+library
+  exposed-modules:     Data.Torrent
+                     , Network.Torrent.THP
+                     , Network.Torrent.PWP
+  -- other-modules:
+  build-depends:       base       == 4.5.*
+                     , bytestring >= 0.10.2.0
+                     , containers >= 0.4.2.1
+
+                     , bencoding  >= 0.1.0.0
+                     , network    >= 2.4.1.2
+                     , HTTP       >= 4000.2.8
+                     , url        >= 2.1.3
+                     , urlencoded >= 0.4.0
+                     , cereal     >= 0.3.5.2
+                     , cryptohash
+                     , text       >= 0.11.2.3
+                     , directory-tree >= 0.11.0
+  extensions:          PatternGuards
+  hs-source-dirs:      src
+
+
+
+executable client
+  main-is:             client.hs
+  build-depends:       base        == 4.5.*
+                     , bytestring >= 0.10.2.0
+                     , bencoding  >= 0.1.0.0
+                     , network-bittorrent >= 0.1.0.0
+
+  hs-source-dirs:      tests
+  ghc-options:         -Wall -O2
+
+
+
+test-suite info-hash.hs
+  type:                exitcode-stdio-1.0
+  main-is:             info-hash.hs
+  hs-source-dirs:      tests
+
+  build-depends:       base       == 4.5.*
+                     , bytestring >= 0.10.2.0
+                     , containers >= 0.4.2.1
+                     , bencoding  >= 0.1.0.0
+                     , network-bittorrent >= 0.1.0.0
+                     , Diff
+
+  ghc-options:         -Wall
+
+
+
+test-suite encoding
+  type:                exitcode-stdio-1.0
+  main-is:             encoding.hs
+  hs-source-dirs:      tests
+
+  build-depends:       base       == 4.5.*
+                     , bytestring >= 0.10.2.0
+                     , cereal     >= 0.3.5.2
+                     , test-framework
+                     , test-framework-quickcheck2
+                     , QuickCheck
+                     , network-bittorrent >= 0.1.0.0
+
+  ghc-options:         -Wall -fno-warn-orphans
+
+
+
+benchmark serialization
+  type:                exitcode-stdio-1.0
+  main-is:             serialization.hs
+  hs-source-dirs:      bench
+
+  build-depends:       base == 4.5.*
+                     , bytestring >= 0.10.2.0
+                     , criterion
+                     , cereal
+                     , network-bittorrent >= 0.1.0.0
+                     , deepseq
+
+  ghc-options:         -O2 -Wall -fno-warn-orphans
