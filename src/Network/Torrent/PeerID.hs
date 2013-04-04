@@ -1,9 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
 -- | Recommended method for generation of the peer ID's is 'newPeerID',
 --   though this module exports some other goodies for custom generation.
 --
 module Network.Torrent.PeerID
-       ( PeerID(PeerID, getPeerID)
+       ( PeerID (getPeerID)
          -- * Encoding styles
        , azureusStyle, shadowStyle
          -- * Defaults
@@ -15,6 +15,7 @@ module Network.Torrent.PeerID
        ) where
 
 import Control.Applicative
+import Data.BEncode
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -22,17 +23,19 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as B
 import Data.Foldable    (foldMap)
 import Data.Monoid      ((<>))
-import Data.Version     (versionBranch)
+import Data.Version     (Version(Version), versionBranch)
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
 import System.Locale    (defaultTimeLocale)
 
-import Paths_network_torrent (version)
-
+-- TODO we have linker error here, so manual hardcoded version for a while.
+--import Paths_network_bittorrent (version)
+version :: Version
+version = Version [0, 10, 0, 0] []
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerID = PeerID { getPeerID :: ByteString }
-                 deriving (Show, Eq, Ord)
+                 deriving (Show, Eq, Ord, BEncodable)
 
 -- | Azureus-style encoding:
 --     * 1  byte : '-'
