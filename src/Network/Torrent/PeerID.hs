@@ -23,19 +23,20 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as B
 import Data.Foldable    (foldMap)
 import Data.Monoid      ((<>))
+import Data.Serialize   (Serialize)
 import Data.Version     (Version(Version), versionBranch)
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
 import System.Locale    (defaultTimeLocale)
 
 -- TODO we have linker error here, so manual hardcoded version for a while.
---import Paths_network_bittorrent (version)
+-- import Paths_network_bittorrent (version)
 version :: Version
 version = Version [0, 10, 0, 0] []
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerID = PeerID { getPeerID :: ByteString }
-                 deriving (Show, Eq, Ord, BEncodable)
+                 deriving (Show, Eq, Ord, BEncodable, Serialize)
 
 -- | Azureus-style encoding:
 --     * 1  byte : '-'
