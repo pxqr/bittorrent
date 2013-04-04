@@ -13,13 +13,13 @@ data BlockIx = BlockIx {
     ixPiece  :: {-# UNPACK #-} !Int -- ^ Zero-based piece index.
   , ixOffset :: {-# UNPACK #-} !Int -- ^ Zero-based byte offset within the piece.
   , ixLength :: {-# UNPACK #-} !Int -- ^ Block size starting from offset.
-  } deriving (Show, Read, Eq)
+  } deriving (Show, Eq)
 
 data Block = Block {
     blkPiece  :: Int -- ^ Zero-based piece index.
   , blkOffset :: Int -- ^ Zero-based byte offset within the piece.
   , blkData   :: ByteString          -- ^ Payload.
-  } deriving (Show, Read, Eq)
+  } deriving (Show, Eq)
 
 -- TODO comment message constructors
 data Message = KeepAlive
@@ -33,7 +33,7 @@ data Message = KeepAlive
              | Piece    Block
              | Cancel   BlockIx
              | Port     Int
-               deriving (Show, Read, Eq)
+               deriving (Show, Eq)
 
 getInt :: Get Int
 getInt = fromIntegral <$> getWord32be
