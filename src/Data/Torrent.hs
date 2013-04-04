@@ -15,7 +15,7 @@ import qualified Data.ByteString.Char8 as BC (pack, unpack)
 import           Data.Text (Text)
 import Crypto.Hash.SHA1
 import Data.BEncode
-import Network.URL
+import Network.URI
 
 type Time = Text
 
@@ -23,15 +23,15 @@ type Time = Text
 -- TODO more convenient form of torrent info.
 data Torrent = Torrent {
       tInfoHash     :: ByteString
-    , tAnnounce     ::       URL
-    , tAnnounceList :: Maybe [[URL]]
+    , tAnnounce     ::       URI
+    , tAnnounceList :: Maybe [[URI]]
     , tComment      :: Maybe Text
     , tCreatedBy    :: Maybe ByteString
     , tCreationDate :: Maybe Time
     , tEncoding     :: Maybe ByteString
     , tInfo         :: TorrentInfo
-    , tPublisher    :: Maybe URL
-    , tPublisherURL :: Maybe URL
+    , tPublisher    :: Maybe URI
+    , tPublisherURL :: Maybe URI
     } deriving Show
 
 data TorrentInfo =
@@ -59,11 +59,11 @@ data TorrentFile = TorrentFile {
     , tfPath        :: [ByteString]
     } deriving (Show, Read, Eq)
 
-instance BEncodable URL where
-  toBEncode = toBEncode . BC.pack . exportURL -- TODO utf8 encoding
+instance BEncodable URI where
+  toBEncode uri = toBEncode (BC.pack (uriToString id uri ""))
   {-# INLINE toBEncode #-}
 
-  fromBEncode (BString s) | Just url <- importURL (BC.unpack s) = return url
+  fromBEncode (BString s) | Just url <- parseURI (BC.unpack s) = return url
   fromBEncode b           = decodingError $ "url <" ++ show b ++ ">"
   {-# INLINE fromBEncode #-}
 

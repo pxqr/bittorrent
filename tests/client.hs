@@ -22,6 +22,7 @@ main = do
   let Right b = decode contents
   let Right t = fromBEncode b
 
+
   let req = defaultRequest (tAnnounce t) (tInfoHash t)
   resp <- sendRequest req
   print resp
