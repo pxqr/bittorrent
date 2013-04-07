@@ -62,6 +62,9 @@ main = do
        [ testProperty "Message encode <-> decode" $
             prop_encoding (T :: T Message)
 
+       , testProperty "PeerID encode <-> decode" $
+            prop_encoding (T :: T PeerID)
+
        , testProperty "Handshake encode <-> decode" $
             prop_encoding (T :: T Handshake)
        ]
