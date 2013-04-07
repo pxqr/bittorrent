@@ -1,11 +1,14 @@
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Torrent.THP
-       ( Peer(..), Event(..), TRequest(..), TResponse(..)
+module Network.Torrent.Tracker
+       ( module Network.Torrent.Tracker.Scrape
+       , Peer(..), Event(..), TRequest(..), TResponse(..)
        , defaultRequest, defaultPorts
        , sendRequest
        )
        where
+
+import Network.Torrent.Tracker.Scrape
 
 import Control.Applicative
 import Data.Char as Char
@@ -187,7 +190,6 @@ defaultRequest announce hash pid =
   , reqNumWant    = Just 25
   , reqEvent      = Just Started
   }
-
 
 -- | TODO rename to ask for peers
 --

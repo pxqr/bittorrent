@@ -19,7 +19,8 @@ source-repository head
 library
   exposed-modules:     Data.Torrent
                      , Network.Torrent
-                     , Network.Torrent.THP
+                     , Network.Torrent.Tracker
+                     , Network.Torrent.Tracker.Scrape
                      , Network.Torrent.PeerWire
                      , Network.Torrent.PeerID
                      , Network.Torrent.Handshake
@@ -71,7 +72,7 @@ executable client
 
 
 
-test-suite info-hash.hs
+test-suite info-hash
   type:                exitcode-stdio-1.0
   main-is:             info-hash.hs
   hs-source-dirs:      tests
