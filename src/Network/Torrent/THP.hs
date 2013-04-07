@@ -2,39 +2,37 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Torrent.THP
        ( Peer(..), Event(..), TRequest(..), TResponse(..)
-       , sendRequest, defaultRequest
+       , defaultRequest, defaultPorts
+       , sendRequest
        )
        where
 
 import Control.Applicative
-import Data.Maybe
-import Data.BEncode
 import Data.Char as Char
-import Data.Monoid
+import Data.Word (Word32)
 import Data.List as L
 import Data.Map  as M
+import Data.Monoid
+import Data.BEncode
 import Data.ByteString as B
-import qualified Data.ByteString.Lazy as Lazy
 import           Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Builder as B
-import qualified Data.ByteString.Builder.Prim as BP
 import           Data.Text as T
 import Data.Serialize.Get hiding (Result)
 import Data.URLEncoded as URL
 
 import Network
+import Network.Socket
 import Network.HTTP
 import Network.URI
 import Network.Torrent.PeerID
 
 import Numeric
 
-type IP = Int
 type Hash = ByteString
 
 data Peer = Peer {
       peerID   :: Maybe PeerID
-    , peerIP   :: IP
+    , peerIP   :: HostAddress
     , peerPort :: PortNumber
     } deriving Show
 
@@ -51,7 +49,7 @@ data TRequest = TRequest { -- TODO peer here -- TODO detach announce
    , reqUploaded   :: Int         -- ^ # of bytes that the peer has uploaded in the swarm.
    , reqDownloaded :: Int         -- ^ # of bytes downloaded in the swarm by the peer.
    , reqLeft       :: Int         -- ^ # of bytes needed in order to complete download.
-   , reqIP         :: Maybe IP    -- ^ The peer IP.
+   , reqIP         :: Maybe HostAddress    -- ^ The peer IP.
    , reqNumWant    :: Maybe Int   -- ^ Number of peers that the peers wants to receive from.
    , reqEvent      :: Maybe Event -- ^ If not specified,
                                   --   the request is regular periodic request.
@@ -130,6 +128,9 @@ instance URLShow PortNumber where
 instance URLShow PeerID where
   urlShow = BC.unpack . getPeerID
 
+instance URLShow Word32 where
+  urlShow = show
+
 instance URLShow Event where
   urlShow e = urlShow (Char.toLower x : xs)
     where
@@ -183,7 +184,7 @@ defaultRequest announce hash pid =
   , reqDownloaded = 0
   , reqLeft       = 0
   , reqIP         = Nothing
-  , reqNumWant    = Just 50
+  , reqNumWant    = Just 25
   , reqEvent      = Just Started
   }
 

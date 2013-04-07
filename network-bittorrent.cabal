@@ -18,11 +18,13 @@ source-repository head
 
 library
   exposed-modules:     Data.Torrent
+                     , Network.Torrent
                      , Network.Torrent.THP
                      , Network.Torrent.PWP
                      , Network.Torrent.PeerID
+                     , Network.Torrent.Handshake
   other-modules:
-                       Network.Torrent.Handshake
+
 
   build-depends:       base       == 4.5.*
 
@@ -55,8 +57,14 @@ executable client
   main-is:             client.hs
   build-depends:       base        == 4.5.*
                      , bytestring >= 0.10.2.0
+                     , network    >= 2.4.1.2
+                     , text
+                     , cereal
+                     , mtl
+
                      , bencoding  >= 0.1.0.0
                      , network-bittorrent >= 0.1.0.0
+
 
   hs-source-dirs:      tests
   ghc-options:         -Wall -O2

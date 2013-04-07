@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
+-- TODO: tests
 -- | Recommended method for generation of the peer ID's is 'newPeerID',
 --   though this module exports some other goodies for custom generation.
 --
