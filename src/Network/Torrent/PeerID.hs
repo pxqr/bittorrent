@@ -24,7 +24,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as B
 import Data.Foldable    (foldMap)
 import Data.Monoid      ((<>))
-import Data.Serialize   (Serialize)
+import Data.Serialize
 import Data.Version     (Version(Version), versionBranch)
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
@@ -37,7 +37,11 @@ version = Version [0, 10, 0, 0] []
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerID = PeerID { getPeerID :: ByteString }
-                 deriving (Show, Eq, Ord, BEncodable, Serialize)
+                 deriving (Show, Eq, Ord, BEncodable)
+
+instance Serialize PeerID where
+  put = putByteString . getPeerID
+  get = PeerID <$> getBytes 20
 
 -- | Azureus-style encoding:
 --     * 1  byte : '-'
@@ -115,4 +119,4 @@ byteStringPadded bs s c =
       B.byteString (B.take s bs) <>
       B.byteString (BC.replicate padLen c)
   where
-    padLen = s - max (B.length bs) s
+    padLen = s - min (B.length bs) s

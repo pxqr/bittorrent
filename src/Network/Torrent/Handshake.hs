@@ -34,7 +34,7 @@ instance Serialize Handshake where
 
   get = do
     len  <- getWord8
-    Handshake <$> getBytes (fromIntegral len)
+    Handshake <$> getBytes (fromIntegral (len - 49))
               <*> getWord64be
               <*> getBytes 20
               <*> get
