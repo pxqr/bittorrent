@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | This module provides torrent metainfo serialization.
 module Data.Torrent
-       ( Torrent(..), TorrentInfo(..), TorrentFile(..)
+       ( module Data.Torrent.InfoHash
+       , Torrent(..), TorrentInfo(..), TorrentFile(..)
        , fromFile
        ) where
 
@@ -13,8 +14,8 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
 import           Data.Text (Text)
-import Crypto.Hash.SHA1
 import Data.BEncode
+import Data.Torrent.InfoHash
 import Network.URI
 
 type Time = Text
@@ -22,7 +23,7 @@ type Time = Text
 -- TODO comment fields
 -- TODO more convenient form of torrent info.
 data Torrent = Torrent {
-      tInfoHash     :: ByteString
+      tInfoHash     :: InfoHash
     , tAnnounce     ::       URI
     , tAnnounceList :: Maybe [[URI]]
     , tComment      :: Maybe Text
@@ -148,4 +149,4 @@ instance BEncodable TorrentFile where
 
 
 fromFile :: FilePath -> IO (Result Torrent)
-fromFile path = (fromBEncode <=< decode) <$> B.readFile path
+fromFile filepath = (fromBEncode <=< decode) <$> B.readFile filepath

@@ -18,6 +18,7 @@ source-repository head
 
 library
   exposed-modules:     Data.Torrent
+                     , Data.Torrent.InfoHash
                      , Network.Torrent
                      , Network.Torrent.PeerID
                      , Network.Torrent.Tracker
@@ -101,6 +102,7 @@ test-suite encoding
                      , test-framework
                      , test-framework-quickcheck2
                      , QuickCheck
+                     , network    >= 2.4.0.13
                      , network-bittorrent >= 0.1.0.0
 
   ghc-options:         -Wall -fno-warn-orphans

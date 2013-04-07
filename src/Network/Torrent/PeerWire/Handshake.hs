@@ -9,7 +9,7 @@ import Data.Word
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Serialize
-
+import Data.Torrent.InfoHash
 import Network.Torrent.PeerID
 
 -- | In order to establish the connection between peers we should send 'Handshake'
@@ -18,7 +18,7 @@ import Network.Torrent.PeerID
 data Handshake = Handshake {
     hsProtocol    :: ByteString  -- ^ Identifier of the protocol.
   , hsReserved    :: Word64      -- ^ Reserved bytes, rarely used.
-  , hsInfoHash    :: ByteString  -- ^ Hash from the metainfo file.
+  , hsInfoHash    :: InfoHash    -- ^ Hash from the metainfo file.
     -- This /should be/ same hash that is transmitted in tracker requests.
   , hsPeerID      :: PeerID      -- ^ Peer id of the initiator.
     -- This is /usually the same peer id that is transmitted in tracker requests.
@@ -29,14 +29,14 @@ instance Serialize Handshake where
     putWord8 (fromIntegral (B.length (hsProtocol hs)))
     putByteString (hsProtocol hs)
     putWord64be   (hsReserved hs)
-    putByteString (hsInfoHash hs)
+    put (hsInfoHash hs)
     put (hsPeerID hs)
 
   get = do
     len  <- getWord8
     Handshake <$> getBytes (fromIntegral len)
               <*> getWord64be
-              <*> getBytes 20
+              <*> get
               <*> get
 
 -- | Default protocol string "BitTorrent protocol" as is.
@@ -48,7 +48,5 @@ defaultReserved :: Word64
 defaultReserved = 0
 
 -- | Length of info hash and peer id is unchecked, so it /should/ be equal 20.
-defaultHandshake :: ByteString -- ^ Info hash string.
-                 -> PeerID
-                 -> Handshake
+defaultHandshake :: InfoHash -> PeerID -> Handshake
 defaultHandshake hash pid = Handshake defaultProtocol defaultReserved hash pid

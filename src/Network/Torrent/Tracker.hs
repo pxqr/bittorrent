@@ -22,6 +22,7 @@ import           Data.ByteString.Char8 as BC
 import           Data.Text as T
 import Data.Serialize.Get hiding (Result)
 import Data.URLEncoded as URL
+import Data.Torrent
 
 import Network
 import Network.Socket
@@ -30,8 +31,6 @@ import Network.URI
 import Network.Torrent.PeerID
 
 import Numeric
-
-type Hash = ByteString
 
 data Peer = Peer {
       peerID   :: Maybe PeerID
@@ -46,7 +45,7 @@ data Event = Started   -- ^ For first request.
 
 data TRequest = TRequest { -- TODO peer here -- TODO detach announce
      reqAnnounce   :: URI         -- ^ Announce url of the torrent.
-   , reqInfoHash   :: Hash        -- ^ Hash of info part of the torrent.
+   , reqInfoHash   :: InfoHash    -- ^ Hash of info part of the torrent.
    , reqPeerID     :: PeerID      -- ^ Id of the peer doing request. ()
    , reqPort       :: PortNumber  -- ^ Port to listen to for connection from other peers.
    , reqUploaded   :: Int         -- ^ # of bytes that the peer has uploaded in the swarm.
@@ -155,7 +154,7 @@ instance URLEncode TRequest where
 
 encodeRequest :: TRequest -> URI
 encodeRequest req = URL.urlEncode req `addToURI` reqAnnounce req
-                    `addHash` BC.unpack (reqInfoHash req)
+                    `addHash` BC.unpack (getInfoHash (reqInfoHash req))
   where
     addHash :: URI -> String -> URI
     addHash uri s = uri { uriQuery = uriQuery uri ++  "&info_hash=" ++ rfc1738Encode s }
@@ -176,7 +175,7 @@ encodeRequest req = URL.urlEncode req `addToURI` reqAnnounce req
 defaultPorts :: [PortNumber]
 defaultPorts = [6881..6889]
 
-defaultRequest :: URI -> Hash -> PeerID -> TRequest
+defaultRequest :: URI -> InfoHash -> PeerID -> TRequest
 defaultRequest announce hash pid =
   TRequest {
     reqAnnounce = announce
