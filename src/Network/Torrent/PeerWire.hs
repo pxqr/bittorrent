@@ -1,7 +1,10 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 module Network.Torrent.PeerWire
-       ( Message(..), Block(..), BlockIx(..),
+       ( module Network.Torrent.PeerWire.Handshake
+       , Message(..), Block(..), BlockIx(..),
        ) where
+
+import Network.Torrent.PeerWire.Handshake
 
 import Control.Applicative
 import           Data.ByteString (ByteString)

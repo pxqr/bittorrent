@@ -19,11 +19,13 @@ source-repository head
 library
   exposed-modules:     Data.Torrent
                      , Network.Torrent
+                     , Network.Torrent.PeerID
                      , Network.Torrent.Tracker
                      , Network.Torrent.Tracker.Scrape
                      , Network.Torrent.PeerWire
-                     , Network.Torrent.PeerID
-                     , Network.Torrent.Handshake
+                     , Network.Torrent.PeerWire.Handshake
+
+
   other-modules:
 
 

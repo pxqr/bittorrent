@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Torrent.Handshake
+module Network.Torrent.PeerWire.Handshake
        ( Handshake
        , defaultProtocol, defaultReserved, defaultHandshake
        ) where
