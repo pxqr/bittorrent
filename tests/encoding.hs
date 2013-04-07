@@ -11,7 +11,7 @@ import Test.Framework (defaultMain)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck
 
-import Network.Torrent.PWP
+import Network.Torrent
 
 positive :: Gen Int
 positive = fromIntegral <$> (arbitrary :: Gen Word32)
@@ -40,20 +40,28 @@ instance Arbitrary Message where
     , Port <$> choose (0, fromIntegral (maxBound :: Word16))
     ]
 
+instance Arbitrary PeerID where
+  arbitrary = azureusStyle <$> pure defaultClientID
+                           <*> arbitrary
+                           <*> arbitrary
 
-encodeMessages :: [Message] -> ByteString
-encodeMessages xs = runPut (mapM_ put xs)
+instance Arbitrary Handshake where
+  arbitrary = defaultHandshake
+                <$> (B.pack <$> (vectorOf 20 arbitrary))
+                <*> arbitrary
 
-decodeMessages :: ByteString -> Either String [Message]
-decodeMessages = runGet (many get)
+data T a = T
 
--- | TODO move tests
-prop_encoding :: [Message] -> Bool
-prop_encoding msgs = decodeMessages (encodeMessages msgs) == Right msgs
+prop_encoding :: (Serialize a, Eq a) => T a -> [a] -> Bool
+prop_encoding _ msgs = decode (encode msgs) == Right msgs
 
 
 main :: IO ()
 main = do
   defaultMain
-       [ testProperty "encode <-> decode" prop_encoding
+       [ testProperty "Message encode <-> decode" $
+            prop_encoding (T :: T Message)
+
+       , testProperty "Handshake encode <-> decode" $
+            prop_encoding (T :: T Handshake)
        ]
