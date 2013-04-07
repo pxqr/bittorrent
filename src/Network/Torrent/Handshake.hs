@@ -26,7 +26,7 @@ data Handshake = Handshake {
 
 instance Serialize Handshake where
   put hs = do
-    putWord8 (49 + fromIntegral (B.length (hsProtocol hs)))
+    putWord8 (fromIntegral (B.length (hsProtocol hs)))
     putByteString (hsProtocol hs)
     putWord64be   (hsReserved hs)
     putByteString (hsInfoHash hs)
@@ -34,7 +34,7 @@ instance Serialize Handshake where
 
   get = do
     len  <- getWord8
-    Handshake <$> getBytes (fromIntegral (len - 49))
+    Handshake <$> getBytes (fromIntegral len)
               <*> getWord64be
               <*> getBytes 20
               <*> get
