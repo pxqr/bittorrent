@@ -25,6 +25,7 @@ import qualified Data.ByteString.Builder as B
 import Data.Foldable    (foldMap)
 import Data.Monoid      ((<>))
 import Data.Serialize
+import Data.URLEncoded
 import Data.Version     (Version(Version), versionBranch)
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
@@ -42,6 +43,10 @@ newtype PeerID = PeerID { getPeerID :: ByteString }
 instance Serialize PeerID where
   put = putByteString . getPeerID
   get = PeerID <$> getBytes 20
+
+instance URLShow PeerID where
+  urlShow = BC.unpack . getPeerID
+
 
 -- | Azureus-style encoding:
 --     * 1  byte : '-'

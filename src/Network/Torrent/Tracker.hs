@@ -127,9 +127,6 @@ instance BEncodable TResponse where
 instance URLShow PortNumber where
   urlShow = urlShow . fromEnum
 
-instance URLShow PeerID where
-  urlShow = BC.unpack . getPeerID
-
 instance URLShow Word32 where
   urlShow = show
 
