@@ -7,7 +7,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Serialize
 
-import Test.Framework (defaultMain)
+import Test.Framework (defaultMain, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck
 
@@ -48,7 +48,7 @@ instance Arbitrary PeerID where
                            <*> arbitrary
 
 instance Arbitrary InfoHash where
-  arbitrary = (hash . B.pack) <$> vectorOf 20 arbitrary
+  arbitrary = (hash . B.pack) <$> arbitrary
 
 instance Arbitrary Handshake where
   arbitrary = defaultHandshake <$> arbitrary <*> arbitrary
@@ -58,8 +58,13 @@ data T a = T
 prop_encoding :: (Serialize a, Eq a) => T a -> [a] -> Bool
 prop_encoding _ msgs = decode (encode msgs) == Right msgs
 
-test_scrape_url :: Bool
-test_scrape_url = check `all` tests
+-- | Note that in 6 esample we intensionally do not agree with specification,
+--   because taking in account '/' in query parameter seems to be meaningless.
+--   (And thats because other clients do not chunk uri by parts)
+--   Moreover in practice there should be no difference. (I hope)
+--
+test_scrape_url :: [Test]
+test_scrape_url = zipWith mkTest [1 :: Int ..] (check `map` tests)
   where
     check (iu, ou) = (parseURI iu >>= (`scrapeURL` []) >>= return . show) == ou
     tests =
@@ -68,13 +73,15 @@ test_scrape_url = check `all` tests
       , ("http://example.com/announce.php"    , Just "http://example.com/scrape.php")
       , ("http://example.com/a"               , Nothing)
       , ("http://example.com/announce?x2%0644", Just "http://example.com/scrape?x2%0644")
-      , ("http://example.com/announce?x=2/4"  , Nothing)
+      , ("http://example.com/announce?x=2/4"  , Just "http://example.com/scrape?x=2/4")
+--      , ("http://example.com/announce?x=2/4"  , Nothing) -- by specs
       , ("http://example.com/x%064announce"   , Nothing)
       ]
 
+    mkTest i = testProperty ("scrape test #" ++ show i)
+
 main :: IO ()
-main = do
-  defaultMain
+main = defaultMain $
        [ testProperty "Message encode <-> decode" $
             prop_encoding (T :: T Message)
 
@@ -83,7 +90,6 @@ main = do
 
        , testProperty "Handshake encode <-> decode" $
             prop_encoding (T :: T Handshake)
-
-       , testProperty "Scrape URL" $
-            test_scrape_url
+       ] ++ test_scrape_url ++
+       [
        ]
