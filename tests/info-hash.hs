@@ -2,15 +2,12 @@
 module Main (main) where
 
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as L
-
 import Data.Torrent
-import Data.Torrent.InfoHash
 
 import System.Environment
 import System.Exit
+
 
 checkInfo :: ByteString
 checkInfo = "0221caf96aa3cb94f0f58d458e78b0fc344ad8bf"
