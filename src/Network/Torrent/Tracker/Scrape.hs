@@ -34,7 +34,7 @@ data ScrapeInfo = ScrapeInfo {
   , siIncomplete :: Int
     -- ^ Number of leechers.
   , siName       :: Maybe ByteString
-    -- | Name of the torrent file, as specified by the "name"
+    -- ^ Name of the torrent file, as specified by the "name"
     --   file in the info section of the .torrent file.
   } deriving (Show, Eq)
 

@@ -1,6 +1,6 @@
 name:                  network-bittorrent
 version:               0.1.0.0
-synopsis:              Straightforward and incomplete implementation of bittorrent protocol.
+synopsis:              Bittorrent protocol implementation.
 description:           Straightforward and incomplete implementation of bittorrent protocol.
 license:               MIT
 license-file:          LICENSE
