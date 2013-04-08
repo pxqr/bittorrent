@@ -30,7 +30,6 @@ import Network.HTTP
 import Network.URI
 import Network.Torrent.PeerID
 
-import Numeric
 
 data Peer = Peer {
       peerID   :: Maybe PeerID
@@ -150,22 +149,9 @@ instance URLEncode TRequest where
     where s :: String -> String;  s = id; {-# INLINE s #-}
 
 encodeRequest :: TRequest -> URI
-encodeRequest req = URL.urlEncode req `addToURI` reqAnnounce req
-                    `addHash` BC.unpack (getInfoHash (reqInfoHash req))
-  where
-    addHash :: URI -> String -> URI
-    addHash uri s = uri { uriQuery = uriQuery uri ++  "&info_hash=" ++ rfc1738Encode s }
-
-    rfc1738Encode :: String -> String
-    rfc1738Encode = L.concatMap (\c -> if unreserved c then [c] else encode c)
-            where
-              unreserved = (`L.elem` chars)
-              chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_./"
-              encode :: Char -> String
-              encode c = '%' : pHex c
-              pHex c =
-                let p = (showHex . ord $ c) ""
-                in if L.length p == 1 then '0' : p else p
+encodeRequest req = URL.urlEncode req
+                    `addToURI`      reqAnnounce req
+                    `addHashToURI`  reqInfoHash req
 
 
 -- | Ports typically reserved for bittorrent.
