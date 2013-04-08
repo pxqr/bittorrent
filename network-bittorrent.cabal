@@ -1,15 +1,19 @@
 name:                  network-bittorrent
 version:               0.1.0.0
-synopsis:              Bittorrent protocol implementation.
-description:           Straightforward and incomplete implementation of bittorrent protocol.
 license:               MIT
 license-file:          LICENSE
 author:                Sam T.
 maintainer:            Sam T. <pxqr.sta@gmail.com>
 copyright:             (c) 2013, Sam T.
-category:              Network
+category:              Network, Data
 build-type:            Simple
 cabal-version:         >= 1.8
+homepage:              https://github.com/fmap/network-bittorrent
+bug-reports:           https://github.com/fmap/network-bittorrent/issues
+synopsis:              Bittorrent protocol implementation.
+description:
+  Straightforward and incomplete implementation of bittorrent protocol.
+
 
 source-repository head
   type:                git
