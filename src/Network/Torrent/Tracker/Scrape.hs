@@ -1,7 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
+-- | By convention most trackers support anouther form of request,
+--   which queries the state of a given torrent (or all torrents) that the
+--   tracker is managing. This module provides a way to easily request
+--   scrape info for a particular torrent list.
+--
 module Network.Torrent.Tracker.Scrape
        ( ScrapeInfo(..), Scrape
        , scrapeURL
+
+         -- * Requests
+       , scrape
+       , scrapeOne
        ) where
 
 import Control.Applicative
@@ -14,15 +23,22 @@ import qualified Data.Map as M
 import Data.Monoid
 import Data.Torrent.InfoHash
 import Network.URI
+import Network.HTTP
 
+-- | Information about particular torrent.
 data ScrapeInfo = ScrapeInfo {
-    siComplete   :: Int              -- ^ Number of seeders.
+    siComplete   :: Int
+    -- ^ Number of seeders - peers with the entire file.
   , siDownloaded :: Int
     -- ^ Total number of times the tracker has registered a completion.
-  , siIncomplete :: Int              -- ^ Number of leechers
-  , siName       :: Maybe ByteString -- ^
+  , siIncomplete :: Int
+    -- ^ Number of leechers.
+  , siName       :: Maybe ByteString
+    -- | Name of the torrent file, as specified by the "name"
+    --   file in the info section of the .torrent file.
   } deriving (Show, Eq)
 
+-- | Scrape info about a set of torrents.
 type Scrape = Map InfoHash ScrapeInfo
 
 instance BEncodable ScrapeInfo where
@@ -40,7 +56,6 @@ instance BEncodable ScrapeInfo where
                <*> d >--? "name"
   fromBEncode _ = decodingError "ScrapeInfo"
 
--- TODO: encode info hash
 -- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'
 --   gives 'Nothing' then tracker do not support scraping. The info hash
 --   list is used to restrict the tracker's report to that particular
@@ -60,3 +75,27 @@ scrapeURL uri ihs = do
       = let newSuff = "scrape" <> B.drop (B.length "announce") (last ps)
         in Just (B.intercalate "/" (init ps ++ [newSuff]))
       | otherwise = Nothing
+
+
+-- | For each 'InfoHash' of torrents request scrape info from the tracker.
+--   However if the info hash list is 'null', the tracker should list
+--   all available torrents.
+--   Note that the 'URI' should be /announce/ URI, not /scrape/ URI.
+--
+scrape :: URI                -- ^ Announce 'URI'.
+       -> [InfoHash]         -- ^ Torrents to be scrapped.
+       -> IO (Result Scrape) -- ^ 'ScrapeInfo' for each torrent.
+scrape announce ihs = undefined
+
+
+-- | More particular version of 'scrape', just for one torrent.
+--
+scrapeOne :: URI                     -- ^ Announce 'URI'
+          -> InfoHash                -- ^ Hash of the torrent info.
+          -> IO (Result ScrapeInfo)  -- ^ 'ScrapeInfo' for the torrent.
+scrapeOne uri ih = extract <$> scrape uri [ih]
+  where
+    extract (Right m)
+      | Just s <- M.lookup ih m = Right s
+      | otherwise = Left "unable to find info hash in response dict"
+    extract (Left e) = Left e
