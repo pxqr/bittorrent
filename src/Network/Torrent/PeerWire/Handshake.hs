@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Torrent.PeerWire.Handshake
        ( Handshake
+       , handshakeMaxSize
        , defaultProtocol, defaultReserved, defaultHandshake
        ) where
 
@@ -39,6 +40,10 @@ instance Serialize Handshake where
               <*> get
               <*> get
 
+-- | Maximum size of handshake message in bytes.
+handshakeMaxSize :: Int
+handshakeMaxSize = 1 + 256 + 8 + 20 + 20
+
 -- | Default protocol string "BitTorrent protocol" as is.
 defaultProtocol :: ByteString
 defaultProtocol = "BitTorrent protocol"
@@ -49,4 +54,4 @@ defaultReserved = 0
 
 -- | Length of info hash and peer id is unchecked, so it /should/ be equal 20.
 defaultHandshake :: InfoHash -> PeerID -> Handshake
-defaultHandshake hash pid = Handshake defaultProtocol defaultReserved hash pid
+defaultHandshake = Handshake defaultProtocol defaultReserved
