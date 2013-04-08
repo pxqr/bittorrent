@@ -48,11 +48,16 @@ instance URLShow PeerID where
   urlShow = BC.unpack . getPeerID
 
 
--- | Azureus-style encoding:
+-- | Azureus-style encoding have the following layout:
+--
 --     * 1  byte : '-'
+--
 --     * 2  bytes: client id
+--
 --     * 4  bytes: version number
+--
 --     * 1  byte : '-'
+--
 --     * 12 bytes: random number
 --
 azureusStyle :: ByteString -- ^ 2 character client ID, padded with 'H'.
@@ -66,9 +71,12 @@ azureusStyle cid ver rnd = PeerID $ BL.toStrict $ B.toLazyByteString $
     B.char8 '-' <>
       byteStringPadded rnd 12 '0'
 
--- | Shadow-style encoding:
+-- | Shadow-style encoding have the following layout:
+--
 --     * 1 byte   : client id.
+--
 --     * 0-4 bytes: version number. If less than 4 then padded with '-' char.
+--
 --     * 15 bytes : random number. If length is less than 15 then padded with '0' char.
 --
 shadowStyle :: Char       -- ^ Client ID.
@@ -91,9 +99,13 @@ defaultVersionNumber :: ByteString
 defaultVersionNumber = B.take 4 (BC.pack (foldMap show (versionBranch version)))
 
 -- | Gives 15 characters long decimal timestamp such that:
+--
 --     * 6 bytes   : first 6 characters from picoseconds obtained with %q.
+--
 --     * 1 bytes   : character '.' for readability.
+--
 --     * 9..* bytes: number of whole seconds since the Unix epoch (!)REVERSED.
+--
 --   Can be used both with shadow and azureus style encoding. This format is
 --   used to make the ID's readable(for debugging) and more or less random.
 --
@@ -104,17 +116,25 @@ timestampByteString = (BC.pack . format) <$> getCurrentTime
                take 9 (reverse (formatTime defaultTimeLocale "%s" t))
 
 -- |  Here we use Azureus-style encoding with the following args:
+--
 --      * 'HS' for the client id.
+--
 --      * Version of the package for the version number
+--
 --      * UTC time day ++ day time for the random number.
 --
 newPeerID :: IO PeerID
 newPeerID = azureusStyle defaultClientID defaultVersionNumber
                                      <$> timestampByteString
 
--- | length < size: Complete bytestring by given charaters.
---   length = size: Output bytestring as is.
---   length > size: Drop last (length - size) charaters from a given bytestring.
+-- | Pad bytestring so it's becomes exactly request length. Conversion is done
+--   like so:
+--
+--     * length < size: Complete bytestring by given charaters.
+--
+--     * length = size: Output bytestring as is.
+--
+--     * length > size: Drop last (length - size) charaters from a given bytestring.
 --
 byteStringPadded :: ByteString -- ^ bytestring to be padded.
                  -> Int        -- ^ size of result builder.

@@ -2,10 +2,10 @@ module Data.Torrent.InfoHash
        ( InfoHash (getInfoHash)
        , addHashToURI
 
-         -- ^ Construction
+         -- * Construction
        , hash, hashlazy
 
-         -- ^ Extra
+         -- * Extra
        , ppHex
        ) where
 
