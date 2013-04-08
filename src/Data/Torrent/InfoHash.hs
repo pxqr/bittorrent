@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleInstances #-}
 module Data.Torrent.InfoHash
        ( InfoHash (getInfoHash)
        , addHashToURI
@@ -10,9 +11,12 @@ module Data.Torrent.InfoHash
        ) where
 
 import Control.Applicative
-import Data.Foldable
-import Data.List as L
+import Data.BEncode
 import Data.Char
+import Data.List as L
+import Data.Foldable
+import           Data.Map (Map)
+import qualified Data.Map as M
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -27,7 +31,7 @@ import Numeric
 
 -- | Exactly 20 bytes long SHA1 hash.
 newtype InfoHash = InfoHash { getInfoHash :: ByteString }
-                   deriving (Eq, Ord)
+                   deriving (Eq, Ord, BEncodable)
 
 instance Show InfoHash where
   show = BC.unpack . ppHex
@@ -35,6 +39,14 @@ instance Show InfoHash where
 instance Serialize InfoHash where
   put = putByteString . getInfoHash
   get = InfoHash <$> getBytes 20
+
+instance BEncodable a => BEncodable (Map InfoHash a) where
+  {-# SPECIALIZE instance BEncodable a => BEncodable (Map InfoHash a)  #-}
+  fromBEncode b = M.mapKeys InfoHash <$> fromBEncode b
+  {-# INLINE fromBEncode #-}
+
+  toBEncode = toBEncode . M.mapKeys getInfoHash
+  {-# INLINE toBEncode #-}
 
 hash :: ByteString -> InfoHash
 hash = InfoHash . C.hash
