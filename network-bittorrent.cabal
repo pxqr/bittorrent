@@ -57,24 +57,6 @@ library
 --  ghc-options:         -Wall
 
 
-executable client
-  main-is:             client.hs
-  build-depends:       base        == 4.5.*
-                     , bytestring >= 0.10.2.0
-                     , network    >= 2.4.1.2
-                     , text
-                     , cereal
-                     , mtl
-
-                     , bencoding  >= 0.1.0.0
-                     , network-bittorrent >= 0.1.0.0
-
-
-  hs-source-dirs:      tests
-  ghc-options:         -Wall -O2
-
-
-
 test-suite info-hash
   type:                exitcode-stdio-1.0
   main-is:             info-hash.hs
