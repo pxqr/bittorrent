@@ -85,8 +85,13 @@ scrapeURL uri ihs = do
 scrape :: URI                -- ^ Announce 'URI'.
        -> [InfoHash]         -- ^ Torrents to be scrapped.
        -> IO (Result Scrape) -- ^ 'ScrapeInfo' for each torrent.
-scrape announce ihs = undefined
+scrape announce ihs
+  | Just uri<- scrapeURL announce ihs = do
+    rawResp  <- simpleHTTP (Request uri GET [] "")
+    respBody <- getResponseBody rawResp
+    return (decoded (BC.pack respBody))
 
+  | otherwise = return (Left "Tracker do not support scraping")
 
 -- | More particular version of 'scrape', just for one torrent.
 --
