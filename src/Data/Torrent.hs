@@ -32,7 +32,7 @@ data Torrent = Torrent {
     , tAnnounceList :: Maybe [[URI]]
       -- ^ Announce list add multiple tracker support.
       --
-      --   BEP 12: http://www.bittorrent.org/beps/bep_0012.html
+      --   BEP 12: <http://www.bittorrent.org/beps/bep_0012.html>
 
     , tComment      :: Maybe Text
       -- ^ Free-form comments of the author.
@@ -47,9 +47,8 @@ data Torrent = Torrent {
       -- ^ String encoding format used to generate the pieces part of
       --   the info dictionary in the .torrent metafile.
 
-      -- ^ Info about each content file.
     , tInfo         :: TorrentInfo
-
+      -- ^ Info about each content file.
 
     , tPublisher    :: Maybe URI
       -- ^ Containing the RSA public key of the publisher of the torrent.
@@ -69,7 +68,7 @@ data TorrentInfo =
       -- ^ Length of the file in bytes.
 
     , tMD5sum       :: Maybe ByteString
-      -- | 32 character long MD5 sum of the file.
+      -- ^ 32 character long MD5 sum of the file.
       --   Used by third-party tools, not by bittorrent protocol itself.
 
     , tName         :: ByteString
@@ -87,7 +86,7 @@ data TorrentInfo =
       -- ^ If set the client MUST publish its presence to get other peers ONLY
       --   via the trackers explicity described in the metainfo file.
       --
-      --   BEP 27: http://www.bittorrent.org/beps/bep_0027.html
+      --   BEP 27: <http://www.bittorrent.org/beps/bep_0027.html>
     }
 
   | MultiFile {
@@ -97,19 +96,9 @@ data TorrentInfo =
     , tName         :: ByteString
       -- | The file path of the directory in which to store all the files.
 
-
-
     , tPieceLength  :: Int
-
-      -- ^ Number of bytes in each piece.
     , tPieces       :: ByteString
-      -- ^ Concatenation of all 20-byte SHA1 hash values.
-
     , tPrivate      :: Maybe Bool
-      -- ^ If set the client MUST publish its presence to get other peers ONLY
-      --   via the trackers explicity described in the metainfo file,
-      --
-      --   BEP 27: http://www.bittorrent.org/beps/bep_0027.html
     } deriving (Show, Read, Eq)
 
 -- | Contain info about one single file.
@@ -118,7 +107,7 @@ data TorrentFile = TorrentFile {
       -- ^ Length of the file in bytes.
 
     , tfMD5sum      :: Maybe ByteString
-      -- | 32 character long MD5 sum of the file.
+      -- ^ 32 character long MD5 sum of the file.
       --   Used by third-party tools, not by bittorrent protocol itself.
 
     , tfPath        :: [ByteString]
@@ -219,5 +208,6 @@ instance BEncodable TorrentFile where
   fromBEncode _ = decodingError "TorrentFile"
 
 
+-- | Read and decode a .torrent file.
 fromFile :: FilePath -> IO (Result Torrent)
-fromFile filepath = (fromBEncode <=< decode) <$> B.readFile filepath
+fromFile filepath = decoded <$> B.readFile filepath
