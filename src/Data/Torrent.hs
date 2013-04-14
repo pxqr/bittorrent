@@ -64,7 +64,7 @@ data Torrent = Torrent {
 -- | Info part of the .torrent file contain info about each content file.
 data TorrentInfo =
     SingleFile {
-      tLength       :: Int
+      tLength       :: Integer
       -- ^ Length of the file in bytes.
 
     , tMD5sum       :: Maybe ByteString
