@@ -4,7 +4,11 @@
 --   though this module exports some other goodies for custom generation.
 --
 module Network.Torrent.PeerID
-       ( Peer(..), PeerID (getPeerID)
+       ( -- ^ Peer addr
+         Peer(..), peerSockAddr
+
+         -- ^ Peer identification
+       , PeerID (getPeerID)
          -- * Encoding styles
        , azureusStyle, shadowStyle
          -- * Defaults
@@ -16,6 +20,8 @@ module Network.Torrent.PeerID
        ) where
 
 import Control.Applicative
+import Data.Word
+import Data.Bits
 import Data.BEncode
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -39,11 +45,32 @@ import Network.Socket
 version :: Version
 version = Version [0, 10, 0, 0] []
 
+
+
 data Peer = Peer {
       peerID   :: Maybe PeerID
     , peerIP   :: HostAddress
     , peerPort :: PortNumber
     } deriving Show
+
+-- TODO make platform independent, clarify htonl
+-- | Convert peer info from tracker response to socket address.
+--   Used for establish connection between peers.
+--
+peerSockAddr :: Peer -> SockAddr
+peerSockAddr = SockAddrInet <$> (g . peerPort) <*> (htonl . peerIP)
+  where
+    htonl :: Word32 -> Word32
+    htonl d =
+       ((d .&. 0xff) `shiftL` 24) .|.
+      (((d `shiftR` 8 ) .&. 0xff) `shiftL` 16) .|.
+      (((d `shiftR` 16) .&. 0xff) `shiftL` 8)  .|.
+       ((d `shiftR` 24) .&. 0xff)
+
+    g :: PortNumber -> PortNumber
+    g (PortNum x) = PortNum x -- $ (x `shiftR` 8) .|.  (x `shiftL` 8)
+
+
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerID = PeerID { getPeerID :: ByteString }
