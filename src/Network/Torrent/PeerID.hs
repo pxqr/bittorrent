@@ -5,7 +5,8 @@
 --
 module Network.Torrent.PeerID
        ( -- ^ Peer addr
-         Peer(..), peerSockAddr
+         Peer(..)
+       , peerSockAddr, connectToPeer
 
          -- ^ Peer identification
        , PeerID (getPeerID)
@@ -70,6 +71,14 @@ peerSockAddr = SockAddrInet <$> (g . peerPort) <*> (htonl . peerIP)
     g :: PortNumber -> PortNumber
     g (PortNum x) = PortNum x -- $ (x `shiftR` 8) .|.  (x `shiftL` 8)
 
+-- ipv6 extension
+-- | Tries to connect to peer using reasonable default parameters.
+--
+connectToPeer :: Peer -> IO Socket
+connectToPeer p = do
+  sock <- socket AF_INET Stream Network.Socket.defaultProtocol
+  connect sock (peerSockAddr p)
+  return sock
 
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
