@@ -2,9 +2,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Torrent.Tracker
        ( module Network.Torrent.Tracker.Scrape
-       , Event(..), TRequest(..), TResponse(..)
-       , defaultRequest, defaultPorts
+
+         -- * Requests
+       , Event(..), TRequest(..)
+       , startedReq, regularReq, stoppedReq, completedReq
+       , defaultRequest -- TODO remove export
+
+         -- * Responses
+       , TResponse(..)
        , sendRequest
+
+         -- * Extra
+       , defaultPorts
        )
        where
 
@@ -167,16 +176,40 @@ defaultRequest announce hash pid =
   , reqEvent      = Just Started
   }
 
+-- | The first request to the tracker that should be created is 'startedReq'.
+--   It includes necessary 'Started' event field.
+--
+startedReq :: TRequest
+startedReq = undefined
+
+-- | Regular request must be sent to keep track new peers and
+--   notify tracker about current state of the client
+--   so new peers could connect to the client.
+--
+regularReq :: TRequest
+regularReq = undefined
+
+-- | Must be sent to the tracker if the client is shutting down gracefully.
+--
+stoppedReq :: TRequest
+stoppedReq = undefined
+
+-- | Must be sent to the tracker when the download completes.
+--   However, must not be sent if the download was already 100% complete.
+--
+completedReq :: TRequest
+completedReq = undefined
+
+
+
 -- | TODO rename to ask for peers
 --
 sendRequest :: TRequest -> IO (Result TResponse)
 sendRequest req = do
   let r = mkHTTPRequest (encodeRequest req)
-  print r
 
   rawResp  <- simpleHTTP r
   respBody <- getResponseBody rawResp
-  print respBody
   return (decoded (BC.pack respBody))
 
   where
