@@ -7,7 +7,6 @@ module Network.Torrent.Tracker
          -- * Requests
        , Event(..), TRequest(..)
        , startedReq, regularReq, stoppedReq, completedReq
-       , defaultRequest -- TODO remove export
 
          -- * Responses
        , TResponse(..)
@@ -51,9 +50,9 @@ data TRequest = TRequest { -- TODO peer here -- TODO detach announce
    , reqInfoHash   :: InfoHash    -- ^ Hash of info part of the torrent.
    , reqPeerID     :: PeerID      -- ^ Id of the peer doing request. ()
    , reqPort       :: PortNumber  -- ^ Port to listen to for connection from other peers.
-   , reqUploaded   :: Int         -- ^ # of bytes that the peer has uploaded in the swarm.
-   , reqDownloaded :: Int         -- ^ # of bytes downloaded in the swarm by the peer.
-   , reqLeft       :: Int         -- ^ # of bytes needed in order to complete download.
+   , reqUploaded   :: Integer     -- ^ # of bytes that the peer has uploaded in the swarm.
+   , reqDownloaded :: Integer     -- ^ # of bytes downloaded in the swarm by the peer.
+   , reqLeft       :: Integer     -- ^ # of bytes needed in order to complete download.
    , reqIP         :: Maybe HostAddress    -- ^ The peer IP.
    , reqNumWant    :: Maybe Int   -- ^ Number of peers that the peers wants to receive from.
    , reqEvent      :: Maybe Event -- ^ If not specified,
@@ -181,9 +180,9 @@ data TSession = TSession {
 --   This data is considered as dynamic within one session.
 --
 data Progress = Progress {
-    prUploaded   :: Int -- ^ Total amount of bytes uploaded.
-  , prDownloaded :: Int -- ^ Total amount of bytes downloaded.
-  , prLeft       :: Int -- ^ Total amount of bytes left.
+    prUploaded   :: Integer -- ^ Total amount of bytes uploaded.
+  , prDownloaded :: Integer -- ^ Total amount of bytes downloaded.
+  , prLeft       :: Integer -- ^ Total amount of bytes left.
   } deriving Show
 
 
