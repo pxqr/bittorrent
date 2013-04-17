@@ -12,8 +12,8 @@ module Network.Torrent.Tracker
        , TResponse(..)
        , sendRequest
 
-         -- * Extra
-       , defaultPorts
+         -- * Defaults
+       , defaultPorts, defaultNumWant
        )
        where
 
@@ -161,8 +161,14 @@ encodeRequest req = URL.urlEncode req
 defaultPorts :: [PortNumber]
 defaultPorts = [6881..6889]
 
+-- | Above 25, new peers are highly unlikely to increase download speed.
+--   Even 30 peers is _plenty_, the official client version 3 in fact only
+--   actively forms new connections if it has less than 30 peers and will
+--   refuse connections if it has 55. So default value is set to 25.
+--
 defaultNumWant :: Int
 defaultNumWant = 25
+
 
 -- | 'TSession' (shorthand for Tracker session) combines tracker request
 --   fields neccessary for tracker, torrent and client identification.
@@ -185,14 +191,9 @@ data Progress = Progress {
   , prLeft       :: Integer -- ^ Total amount of bytes left.
   } deriving Show
 
-
-
--- | The first request to the tracker that should be created is 'startedReq'.
---   It includes necessary 'Started' event field.
---
-startedReq :: TSession -> Progress -> TRequest
-startedReq ses pr =
-  TRequest {
+-- | used to avoid boilerplate; do NOT export me
+genericReq :: TSession -> Progress -> TRequest
+genericReq ses pr =   TRequest {
     reqAnnounce   = tsesAnnounce ses
   , reqInfoHash   = tsesInfoHash ses
   , reqPeerID     = tsesPeerID   ses
@@ -203,6 +204,17 @@ startedReq ses pr =
   , reqLeft       = prLeft       pr
 
   , reqIP         = Nothing
+  , reqNumWant    = Nothing
+  , reqEvent      = Nothing
+  }
+
+
+-- | The first request to the tracker that should be created is 'startedReq'.
+--   It includes necessary 'Started' event field.
+--
+startedReq :: TSession -> Progress -> TRequest
+startedReq ses pr = (genericReq ses pr) {
+    reqIP         = Nothing
   , reqNumWant    = Just defaultNumWant
   , reqEvent      = Just Started
   }
@@ -211,20 +223,31 @@ startedReq ses pr =
 --   notify tracker about current state of the client
 --   so new peers could connect to the client.
 --
-regularReq :: TRequest
-regularReq = undefined
+regularReq :: Int -> TSession -> Progress -> TRequest
+regularReq numWant ses pr = (genericReq ses pr) {
+    reqIP         = Nothing
+  , reqNumWant    = Just numWant
+  , reqEvent      = Nothing
+  }
 
 -- | Must be sent to the tracker if the client is shutting down gracefully.
 --
-stoppedReq :: TRequest
-stoppedReq = undefined
+stoppedReq :: TSession -> Progress -> TRequest
+stoppedReq ses pr = (genericReq ses pr) {
+    reqIP         = Nothing
+  , reqNumWant    = Nothing
+  , reqEvent      = Just Stopped
+  }
 
 -- | Must be sent to the tracker when the download completes.
 --   However, must not be sent if the download was already 100% complete.
 --
-completedReq :: TRequest
-completedReq = undefined
-
+completedReq :: TSession -> Progress -> TRequest
+completedReq ses pr = (genericReq ses pr) {
+    reqIP         = Nothing
+  , reqNumWant    = Nothing
+  , reqEvent      = Just Completed
+  }
 
 
 -- | TODO rename to ask for peers
