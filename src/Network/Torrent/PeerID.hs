@@ -4,19 +4,23 @@
 --   though this module exports some other goodies for custom generation.
 --
 module Network.Torrent.PeerID
-       ( -- ^ Peer addr
+       ( -- * Peer addr
          Peer(..)
        , peerSockAddr, connectToPeer
 
-         -- ^ Peer identification
+         -- * Peer identification
        , PeerID (getPeerID)
-         -- * Encoding styles
+
+         -- ** Encoding styles
        , azureusStyle, shadowStyle
-         -- * Defaults
+
+         -- ** Defaults
        , defaultClientID, defaultVersionNumber
-         -- * Generation
+
+         -- ** Generation
        , newPeerID, timestampByteString
-         -- * Extra
+         -- ** Extra
+
        , byteStringPadded
        ) where
 
@@ -64,12 +68,12 @@ peerSockAddr = SockAddrInet <$> (g . peerPort) <*> (htonl . peerIP)
     htonl :: Word32 -> Word32
     htonl d =
        ((d .&. 0xff) `shiftL` 24) .|.
-      (((d `shiftR` 8 ) .&. 0xff) `shiftL` 16) .|.
-      (((d `shiftR` 16) .&. 0xff) `shiftL` 8)  .|.
+       (((d `shiftR` 8 ) .&. 0xff) `shiftL` 16) .|.
+       (((d `shiftR` 16) .&. 0xff) `shiftL` 8)  .|.
        ((d `shiftR` 24) .&. 0xff)
 
     g :: PortNumber -> PortNumber
-    g (PortNum x) = PortNum x -- $ (x `shiftR` 8) .|.  (x `shiftL` 8)
+    g = id
 
 -- ipv6 extension
 -- | Tries to connect to peer using reasonable default parameters.
