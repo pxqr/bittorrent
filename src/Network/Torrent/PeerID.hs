@@ -1,8 +1,17 @@
-{-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
 -- TODO: tests
--- | Recommended method for generation of the peer ID's is 'newPeerID',
+-- |
+--   Copyright   :  (c) Sam T. 2013
+--   License     :  MIT
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  non-portable
+--
+--   This module provides 'Peer' and 'PeerID' datatypes and all related
+--   operations.
+--   Recommended method for generation of the peer ID's is 'newPeerID',
 --   though this module exports some other goodies for custom generation.
 --
+{-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
 module Network.Torrent.PeerID
        ( -- * Peer addr
          Peer(..)

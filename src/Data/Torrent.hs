@@ -1,3 +1,10 @@
+-- |
+--   Copyright   :  (c) Sam T. 2013
+--   License     :  MIT
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- | This module provides torrent metainfo serialization.

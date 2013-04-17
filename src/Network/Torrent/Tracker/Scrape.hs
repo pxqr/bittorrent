@@ -1,9 +1,16 @@
-{-# LANGUAGE OverloadedStrings #-}
--- | By convention most trackers support anouther form of request,
+-- |
+--   Copyright   :  (c) Sam T. 2013
+--   License     :  MIT
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   By convention most trackers support anouther form of request,
 --   which queries the state of a given torrent (or all torrents) that the
 --   tracker is managing. This module provides a way to easily request
 --   scrape info for a particular torrent list.
 --
+{-# LANGUAGE OverloadedStrings #-}
 module Network.Torrent.Tracker.Scrape
        ( ScrapeInfo(..), Scrape
        , scrapeURL

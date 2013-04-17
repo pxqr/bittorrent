@@ -1,4 +1,11 @@
--- TODO: add "compact" field
+-- TODO: add "compact" field to TRequest
+-- |
+--   Copyright   :  (c) Sam T. 2013
+--   License     :  MIT
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  non-portable
+--
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Torrent.Tracker

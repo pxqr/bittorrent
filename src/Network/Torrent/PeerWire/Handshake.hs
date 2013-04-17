@@ -1,3 +1,10 @@
+-- |
+--   Copyright   :  (c) Sam T. 2013
+--   License     :  MIT
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Torrent.PeerWire.Handshake
        ( Handshake
