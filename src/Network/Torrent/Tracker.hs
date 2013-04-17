@@ -1,3 +1,4 @@
+-- TODO: add "compact" field
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Torrent.Tracker
@@ -161,26 +162,51 @@ encodeRequest req = URL.urlEncode req
 defaultPorts :: [PortNumber]
 defaultPorts = [6881..6889]
 
-defaultRequest :: URI -> InfoHash -> PeerID -> TRequest
-defaultRequest announce hash pid =
-  TRequest {
-    reqAnnounce = announce
-  , reqInfoHash = hash
-  , reqPeerID   = pid
-  , reqPort     = L.head defaultPorts
-  , reqUploaded = 0
-  , reqDownloaded = 0
-  , reqLeft       = 0
-  , reqIP         = Nothing
-  , reqNumWant    = Just 25
-  , reqEvent      = Just Started
-  }
+defaultNumWant :: Int
+defaultNumWant = 25
+
+-- | 'TSession' (shorthand for Tracker session) combines tracker request
+--   fields neccessary for tracker, torrent and client identification.
+--   This data is considered as static within one session.
+--
+data TSession = TSession {
+    tsesAnnounce :: URI        -- ^ Announce URL.
+  , tsesInfoHash :: InfoHash   -- ^ Hash of info part of current .torrent file.
+  , tsesPeerID   :: PeerID     -- ^ Client peer ID.
+  , tsesPort     :: PortNumber -- ^ The port number the client is listenning on.
+  } deriving Show
+
+-- | 'Progress' contains upload/download/left stats about
+--   current client state.
+--   This data is considered as dynamic within one session.
+--
+data Progress = Progress {
+    prUploaded   :: Int -- ^ Total amount of bytes uploaded.
+  , prDownloaded :: Int -- ^ Total amount of bytes downloaded.
+  , prLeft       :: Int -- ^ Total amount of bytes left.
+  } deriving Show
+
+
 
 -- | The first request to the tracker that should be created is 'startedReq'.
 --   It includes necessary 'Started' event field.
 --
-startedReq :: TRequest
-startedReq = undefined
+startedReq :: TSession -> Progress -> TRequest
+startedReq ses pr =
+  TRequest {
+    reqAnnounce   = tsesAnnounce ses
+  , reqInfoHash   = tsesInfoHash ses
+  , reqPeerID     = tsesPeerID   ses
+  , reqPort       = tsesPort     ses
+
+  , reqUploaded   = prUploaded   pr
+  , reqDownloaded = prDownloaded pr
+  , reqLeft       = prLeft       pr
+
+  , reqIP         = Nothing
+  , reqNumWant    = Just defaultNumWant
+  , reqEvent      = Just Started
+  }
 
 -- | Regular request must be sent to keep track new peers and
 --   notify tracker about current state of the client
