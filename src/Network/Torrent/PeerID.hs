@@ -4,7 +4,7 @@
 --   though this module exports some other goodies for custom generation.
 --
 module Network.Torrent.PeerID
-       ( PeerID (getPeerID)
+       ( Peer(..), PeerID (getPeerID)
          -- * Encoding styles
        , azureusStyle, shadowStyle
          -- * Defaults
@@ -30,11 +30,20 @@ import Data.Version     (Version(Version), versionBranch)
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
 import System.Locale    (defaultTimeLocale)
+import Network
+import Network.Socket
+
 
 -- TODO we have linker error here, so manual hardcoded version for a while.
 -- import Paths_network_bittorrent (version)
 version :: Version
 version = Version [0, 10, 0, 0] []
+
+data Peer = Peer {
+      peerID   :: Maybe PeerID
+    , peerIP   :: HostAddress
+    , peerPort :: PortNumber
+    } deriving Show
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerID = PeerID { getPeerID :: ByteString }

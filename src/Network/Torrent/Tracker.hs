@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Torrent.Tracker
        ( module Network.Torrent.Tracker.Scrape
-       , Peer(..), Event(..), TRequest(..), TResponse(..)
+       , Event(..), TRequest(..), TResponse(..)
        , defaultRequest, defaultPorts
        , sendRequest
        )
@@ -30,12 +30,6 @@ import Network.HTTP
 import Network.URI
 import Network.Torrent.PeerID
 
-
-data Peer = Peer {
-      peerID   :: Maybe PeerID
-    , peerIP   :: HostAddress
-    , peerPort :: PortNumber
-    } deriving Show
 
 data Event = Started   -- ^ For first request.
            | Stopped   -- ^ Sent when the peer is shutting down.
