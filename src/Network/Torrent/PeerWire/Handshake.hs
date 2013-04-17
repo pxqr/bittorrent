@@ -2,15 +2,18 @@
 module Network.Torrent.PeerWire.Handshake
        ( Handshake
        , handshakeMaxSize
-       , defaultProtocol, defaultReserved, defaultHandshake
+       , defaultBTProtocol, defaultReserved, defaultHandshake
+       , handshake
        ) where
 
 import Control.Applicative
 import Data.Word
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import Data.Serialize
+import Data.Serialize as S
 import Data.Torrent.InfoHash
+import Network
+import Network.Socket.ByteString
 import Network.Torrent.PeerID
 
 -- | In order to establish the connection between peers we should send 'Handshake'
@@ -45,8 +48,8 @@ handshakeMaxSize :: Int
 handshakeMaxSize = 1 + 256 + 8 + 20 + 20
 
 -- | Default protocol string "BitTorrent protocol" as is.
-defaultProtocol :: ByteString
-defaultProtocol = "BitTorrent protocol"
+defaultBTProtocol :: ByteString
+defaultBTProtocol = "BitTorrent protocol"
 
 -- | Default reserved word is 0.
 defaultReserved :: Word64
@@ -54,4 +57,14 @@ defaultReserved = 0
 
 -- | Length of info hash and peer id is unchecked, so it /should/ be equal 20.
 defaultHandshake :: InfoHash -> PeerID -> Handshake
-defaultHandshake = Handshake defaultProtocol defaultReserved
+defaultHandshake = Handshake defaultBTProtocol defaultReserved
+
+
+-- TODO check if hash the same
+-- | Handshaking with a peer specified by the second argument.
+--
+handshake :: Socket -> Handshake -> IO (Either String Handshake)
+handshake sock hs = do
+  sendAll sock (S.encode hs)
+  r <- recv sock handshakeMaxSize
+  return (S.decode r)
