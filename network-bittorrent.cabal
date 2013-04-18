@@ -34,25 +34,25 @@ library
   other-modules:
 
 
-  build-depends:       base       == 4.5.*
+  build-depends:
+                       base == 4.*
 
                        -- Data packages
                      , bytestring >= 0.10.2.0
-                     , containers >= 0.4.2.1
-                     , text       >= 0.11.2.3
+                     , text       >= 0.11.0.0
 
                        -- encoding/serializations packages
-                     , bencoding  >= 0.1.0.0
-                     , cereal     >= 0.3.5.2
-                     , urlencoded >= 0.4.0
+                     , bencoding  >= 0.1
+                     , cereal     >= 0.3
+                     , urlencoded >= 0.4
 
                        -- time packages
-                     , time       >= 0.1.0.0
-                     , old-locale >= 1.0.0.0
+                     , time       >= 0.1
+                     , old-locale >= 1.0
 
                        -- network related packages
-                     , network    >= 2.4.1.2
-                     , HTTP       >= 4000.2.8
+                     , network    >= 2.4
+                     , HTTP       >= 4000.2
                      , cryptohash
 
 
@@ -66,7 +66,7 @@ test-suite info-hash
   main-is:             info-hash.hs
   hs-source-dirs:      tests
 
-  build-depends:       base       == 4.5.*
+  build-depends:       base       == 4.*
                      , bytestring >= 0.10.2.0
                      , containers >= 0.4.2.1
                      , bencoding  >= 0.1.0.0
@@ -82,8 +82,8 @@ test-suite encoding
   main-is:             encoding.hs
   hs-source-dirs:      tests
 
-  build-depends:       base       == 4.5.*
-                     , bytestring >= 0.10.2.0
+  build-depends:       base       == 4.*
+                     , bytestring >= 0.10.2
                      , cereal     >= 0.3.5.2
                      , test-framework
                      , test-framework-quickcheck2
@@ -100,7 +100,7 @@ benchmark serialization
   main-is:             serialization.hs
   hs-source-dirs:      bench
 
-  build-depends:       base == 4.5.*
+  build-depends:       base == 4.*
                      , bytestring >= 0.10.2.0
                      , criterion
                      , cereal
