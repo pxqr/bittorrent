@@ -4,7 +4,7 @@ notifications:
   email: false
 
 install:
-  - git clone https://github.com/fmap/bencoding.git
+  - git clone https://github.com/pxqr/bencoding.git
   - cd bencoding
   - cabal install --force-reinstalls
   - cd ..

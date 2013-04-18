@@ -8,8 +8,8 @@ copyright:             (c) 2013, Sam T.
 category:              Network, Data
 build-type:            Simple
 cabal-version:         >= 1.8
-homepage:              https://github.com/fmap/network-bittorrent
-bug-reports:           https://github.com/fmap/network-bittorrent/issues
+homepage:              https://github.com/pxqr/network-bittorrent
+bug-reports:           https://github.com/pxqr/network-bittorrent/issues
 synopsis:              Bittorrent protocol implementation.
 description:
   Straightforward and incomplete implementation of bittorrent protocol.
@@ -17,7 +17,7 @@ description:
 
 source-repository head
   type:                git
-  location:            https://github.com/fmap/network-bittorrent.git
+  location:            https://github.com/pxqr/network-bittorrent.git
 
 
 library

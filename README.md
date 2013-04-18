@@ -15,5 +15,5 @@ The module hierarhy is tend to be:
 
 [![Build Status][1]][2]
 
-[1]: https://travis-ci.org/fmap/network-bittorrent.png
-[2]: https://travis-ci.org/fmap/network-bittorrent
+[1]: https://travis-ci.org/pxqr/network-bittorrent.png
+[2]: https://travis-ci.org/pxqr/network-bittorrent
