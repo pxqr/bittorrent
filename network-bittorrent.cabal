@@ -39,6 +39,7 @@ library
 
                        -- Data packages
                      , bytestring >= 0.10.2.0
+                     , containers >= 0.4
                      , text       >= 0.11.0.0
 
                        -- encoding/serializations packages
