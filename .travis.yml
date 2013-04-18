@@ -4,12 +4,11 @@ notifications:
   email: false
 
 install:
-  git clone https://github.com/fmap/bencoding.git
-  cd bencoding
-  cabal install --enable-tests --enable-benchmark --force-reinstalls
-  cd ..
-
-  cabal install --enable-tests --enable-benchmark --force-reinstalls --only-dependencies
+  - git clone https://github.com/fmap/bencoding.git
+  - cd bencoding
+  - cabal install --force-reinstalls
+  - cd ..
+  - cabal install --enable-tests --enable-benchmark --force-reinstalls --only-dependencies
 
 script:
   cabal configure --enable-tests --enable-benchmark && cabal build && cabal test
