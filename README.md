@@ -8,5 +8,12 @@ Basically it provides serialization\deserealization and some widely used routine
 The module hierarhy is tend to be:
 
 * Data.Torrent — for torrent metainfo, data verification, etc
-* Network.Torrent.PeerWire - peer wire TCP message passing.
+* Network.Torrent.PeerWire — peer wire TCP message passing.
 * Network.Torrent.Tracker  — tracker HTTP message passing.
+
+# Build Status
+
+[![Build Status][1]][2]
+
+[1]: https://travis-ci.org/fmap/network-bittorrent.png
+[2]: https://travis-ci.org/fmap/network-bittorrent
