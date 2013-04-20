@@ -11,7 +11,7 @@
 --   scrape info for a particular torrent list.
 --
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Torrent.Tracker.Scrape
+module Network.BitTorrent.Tracker.Scrape
        ( ScrapeInfo(..), Scrape
        , scrapeURL
 

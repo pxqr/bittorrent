@@ -8,8 +8,8 @@
 --
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Torrent.Tracker
-       ( module Network.Torrent.Tracker.Scrape
+module Network.BitTorrent.Tracker
+       ( module Network.BitTorrent.Tracker.Scrape
 
          -- * Requests
        , Event(..), TRequest(..)
@@ -23,8 +23,6 @@ module Network.Torrent.Tracker
        , defaultPorts, defaultNumWant
        )
        where
-
-import Network.Torrent.Tracker.Scrape
 
 import Control.Applicative
 import Data.Char as Char
@@ -44,7 +42,9 @@ import Network
 import Network.Socket
 import Network.HTTP
 import Network.URI
-import Network.Torrent.PeerID
+
+import Network.BitTorrent.PeerID
+import Network.BitTorrent.Tracker.Scrape
 
 
 data Event = Started   -- ^ For first request.

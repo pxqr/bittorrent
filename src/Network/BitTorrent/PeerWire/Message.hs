@@ -1,4 +1,4 @@
-module Network.Torrent.PeerWire.Message
+module Network.BitTorrent.PeerWire.Message
        ( Message(..)
        ) where
 
@@ -8,7 +8,7 @@ import qualified Data.ByteString as B
 
 import Data.Serialize
 
-import Network.Torrent.PeerWire.Block
+import Network.BitTorrent.PeerWire.Block
 
 
 -- TODO comment message constructors

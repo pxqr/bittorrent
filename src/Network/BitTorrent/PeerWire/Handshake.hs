@@ -6,7 +6,7 @@
 --   Portability :  portable
 --
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Torrent.PeerWire.Handshake
+module Network.BitTorrent.PeerWire.Handshake
        ( Handshake
        , handshakeMaxSize
        , defaultBTProtocol, defaultReserved, defaultHandshake
@@ -21,7 +21,9 @@ import Data.Serialize as S
 import Data.Torrent.InfoHash
 import Network
 import Network.Socket.ByteString
-import Network.Torrent.PeerID
+
+import Network.BitTorrent.PeerID
+
 
 -- | In order to establish the connection between peers we should send 'Handshake'
 --   message. The 'Handshake' is a required message and must be the first message

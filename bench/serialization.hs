@@ -6,7 +6,7 @@ import Control.DeepSeq
 import Criterion.Main
 import Data.ByteString (ByteString)
 import Data.Serialize
-import Network.Torrent
+import Network.BitTorrent
 
 
 instance NFData BlockIx where

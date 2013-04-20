@@ -12,7 +12,7 @@
 --   though this module exports some other goodies for custom generation.
 --
 {-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
-module Network.Torrent.PeerID
+module Network.BitTorrent.PeerID
        ( -- * Peer addr
          Peer(..)
        , peerSockAddr, connectToPeer

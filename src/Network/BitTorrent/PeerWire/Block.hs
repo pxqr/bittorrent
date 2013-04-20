@@ -1,4 +1,4 @@
-module Network.Torrent.PeerWire.Block
+module Network.BitTorrent.PeerWire.Block
        ( BlockIx(..), Block(..)
        , defaultBlockSize
        , blockRange, ixRange, pieceIx

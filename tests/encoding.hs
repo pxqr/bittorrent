@@ -11,9 +11,11 @@ import Test.Framework (defaultMain, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck
 
-import Data.Torrent
-import Network.Torrent
 import Network.URI
+
+import Data.Torrent
+import Network.BitTorrent
+
 
 positive :: Gen Int
 positive = fromIntegral <$> (arbitrary :: Gen Word32)
