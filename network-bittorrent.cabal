@@ -28,8 +28,9 @@ library
                      , Network.Torrent.Tracker
                      , Network.Torrent.Tracker.Scrape
                      , Network.Torrent.PeerWire
+                     , Network.Torrent.PeerWire.Block
+                     , Network.Torrent.PeerWire.Message
                      , Network.Torrent.PeerWire.Handshake
-
 
   other-modules:
 
