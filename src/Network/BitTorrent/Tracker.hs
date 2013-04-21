@@ -10,6 +10,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.Tracker
        ( module Network.BitTorrent.Tracker.Scrape
+       , Progress(..), TSession(..)
+       , tsession, startProgress
 
          -- * Requests
        , Event(..), TRequest(..)
@@ -179,6 +181,7 @@ defaultNumWant = 25
 
 -- | 'TSession' (shorthand for Tracker session) combines tracker request
 --   fields neccessary for tracker, torrent and client identification.
+--
 --   This data is considered as static within one session.
 --
 data TSession = TSession {
@@ -188,8 +191,13 @@ data TSession = TSession {
   , tsesPort     :: PortNumber -- ^ The port number the client is listenning on.
   } deriving Show
 
+tsession :: Torrent -> PeerID -> PortNumber -> TSession
+tsession t = TSession (tAnnounce t) (tInfoHash t)
+
+
 -- | 'Progress' contains upload/download/left stats about
 --   current client state.
+--
 --   This data is considered as dynamic within one session.
 --
 data Progress = Progress {
@@ -197,6 +205,10 @@ data Progress = Progress {
   , prDownloaded :: Integer -- ^ Total amount of bytes downloaded.
   , prLeft       :: Integer -- ^ Total amount of bytes left.
   } deriving Show
+
+startProgress :: Integer -> Progress
+startProgress = Progress 0 0
+
 
 -- | used to avoid boilerplate; do NOT export me
 genericReq :: TSession -> Progress -> TRequest
