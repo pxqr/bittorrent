@@ -11,6 +11,7 @@
 module Data.Torrent
        ( module Data.Torrent.InfoHash
        , Torrent(..), ContentInfo(..), FileInfo(..)
+       , contenLength, pieceCount
        , fromFile
        ) where
 
@@ -215,6 +216,18 @@ instance BEncodable FileInfo where
                 <*> d >--  "path"
 
   fromBEncode _ = decodingError "FileInfo"
+
+sizeInBase :: Integer -> Int -> Int
+sizeInBase n b = fromIntegral (n `div` fromIntegral b) + align
+  where
+    align = if n `mod` fromIntegral b == 0 then 0 else 1
+
+contentLength :: ContentInfo -> Integer
+contentLength SingleFile { ciLength = len } = len
+contentLength MultiFile  { ciFiles  = tfs } = sum (map fiLength tfs)
+
+pieceCount :: ContentInfo -> Int
+pieceCount ti = contentLength ti `sizeInBase` ciPieceLength ti
 
 
 -- | Read and decode a .torrent file.
