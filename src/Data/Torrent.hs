@@ -10,12 +10,11 @@
 -- | This module provides torrent metainfo serialization.
 module Data.Torrent
        ( module Data.Torrent.InfoHash
-       , Torrent(..), TorrentInfo(..), TorrentFile(..)
+       , Torrent(..), ContentInfo(..), FileInfo(..)
        , fromFile
        ) where
 
 import Control.Applicative
-import Control.Monad
 import qualified Data.Map as M
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -24,6 +23,7 @@ import           Data.Text (Text)
 import Data.BEncode
 import Data.Torrent.InfoHash
 import Network.URI
+
 
 type Time = Text
 
@@ -54,7 +54,7 @@ data Torrent = Torrent {
       -- ^ String encoding format used to generate the pieces part of
       --   the info dictionary in the .torrent metafile.
 
-    , tInfo         :: TorrentInfo
+    , tInfo         :: ContentInfo
       -- ^ Info about each content file.
 
     , tPublisher    :: Maybe URI
@@ -69,27 +69,27 @@ data Torrent = Torrent {
     } deriving Show
 
 -- | Info part of the .torrent file contain info about each content file.
-data TorrentInfo =
+data ContentInfo =
     SingleFile {
-      tiLength       :: Integer
+      ciLength       :: Integer
       -- ^ Length of the file in bytes.
 
-    , tiMD5sum       :: Maybe ByteString
+    , ciMD5sum       :: Maybe ByteString
       -- ^ 32 character long MD5 sum of the file.
       --   Used by third-party tools, not by bittorrent protocol itself.
 
-    , tiName         :: ByteString
+    , ciName         :: ByteString
       -- ^ Suggested name of the file single file.
 
 
 
-    , tiPieceLength  :: Int
+    , ciPieceLength  :: Int
       -- ^ Number of bytes in each piece.
 
-    , tiPieces       :: ByteString
+    , ciPieces       :: ByteString
       -- ^ Concatenation of all 20-byte SHA1 hash values.
 
-    , tiPrivate      :: Maybe Bool
+    , ciPrivate      :: Maybe Bool
       -- ^ If set the client MUST publish its presence to get other peers ONLY
       --   via the trackers explicity described in the metainfo file.
       --
@@ -97,33 +97,35 @@ data TorrentInfo =
     }
 
   | MultiFile {
-      tiFiles        :: [TorrentFile]
+      ciFiles        :: [FileInfo]
       -- ^ List of the all files that torrent contains.
 
-    , tiName         :: ByteString
+    , ciName         :: ByteString
       -- | The file path of the directory in which to store all the files.
 
-    , tiPieceLength  :: Int
-    , tiPieces       :: ByteString
-    , tiPrivate      :: Maybe Bool
+    , ciPieceLength  :: Int
+    , ciPieces       :: ByteString
+    , ciPrivate      :: Maybe Bool
     } deriving (Show, Read, Eq)
 
+
 -- | Contain info about one single file.
-data TorrentFile = TorrentFile {
-      tfLength      :: Int
+data FileInfo = FileInfo {
+      fiLength      :: Integer
       -- ^ Length of the file in bytes.
 
-    , tfMD5sum      :: Maybe ByteString
+    , fiMD5sum      :: Maybe ByteString
       -- ^ 32 character long MD5 sum of the file.
       --   Used by third-party tools, not by bittorrent protocol itself.
 
-    , tfPath        :: [ByteString]
+    , fiPath        :: [ByteString]
       -- ^ One or more string elements that together represent the path and
       --   filename. Each element in the list corresponds to either a directory
       --   name or (in the case of the last element) the filename.
       --   For example, the file "dir1/dir2/file.ext" would consist of three
       --   string elements ["dir1", "dir2", "file.ext"]
     } deriving (Show, Read, Eq)
+
 
 instance BEncodable URI where
   toBEncode uri = toBEncode (BC.pack (uriToString id uri ""))
@@ -163,24 +165,24 @@ instance BEncodable Torrent where
   fromBEncode _ = decodingError "Torrent"
 
 
-instance BEncodable TorrentInfo where
+instance BEncodable ContentInfo where
   toBEncode ti@(SingleFile { })  = fromAscAssocs
-    [ "length"       -->  tLength ti
-    , "md5sum"       -->? tMD5sum ti
-    , "name"         -->  tName ti
+    [ "length"       -->  ciLength ti
+    , "md5sum"       -->? ciMD5sum ti
+    , "name"         -->  ciName   ti
 
-    , "piece length" -->  tPieceLength ti
-    , "pieces"       -->  tPieces ti
-    , "private"      -->? tPrivate ti
+    , "piece length" -->  ciPieceLength ti
+    , "pieces"       -->  ciPieces  ti
+    , "private"      -->? ciPrivate ti
     ]
 
   toBEncode ti@(MultiFile {}) = fromAscAssocs
-    [ "files"        -->  tFiles ti
-    , "name"         -->  tName ti
+    [ "files"        -->  ciFiles ti
+    , "name"         -->  ciName  ti
 
-    , "piece length" -->  tPieceLength ti
-    , "pieces"       -->  tPieces ti
-    , "private"      -->? tPrivate ti
+    , "piece length" -->  ciPieceLength ti
+    , "pieces"       -->  ciPieces  ti
+    , "private"      -->? ciPrivate ti
     ]
 
   fromBEncode (BDict d)
@@ -197,22 +199,22 @@ instance BEncodable TorrentInfo where
                   <*> d >--  "piece length"
                   <*> d >--  "pieces"
                   <*> d >--? "private"
-  fromBEncode _ = decodingError "TorrentInfo"
+  fromBEncode _ = decodingError "ContentInfo"
 
 
-instance BEncodable TorrentFile where
+instance BEncodable FileInfo where
   toBEncode tf = fromAssocs
-                 [ "length" -->  tfLength tf
-                 , "md5sum" -->? tfMD5sum tf
-                 , "path"   -->  tfPath tf
+                 [ "length" -->  fiLength tf
+                 , "md5sum" -->? fiMD5sum tf
+                 , "path"   -->  fiPath tf
                  ]
 
   fromBEncode (BDict d) =
-    TorrentFile <$> d >--  "length"
+    FileInfo <$> d >--  "length"
                 <*> d >--? "md5sum"
                 <*> d >--  "path"
 
-  fromBEncode _ = decodingError "TorrentFile"
+  fromBEncode _ = decodingError "FileInfo"
 
 
 -- | Read and decode a .torrent file.
