@@ -71,25 +71,25 @@ data Torrent = Torrent {
 -- | Info part of the .torrent file contain info about each content file.
 data TorrentInfo =
     SingleFile {
-      tLength       :: Integer
+      tiLength       :: Integer
       -- ^ Length of the file in bytes.
 
-    , tMD5sum       :: Maybe ByteString
+    , tiMD5sum       :: Maybe ByteString
       -- ^ 32 character long MD5 sum of the file.
       --   Used by third-party tools, not by bittorrent protocol itself.
 
-    , tName         :: ByteString
+    , tiName         :: ByteString
       -- ^ Suggested name of the file single file.
 
 
 
-    , tPieceLength  :: Int
+    , tiPieceLength  :: Int
       -- ^ Number of bytes in each piece.
 
-    , tPieces       :: ByteString
+    , tiPieces       :: ByteString
       -- ^ Concatenation of all 20-byte SHA1 hash values.
 
-    , tPrivate      :: Maybe Bool
+    , tiPrivate      :: Maybe Bool
       -- ^ If set the client MUST publish its presence to get other peers ONLY
       --   via the trackers explicity described in the metainfo file.
       --
@@ -97,15 +97,15 @@ data TorrentInfo =
     }
 
   | MultiFile {
-      tFiles        :: [TorrentFile]
+      tiFiles        :: [TorrentFile]
       -- ^ List of the all files that torrent contains.
 
-    , tName         :: ByteString
+    , tiName         :: ByteString
       -- | The file path of the directory in which to store all the files.
 
-    , tPieceLength  :: Int
-    , tPieces       :: ByteString
-    , tPrivate      :: Maybe Bool
+    , tiPieceLength  :: Int
+    , tiPieces       :: ByteString
+    , tiPrivate      :: Maybe Bool
     } deriving (Show, Read, Eq)
 
 -- | Contain info about one single file.
