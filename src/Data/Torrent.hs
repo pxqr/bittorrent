@@ -17,6 +17,7 @@ module Data.Torrent
        ) where
 
 import Control.Applicative
+import Control.Arrow
 import qualified Data.Map as M
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -236,19 +237,19 @@ pieceCount ti = contentLength ti `sizeInBase` ciPieceLength ti
 --
 type Layout = [(FilePath, Int)]
 
-fileInfo :: ContentInfo -> [FileInfo]
-fileInfo  (SingleFile { ciName = name, ciLength = len, ciMD5sum = md5 })
-  = [FileInfo len md5 [name]]
-fileInfo  (MultiFile  { ciFiles = fs }) = fs
+contentLayout :: FilePath -> ContentInfo -> Layout
+contentLayout rootPath = filesLayout
+  where
+    filesLayout   (SingleFile { ciName = name, ciLength = len })
+      = [(rootPath </> BC.unpack name, fromIntegral len)]
+    filesLayout   (MultiFile  { ciFiles = fs, ciName = dir }) =
+      map (first mkPath . fl) fs
+     where   -- TODO use utf8 encoding in name
+        mkPath = ((rootPath </> BC.unpack dir) </>) . joinPath . map BC.unpack
 
-fileLayout :: FileInfo -> (FilePath, Int)
-fileLayout (FileInfo { fiLength = len, fiPath = name }) = (path, fromIntegral len)
-  where   -- WARN use utf8 encoding in name
-    path = joinPath (map BC.unpack name)
+    fl (FileInfo { fiPath = p, fiLength = len }) = (p, fromIntegral len)
 
 
-contentLayout :: ContentInfo -> Layout
-contentLayout = map fileLayout . fileInfo
 
 
 -- | Read and decode a .torrent file.
