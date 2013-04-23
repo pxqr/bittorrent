@@ -11,8 +11,9 @@
 module Data.Torrent
        ( module Data.Torrent.InfoHash
        , Torrent(..), ContentInfo(..), FileInfo(..)
-       , contentLength, pieceCount
-       , contentLayout
+       , contentLength, pieceCount, blockCount
+       , Layout, contentLayout
+       , isSingleFile, isMultiFile
        , fromFile
        ) where
 
@@ -229,7 +230,10 @@ contentLength SingleFile { ciLength = len } = len
 contentLength MultiFile  { ciFiles  = tfs } = sum (map fiLength tfs)
 
 pieceCount :: ContentInfo -> Int
-pieceCount ti = contentLength ti `sizeInBase` ciPieceLength ti
+pieceCount ci = contentLength ci `sizeInBase` ciPieceLength ci
+
+blockCount :: Int -> ContentInfo -> Int
+blockCount blkSize ci = contentLength ci `sizeInBase` blkSize
 
 -- | File layout specifies the order and the size of each file in the storage.
 --   Note that order of files is highly important since we coalesce all
@@ -250,6 +254,13 @@ contentLayout rootPath = filesLayout
     fl (FileInfo { fiPath = p, fiLength = len }) = (p, fromIntegral len)
 
 
+isSingleFile :: ContentInfo -> Bool
+isSingleFile SingleFile {} = True
+isSingleFile _             = False
+
+isMultiFile :: ContentInfo -> Bool
+isMultiFile MultiFile {} = True
+isMultiFile _            = False
 
 
 -- | Read and decode a .torrent file.
