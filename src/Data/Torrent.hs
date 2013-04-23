@@ -11,7 +11,8 @@
 module Data.Torrent
        ( module Data.Torrent.InfoHash
        , Torrent(..), ContentInfo(..), FileInfo(..)
-       , contenLength, pieceCount
+       , contentLength, pieceCount
+       , contentLayout
        , fromFile
        ) where
 
@@ -24,7 +25,7 @@ import           Data.Text (Text)
 import Data.BEncode
 import Data.Torrent.InfoHash
 import Network.URI
-
+import System.FilePath
 
 type Time = Text
 
@@ -228,6 +229,26 @@ contentLength MultiFile  { ciFiles  = tfs } = sum (map fiLength tfs)
 
 pieceCount :: ContentInfo -> Int
 pieceCount ti = contentLength ti `sizeInBase` ciPieceLength ti
+
+-- | File layout specifies the order and the size of each file in the storage.
+--   Note that order of files is highly important since we coalesce all
+--   the files in the given order to get the linear block address space.
+--
+type Layout = [(FilePath, Int)]
+
+fileInfo :: ContentInfo -> [FileInfo]
+fileInfo  (SingleFile { ciName = name, ciLength = len, ciMD5sum = md5 })
+  = [FileInfo len md5 [name]]
+fileInfo  (MultiFile  { ciFiles = fs }) = fs
+
+fileLayout :: FileInfo -> (FilePath, Int)
+fileLayout (FileInfo { fiLength = len, fiPath = name }) = (path, fromIntegral len)
+  where   -- WARN use utf8 encoding in name
+    path = joinPath (map BC.unpack name)
+
+
+contentLayout :: ContentInfo -> Layout
+contentLayout = map fileLayout . fileInfo
 
 
 -- | Read and decode a .torrent file.

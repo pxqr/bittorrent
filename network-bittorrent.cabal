@@ -57,6 +57,7 @@ library
                      , HTTP       >= 4000.2
                      , cryptohash
 
+                     , filepath   == 1.*
 
   extensions:          PatternGuards
   hs-source-dirs:      src

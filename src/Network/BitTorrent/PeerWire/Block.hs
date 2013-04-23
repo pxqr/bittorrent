@@ -1,25 +1,41 @@
 module Network.BitTorrent.PeerWire.Block
        ( BlockIx(..), Block(..)
+       , BlockLIx, PieceLIx
        , defaultBlockSize
-       , blockRange, ixRange, pieceIx
-       , isPiece
+       , pieceIx, blockIx
+       , blockRange, ixRange, isPiece
        ) where
 
+import Control.Applicative
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Int
 
+type BlockLIx = Int
+type PieceLIx = Int
+
 
 data BlockIx = BlockIx {
-    ixPiece  :: {-# UNPACK #-} !Int -- ^ Zero-based piece index.
-  , ixOffset :: {-# UNPACK #-} !Int -- ^ Zero-based byte offset within the piece.
-  , ixLength :: {-# UNPACK #-} !Int -- ^ Block size starting from offset.
+    -- ^ Zero-based piece index.
+    ixPiece  :: {-# UNPACK #-} !PieceLIx
+
+    -- ^ Zero-based byte offset within the piece.
+  , ixOffset :: {-# UNPACK #-} !Int
+
+    -- ^ Block size starting from offset.
+  , ixLength :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
 
+
 data Block = Block {
-    blkPiece  :: Int         -- ^ Zero-based piece index.
-  , blkOffset :: Int         -- ^ Zero-based byte offset within the piece.
-  , blkData   :: ByteString  -- ^ Payload.
+    -- ^ Zero-based piece index.
+    blkPiece  :: PieceLIx
+
+    -- ^ Zero-based byte offset within the piece.
+  , blkOffset :: Int
+
+    -- ^ Payload.
+  , blkData   :: ByteString
   } deriving (Show, Eq)
 
 
@@ -36,6 +52,9 @@ isPiece pieceSize (Block i offset bs) =
 pieceIx :: Int -> Int -> BlockIx
 pieceIx i = BlockIx i 0
 {-# INLINE pieceIx #-}
+
+blockIx :: Block -> BlockIx
+blockIx = BlockIx <$> blkPiece <*> blkOffset <*> B.length . blkData
 
 blockRange :: (Num a, Integral a) => Int -> Block -> (a, a)
 blockRange pieceSize blk = (offset, offset + len)

@@ -8,6 +8,7 @@
 --
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
+-- make higher level api
 module Network.BitTorrent.Tracker
        ( module Network.BitTorrent.Tracker.Scrape
        , Progress(..), TSession(..)
