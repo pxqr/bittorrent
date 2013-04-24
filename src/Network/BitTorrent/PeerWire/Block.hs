@@ -4,12 +4,16 @@ module Network.BitTorrent.PeerWire.Block
        , defaultBlockSize
        , pieceIx, blockIx
        , blockRange, ixRange, isPiece
+
+       , putInt, getInt
        ) where
 
 import Control.Applicative
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Int
+import Data.Serialize
+
 
 type BlockLIx = Int
 type PieceLIx = Int
@@ -25,6 +29,24 @@ data BlockIx = BlockIx {
     -- ^ Block size starting from offset.
   , ixLength :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
+
+getInt :: Get Int
+getInt = fromIntegral <$> getWord32be
+{-# INLINE getInt #-}
+
+putInt :: Putter Int
+putInt = putWord32be . fromIntegral
+{-# INLINE putInt #-}
+
+instance Serialize BlockIx where
+  {-# SPECIALIZE instance Serialize BlockIx #-}
+  get = BlockIx <$> getInt <*> getInt <*> getInt
+  {-# INLINE get #-}
+
+  put ix = do putInt (ixPiece ix)
+              putInt (ixOffset ix)
+              putInt (ixLength ix)
+  {-# INLINE put #-}
 
 
 data Block = Block {

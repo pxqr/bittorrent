@@ -25,15 +25,6 @@ data Message = KeepAlive
              | Port     Int
                deriving (Show, Eq)
 
-instance Serialize BlockIx where
-  {-# SPECIALIZE instance Serialize BlockIx #-}
-  get = BlockIx <$> getInt <*> getInt <*> getInt
-  {-# INLINE get #-}
-
-  put ix = do putInt (ixPiece ix)
-              putInt (ixOffset ix)
-              putInt (ixLength ix)
-  {-# INLINE put #-}
 
 instance Serialize Message where
   get = do
@@ -80,12 +71,3 @@ instance Serialize Message where
 
   put (Cancel  blk) = putInt 13 >> putWord8 8 >> put blk
   put (Port    p  ) = putInt 3  >> putWord8 9 >> putWord16be (fromIntegral p)
-
-
-getInt :: Get Int
-getInt = fromIntegral <$> getWord32be
-{-# INLINE getInt #-}
-
-putInt :: Putter Int
-putInt = putWord32be . fromIntegral
-{-# INLINE putInt #-}

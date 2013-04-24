@@ -15,6 +15,8 @@ module Data.Torrent
        , Layout, contentLayout
        , isSingleFile, isMultiFile
        , fromFile
+
+       , sizeInBase
        ) where
 
 import Control.Applicative
