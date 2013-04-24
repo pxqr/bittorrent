@@ -1,5 +1,5 @@
 module Network.BitTorrent.PeerWire.Block
-       ( BlockIx(..), Block(..)
+       ( BlockIx(..), Block(..), PieceIx
        , BlockLIx, PieceLIx
        , defaultBlockSize
        , pieceIx, blockIx
@@ -17,7 +17,7 @@ import Data.Serialize
 
 type BlockLIx = Int
 type PieceLIx = Int
-
+type PieceIx = Int
 
 data BlockIx = BlockIx {
     -- ^ Zero-based piece index.
