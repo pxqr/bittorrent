@@ -91,11 +91,14 @@ defaultHandshake :: InfoHash -> PeerID -> Handshake
 defaultHandshake = Handshake defaultBTProtocol defaultReserved
 
 
--- TODO check if hash the same
 -- | Handshaking with a peer specified by the second argument.
 --
 handshake :: Socket -> Handshake -> IO (Either String Handshake)
 handshake sock hs = do
-  sendAll sock (S.encode hs)
-  r <- recv sock handshakeMaxSize
-  return (S.decode r)
+    sendAll sock (S.encode hs)
+    r <- recv sock handshakeMaxSize
+    return (checkIH (S.decode r))
+  where
+    checkIH (Right hs')
+      | hsInfoHash hs /= hsInfoHash hs' = Left "Handshake info hash do not match."
+    checkIH x = x
