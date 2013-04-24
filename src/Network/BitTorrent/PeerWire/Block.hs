@@ -4,6 +4,7 @@ module Network.BitTorrent.PeerWire.Block
        , defaultBlockSize
        , pieceIx, blockIx
        , blockRange, ixRange, isPiece
+       , ppBlockIx, ppBlock
 
        , putInt, getInt
        ) where
@@ -48,6 +49,10 @@ instance Serialize BlockIx where
               putInt (ixLength ix)
   {-# INLINE put #-}
 
+ppBlockIx :: BlockIx -> String
+ppBlockIx ix = "piece = "  ++ show (ixPiece ix)  ++ ", "
+            ++ "offset = " ++ show (ixOffset ix) ++ ", "
+            ++ "length = " ++ show (ixLength ix)
 
 data Block = Block {
     -- ^ Zero-based piece index.
@@ -60,6 +65,8 @@ data Block = Block {
   , blkData   :: ByteString
   } deriving (Show, Eq)
 
+ppBlock :: Block -> String
+ppBlock = ppBlockIx . blockIx
 
 -- | Widely used semi-official block size.
 defaultBlockSize :: Int

@@ -1,5 +1,6 @@
 module Network.BitTorrent.PeerWire.Message
        ( Message(..)
+       , ppMessage
        ) where
 
 import Control.Applicative
@@ -129,3 +130,13 @@ instance Serialize Message where
   put (SuggestPiece pix) = putInt 5  >> putWord8 0x0D >> putInt pix
   put (RejectRequest ix) = putInt 13 >> putWord8 0x10 >> put ix
   put (AllowedFast   ix) = putInt 5  >> putWord8 0x11 >> putInt ix
+
+
+-- | Compact output for logging: only useful information but not payload bytes.
+ppMessage :: Message -> String
+ppMessage (Bitfield _)       = "Bitfield "
+ppMessage (Piece blk)        = "Piece "    ++ ppBlock blk
+ppMessage (Cancel ix)        = "Cancel "   ++ ppBlockIx ix
+ppMessage (SuggestPiece pix) = "Suggest"   ++ show pix
+ppMessage (RejectRequest ix) = "Reject"    ++ ppBlockIx ix
+ppMessage msg = show msg
