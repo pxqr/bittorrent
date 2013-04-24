@@ -46,6 +46,7 @@ import Network.Socket
 import Network.HTTP
 import Network.URI
 
+import Network.BitTorrent.Peer
 import Network.BitTorrent.PeerID
 import Network.BitTorrent.Tracker.Scrape
 

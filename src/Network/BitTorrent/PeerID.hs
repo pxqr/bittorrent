@@ -8,17 +8,14 @@
 --
 --   This module provides 'Peer' and 'PeerID' datatypes and all related
 --   operations.
+--
 --   Recommended method for generation of the peer ID's is 'newPeerID',
 --   though this module exports some other goodies for custom generation.
 --
 {-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
 module Network.BitTorrent.PeerID
-       ( -- * Peer addr
-         Peer(..)
-       , peerSockAddr, connectToPeer
-
-         -- * Peer identification
-       , PeerID (getPeerID)
+       ( -- * Peer identification
+         PeerID (getPeerID), ppPeerID
 
          -- ** Encoding styles
        , azureusStyle, shadowStyle
@@ -34,8 +31,6 @@ module Network.BitTorrent.PeerID
        ) where
 
 import Control.Applicative
-import Data.Word
-import Data.Bits
 import Data.BEncode
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -50,48 +45,12 @@ import Data.Version     (Version(Version), versionBranch)
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
 import System.Locale    (defaultTimeLocale)
-import Network
-import Network.Socket
 
 
 -- TODO we have linker error here, so manual hardcoded version for a while.
 -- import Paths_network_bittorrent (version)
 version :: Version
 version = Version [0, 10, 0, 0] []
-
-
-
-data Peer = Peer {
-      peerID   :: Maybe PeerID
-    , peerIP   :: HostAddress
-    , peerPort :: PortNumber
-    } deriving Show
-
--- TODO make platform independent, clarify htonl
--- | Convert peer info from tracker response to socket address.
---   Used for establish connection between peers.
---
-peerSockAddr :: Peer -> SockAddr
-peerSockAddr = SockAddrInet <$> (g . peerPort) <*> (htonl . peerIP)
-  where
-    htonl :: Word32 -> Word32
-    htonl d =
-       ((d .&. 0xff) `shiftL` 24) .|.
-       (((d `shiftR` 8 ) .&. 0xff) `shiftL` 16) .|.
-       (((d `shiftR` 16) .&. 0xff) `shiftL` 8)  .|.
-       ((d `shiftR` 24) .&. 0xff)
-
-    g :: PortNumber -> PortNumber
-    g = id
-
--- ipv6 extension
--- | Tries to connect to peer using reasonable default parameters.
---
-connectToPeer :: Peer -> IO Socket
-connectToPeer p = do
-  sock <- socket AF_INET Stream Network.Socket.defaultProtocol
-  connect sock (peerSockAddr p)
-  return sock
 
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
@@ -104,6 +63,9 @@ instance Serialize PeerID where
 
 instance URLShow PeerID where
   urlShow = BC.unpack . getPeerID
+
+ppPeerID :: PeerID -> String
+ppPeerID = BC.unpack . getPeerID
 
 
 -- | Azureus-style encoding have the following layout:

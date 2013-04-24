@@ -11,30 +11,47 @@ module Network.BitTorrent.PeerWire.Handshake
        , handshakeMaxSize
        , defaultBTProtocol, defaultReserved, defaultHandshake
        , handshake
+       , ppHandshake
        ) where
 
 import Control.Applicative
 import Data.Word
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import Data.Serialize as S
 import Data.Torrent.InfoHash
 import Network
 import Network.Socket.ByteString
 
 import Network.BitTorrent.PeerID
+import Network.BitTorrent.PeerWire.ClientInfo
 
 
--- | In order to establish the connection between peers we should send 'Handshake'
---   message. The 'Handshake' is a required message and must be the first message
---   transmitted by the peer to the another peer.
+-- | In order to establish the connection between peers we should send
+--   'Handshake' message. The 'Handshake' is a required message and
+--   must be the first message transmitted by the peer to the another
+--   peer.
+--
 data Handshake = Handshake {
-    hsProtocol    :: ByteString  -- ^ Identifier of the protocol.
-  , hsReserved    :: Word64      -- ^ Reserved bytes, rarely used.
-  , hsInfoHash    :: InfoHash    -- ^ Hash from the metainfo file.
-    -- This /should be/ same hash that is transmitted in tracker requests.
-  , hsPeerID      :: PeerID      -- ^ Peer id of the initiator.
-    -- This is /usually the same peer id that is transmitted in tracker requests.
+    -- ^ Identifier of the protocol.
+    hsProtocol    :: ByteString
+
+    -- ^ Reserved bytes used to specify supported BEP's.
+  , hsReserved    :: Word64
+
+    -- ^ Info hash of the info part of the metainfo file. that is
+    -- transmitted in tracker requests. Info hash of the initiator
+    -- handshake and response handshake should match, otherwise
+    -- initiator should break the connection.
+    --
+  , hsInfoHash    :: InfoHash
+
+    -- ^ Peer id of the initiator. This is usually the same peer id
+    -- that is transmitted in tracker requests.
+    --
+  , hsPeerID      :: PeerID
+
   } deriving (Show, Eq)
 
 instance Serialize Handshake where
@@ -51,6 +68,11 @@ instance Serialize Handshake where
               <*> getWord64be
               <*> get
               <*> get
+
+-- TODO add reserved bits info
+ppHandshake :: Handshake -> String
+ppHandshake hs = BC.unpack (hsProtocol hs) ++ " "
+              ++ ppClientInfo (clientInfo (hsPeerID hs))
 
 -- | Maximum size of handshake message in bytes.
 handshakeMaxSize :: Int

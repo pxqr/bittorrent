@@ -24,9 +24,12 @@ library
   exposed-modules:     Data.Torrent
                      , Data.Torrent.InfoHash
                      , Network.BitTorrent
+                     , Network.BitTorrent.Peer
                      , Network.BitTorrent.PeerID
+
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Tracker.Scrape
+
                      , Network.BitTorrent.PeerWire
                      , Network.BitTorrent.PeerWire.ClientInfo
                      , Network.BitTorrent.PeerWire.Block
