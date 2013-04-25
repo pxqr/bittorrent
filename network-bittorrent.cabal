@@ -28,6 +28,7 @@ library
                      , Network.BitTorrent.PeerID
 
                      , Network.BitTorrent.Tracker
+                     , Network.BitTorrent.Tracker.Protocol
                      , Network.BitTorrent.Tracker.Scrape
 
                      , Network.BitTorrent.PeerWire
@@ -40,14 +41,15 @@ library
 
 
   build-depends:
-                       base == 4.*
+                       base       == 4.*
+                     , stm        >= 2.4
 
                        -- Data packages
-                     , bytestring >= 0.10.2.0
+                     , bytestring >= 0.10.2
                      , containers >= 0.4
-                     , text       >= 0.11.0.0
+                     , text       >= 0.11.0
 
-                       -- encoding/serializations packages
+                       -- encoding/serialization packages
                      , bencoding  >= 0.1
                      , cereal     >= 0.3
                      , urlencoded >= 0.4
@@ -62,6 +64,7 @@ library
                      , cryptohash
 
                      , filepath   == 1.*
+
 
   extensions:          PatternGuards
   hs-source-dirs:      src
