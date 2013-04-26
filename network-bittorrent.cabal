@@ -68,7 +68,7 @@ library
 
   extensions:          PatternGuards
   hs-source-dirs:      src
---  ghc-options:         -Wall
+  ghc-options:         -Wall
 
 
 test-suite info-hash

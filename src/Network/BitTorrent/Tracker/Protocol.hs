@@ -37,7 +37,6 @@ import Control.Applicative
 import Control.Monad
 import Data.Char as Char
 import Data.Word (Word32)
-import Data.List as L
 import Data.Map  as M
 import Data.Monoid
 import Data.BEncode

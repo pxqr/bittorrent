@@ -190,7 +190,7 @@ clientInfo :: PeerID -> ClientInfo
 clientInfo pid = either (const unknownClient) id $ runGet getCI (getPeerID pid)
   where -- TODO other styles
     getCI = do
-      getWord8
+      _ <- getWord8
       ClientInfo <$> (parseImpl <$> getByteString 2) <*> getByteString 4
 
 

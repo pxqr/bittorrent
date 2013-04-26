@@ -77,7 +77,7 @@ data Message = KeepAlive
 instance Serialize Message where
   get = do
     len <- getInt
-    lookAhead $ ensure len
+    _   <- lookAhead $ ensure len
     if len == 0 then return KeepAlive
       else do
         mid <- getWord8
