@@ -34,6 +34,7 @@ module Network.BitTorrent.Tracker.Protocol
        where
 
 import Control.Applicative
+import Control.Monad
 import Data.Char as Char
 import Data.Word (Word32)
 import Data.List as L
@@ -130,7 +131,7 @@ instance BEncodable TResponse where
         getPeers (Just (BString s))
             | B.length s `mod` 6 == 0 =
               let cnt = B.length s `div` 6 in
-              runGet (sequence (L.replicate cnt peerG)) s
+              runGet (replicateM cnt peerG) s
             | otherwise = decodingError "peers length not a multiple of 6"
           where
             peerG = do

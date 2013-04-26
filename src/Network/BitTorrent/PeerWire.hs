@@ -6,14 +6,9 @@
 --   Portability :  portable
 --
 {-# LANGUAGE DoAndIfThenElse #-}
-module Network.BitTorrent.PeerWire
-       ( module Network.BitTorrent.PeerWire.Block
-       , module Network.BitTorrent.PeerWire.Message
-       , module Network.BitTorrent.PeerWire.Handshake
-       , module Network.BitTorrent.PeerWire.ClientInfo
-       ) where
+module Network.BitTorrent.PeerWire (module PW) where
 
-import Network.BitTorrent.PeerWire.Block
-import Network.BitTorrent.PeerWire.Message
-import Network.BitTorrent.PeerWire.Handshake
-import Network.BitTorrent.PeerWire.ClientInfo
+import Network.BitTorrent.PeerWire.Block as PW
+import Network.BitTorrent.PeerWire.Message as PW
+import Network.BitTorrent.PeerWire.Handshake as PW
+import Network.BitTorrent.PeerWire.ClientInfo as PW

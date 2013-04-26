@@ -52,7 +52,7 @@ data ClientImpl =
  | IFoxTorrent
  | IGSTorrent
  | IHalite
- | IlibHSnetwork_bittorrent
+ | IlibHSbittorrent
  | IHydranode
  | IKGet
  | IKTorrent
@@ -116,7 +116,7 @@ parseImpl = f . BC.unpack
   f "FT" = IFoxTorrent
   f "GS" = IGSTorrent
   f "HL" = IHalite
-  f "HS" = IlibHSnetwork_bittorrent
+  f "HS" = IlibHSbittorrent
   f "HN" = IHydranode
   f "KG" = IKGet
   f "KT" = IKTorrent
