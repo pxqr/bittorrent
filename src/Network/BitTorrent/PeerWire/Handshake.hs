@@ -5,13 +5,18 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
+--   In order to establish the connection between peers we should send
+--   'Handshake' message. The 'Handshake' is a required message and
+--   must be the first message transmitted by the peer to the another
+--   peer.
+--
 {-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.PeerWire.Handshake
        ( Handshake
-       , handshakeMaxSize
-       , defaultBTProtocol, defaultReserved, defaultHandshake
        , handshake
        , ppHandshake
+       , defaultHandshake, defaultBTProtocol, defaultReserved
+       , handshakeMaxSize
        ) where
 
 import Control.Applicative
@@ -28,11 +33,6 @@ import Network.BitTorrent.PeerID
 import Network.BitTorrent.PeerWire.ClientInfo
 
 
--- | In order to establish the connection between peers we should send
---   'Handshake' message. The 'Handshake' is a required message and
---   must be the first message transmitted by the peer to the another
---   peer.
---
 data Handshake = Handshake {
     -- | Identifier of the protocol.
     hsProtocol    :: ByteString
@@ -70,6 +70,7 @@ instance Serialize Handshake where
               <*> get
 
 -- TODO add reserved bits info
+-- | Format handshake in human readable form.
 ppHandshake :: Handshake -> String
 ppHandshake hs = BC.unpack (hsProtocol hs) ++ " "
               ++ ppClientInfo (clientInfo (hsPeerID hs))

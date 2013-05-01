@@ -5,7 +5,7 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   By convention most trackers support anouther form of request,
+--   By convention most trackers support another form of request,
 --   which queries the state of a given torrent (or all torrents) that the
 --   tracker is managing. This module provides a way to easily request
 --   scrape info for a particular torrent list.

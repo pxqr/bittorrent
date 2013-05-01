@@ -132,7 +132,10 @@ instance Serialize Message where
   put (AllowedFast   ix) = putInt 5  >> putWord8 0x11 >> putInt ix
 
 
--- | Compact output for logging: only useful information but not payload bytes.
+-- | Format messages in human readable form. Note that output is
+--   compact and suitable for logging: only useful information but not
+--   payload bytes.
+--
 ppMessage :: Message -> String
 ppMessage (Bitfield _)       = "Bitfield "
 ppMessage (Piece blk)        = "Piece "    ++ ppBlock blk
