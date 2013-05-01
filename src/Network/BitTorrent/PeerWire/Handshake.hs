@@ -34,20 +34,20 @@ import Network.BitTorrent.PeerWire.ClientInfo
 --   peer.
 --
 data Handshake = Handshake {
-    -- ^ Identifier of the protocol.
+    -- | Identifier of the protocol.
     hsProtocol    :: ByteString
 
-    -- ^ Reserved bytes used to specify supported BEP's.
+    -- | Reserved bytes used to specify supported BEP's.
   , hsReserved    :: Word64
 
-    -- ^ Info hash of the info part of the metainfo file. that is
+    -- | Info hash of the info part of the metainfo file. that is
     -- transmitted in tracker requests. Info hash of the initiator
     -- handshake and response handshake should match, otherwise
     -- initiator should break the connection.
     --
   , hsInfoHash    :: InfoHash
 
-    -- ^ Peer id of the initiator. This is usually the same peer id
+    -- | Peer id of the initiator. This is usually the same peer id
     -- that is transmitted in tracker requests.
     --
   , hsPeerID      :: PeerID

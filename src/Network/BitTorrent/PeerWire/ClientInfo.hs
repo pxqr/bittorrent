@@ -9,13 +9,14 @@
 --  implementation that can be later printed in human frienly
 --  form. Useful for debugging and logging.
 --
---  See http://bittorrent.org/beps/bep_0020.html for more information.
+--  > See http://bittorrent.org/beps/bep_0020.html for more information.
 --
 {-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.PeerWire.ClientInfo
-       ( ClientInfo(..), ClientVersion, ClientImpl
-       , clientInfo
-       , ppClientInfo, ppClientVersion, ppClientImpl
+       ( ClientInfo(..), clientInfo, ppClientInfo, unknownClient
+
+       , ClientVersion, ppClientVersion
+       , ClientImpl(..), ppClientImpl
 
 --       , mkEnumTyDef, mkPars, nameMap
        ) where
@@ -29,6 +30,7 @@ import Data.Serialize.Get
 import Network.BitTorrent.PeerID
 
 
+-- | All known client versions.
 data ClientImpl =
    IUnknown
  | IAres
@@ -89,7 +91,7 @@ data ClientImpl =
  | IXanTorrent
  | IXtorrent
  | IZipTorrent
-   deriving Show
+   deriving (Show, Eq, Ord)
 
 parseImpl :: ByteString -> ClientImpl
 parseImpl = f . BC.unpack
@@ -156,6 +158,7 @@ parseImpl = f . BC.unpack
   f "ZT" = IZipTorrent
   f _    = IUnknown
 
+-- | Format client implementation info in human readable form.
 ppClientImpl :: ClientImpl -> String
 ppClientImpl = tail . show
 
@@ -166,6 +169,7 @@ unknownImpl = IUnknown
 
 type ClientVersion = ByteString
 
+-- | Format client implementation version in human readable form.
 ppClientVersion :: ClientVersion -> String
 ppClientVersion = BC.unpack
 
@@ -173,19 +177,26 @@ unknownVersion :: ClientVersion
 unknownVersion = "0000"
 
 
-
+-- | All useful infomation that can be obtained from a peer
+-- identifier.
 data ClientInfo = ClientInfo {
     ciImpl    :: ClientImpl
   , ciVersion :: ClientVersion
-  } deriving Show
+  } deriving (Show, Eq, Ord)
 
+-- | Format client implementation in human readable form.
 ppClientInfo :: ClientInfo -> String
 ppClientInfo ci = ppClientImpl    (ciImpl ci) ++ " version "
                ++ ppClientVersion (ciVersion ci)
 
+-- | Unrecognized client implementation.
 unknownClient :: ClientInfo
 unknownClient = ClientInfo unknownImpl unknownVersion
 
+-- | Tries to extract meaningful information from peer ID bytes. If
+--   peer id uses unknown coding style then client info returned is
+--   'unknownClient'.
+--
 clientInfo :: PeerID -> ClientInfo
 clientInfo pid = either (const unknownClient) id $ runGet getCI (getPeerID pid)
   where -- TODO other styles
