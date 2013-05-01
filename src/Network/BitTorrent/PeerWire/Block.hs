@@ -21,13 +21,13 @@ type PieceLIx = Int
 type PieceIx = Int
 
 data BlockIx = BlockIx {
-    -- ^ Zero-based piece index.
+    -- | Zero-based piece index.
     ixPiece  :: {-# UNPACK #-} !PieceLIx
 
-    -- ^ Zero-based byte offset within the piece.
+    -- | Zero-based byte offset within the piece.
   , ixOffset :: {-# UNPACK #-} !Int
 
-    -- ^ Block size starting from offset.
+    -- | Block size starting from offset.
   , ixLength :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
 
@@ -55,13 +55,13 @@ ppBlockIx ix = "piece = "  ++ show (ixPiece ix)  ++ ", "
             ++ "length = " ++ show (ixLength ix)
 
 data Block = Block {
-    -- ^ Zero-based piece index.
+    -- | Zero-based piece index.
     blkPiece  :: PieceLIx
 
-    -- ^ Zero-based byte offset within the piece.
+    -- | Zero-based byte offset within the piece.
   , blkOffset :: Int
 
-    -- ^ Payload.
+    -- | Payload.
   , blkData   :: ByteString
   } deriving (Show, Eq)
 

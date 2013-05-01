@@ -5,9 +5,9 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
+--   This module provides torrent metainfo serialization.
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
--- | This module provides torrent metainfo serialization.
 module Data.Torrent
        ( module Data.Torrent.InfoHash
        , Torrent(..), ContentInfo(..), FileInfo(..)
