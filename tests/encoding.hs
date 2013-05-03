@@ -1,3 +1,5 @@
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Main (main) where
 
@@ -28,6 +30,8 @@ instance Arbitrary BlockIx where
 
 instance Arbitrary Block where
   arbitrary = Block <$> positive <*> positive <*> arbitrary
+
+deriving instance Arbitrary Bitfield
 
 instance Arbitrary Message where
   arbitrary = oneof

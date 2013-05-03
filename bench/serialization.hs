@@ -15,6 +15,9 @@ instance NFData BlockIx where
 instance NFData Block where
   rnf (Block a b c) = a `deepseq` b `deepseq` rnf c
 
+instance NFData Bitfield where
+  rnf = rnf . bfBits
+
 instance NFData Message where
   rnf (Have i)     = rnf i
   rnf (Bitfield b) = rnf b

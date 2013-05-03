@@ -32,8 +32,9 @@ library
                      , Network.BitTorrent.Tracker.Scrape
 
                      , Network.BitTorrent.PeerWire
-                     , Network.BitTorrent.PeerWire.ClientInfo
+                     , Network.BitTorrent.PeerWire.Bitfield
                      , Network.BitTorrent.PeerWire.Block
+                     , Network.BitTorrent.PeerWire.ClientInfo
                      , Network.BitTorrent.PeerWire.Message
                      , Network.BitTorrent.PeerWire.Handshake
 
