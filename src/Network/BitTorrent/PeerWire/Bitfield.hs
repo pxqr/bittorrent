@@ -18,7 +18,9 @@ module Network.BitTorrent.PeerWire.Bitfield
        , fromByteString, toByteString
 
          -- * Query
-       , findMin, findMax, difference
+       , findMin, findMax
+       , union, intersection, difference
+       , frequencies
 
          -- * Serialization
        , getBitfield, putBitfield, bitfieldByteCount
@@ -29,7 +31,7 @@ import Data.Array.Unboxed
 import Data.Bits
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import Data.List as L
+import Data.List as L hiding (union)
 import Data.Maybe
 import Data.Serialize
 import Data.Word
@@ -45,9 +47,11 @@ newtype Bitfield = MkBitfield {
 
 empty :: Int -> Bitfield
 empty n = MkBitfield $ B.replicate (sizeInBase n 8) 0
+{-# INLINE empty #-}
 
 full :: Int -> Bitfield
 full n = MkBitfield $ B.replicate (sizeInBase n 8)  (complement 0)
+{-# INLINE full #-}
 
 fromByteString :: ByteString -> Bitfield
 fromByteString = MkBitfield
@@ -67,38 +71,52 @@ combine as@(a : _) = return $ foldr andBS empty as
 frequencies :: [Bitfield] -> UArray PieceIx Int
 frequencies = undefined
 
-diffWord8 :: Word8 -> Word8 -> Word8
-diffWord8 a b = a .&. (a `xor` b)
-{-# INLINE diffWord8 #-}
+zipWithBF :: (Word8 -> Word8 -> Word8) -> Bitfield -> Bitfield -> Bitfield
+zipWithBF f a b = MkBitfield $ B.pack $ B.zipWith f (bfBits a) (bfBits b)
+{-# INLINE zipWithBF #-}
+
+union :: Bitfield -> Bitfield -> Bitfield
+union = zipWithBF (.|.)
+
+intersection :: Bitfield -> Bitfield -> Bitfield
+intersection = zipWithBF (.&.)
 
 difference :: Bitfield -> Bitfield -> Bitfield
-difference a b = MkBitfield $ B.pack $ B.zipWith diffWord8 (bfBits a) (bfBits b)
+difference = zipWithBF diffWord8
+  where
+    diffWord8 :: Word8 -> Word8 -> Word8
+    diffWord8 a b = a .&. (a `xor` b)
+    {-# INLINE diffWord8 #-}
 {-# INLINE difference #-}
 
-difference' :: ByteString -> ByteString -> ByteString
-difference' a b = undefined
-  where
-    go i = undefined
 
-
--- TODO: bit tricks
-findMinWord8 :: Word8 -> Maybe Int
-findMinWord8 b = L.findIndex (testBit b) [0..bitSize (undefined :: Word8) - 1]
-{-# INLINE findMinWord8 #-}
 
 -- | Get min index of piece that the peer have.
 findMin :: Bitfield -> Maybe PieceIx
 findMin (MkBitfield b) = do
-  byteIx <- B.findIndex (0 /=) b
-  bitIx  <- findMinWord8 (B.index b byteIx)
-  return $ byteIx * bitSize (undefined :: Word8) + bitIx
+    byteIx <- B.findIndex (0 /=) b
+    bitIx  <- findMinWord8 (B.index b byteIx)
+    return $ byteIx * bitSize (undefined :: Word8) + bitIx
+  where
+    -- TODO: bit tricks
+    findMinWord8 :: Word8 -> Maybe Int
+    findMinWord8 b = L.find (testBit b) [0..bitSize (undefined :: Word8) - 1]
+    {-# INLINE findMinWord8 #-}
 {-# INLINE findMin #-}
 
-findMaxWord8 :: Word8 -> Maybe Int
-findMaxWord8 = error "bitfield: findMaxWord8"
 
 findMax :: Bitfield -> Maybe PieceIx
-findMax = error "bitfield: findMax"
+findMax (MkBitfield b) = do
+    byteIx <- (pred (B.length b) -) <$> B.findIndex (0 /=) (B.reverse b)
+    bitIx  <- findMaxWord8 (B.index b byteIx)
+    return $ byteIx * bitSize (undefined :: Word8) + bitIx
+  where
+    -- TODO: bit tricks
+    findMaxWord8 :: Word8 -> Maybe Int
+    findMaxWord8 b = L.find (testBit b)
+                             (reverse [0 :: Int ..
+                                            bitSize (undefined :: Word8) - 1])
+
 {-# INLINE findMax #-}
 
 
