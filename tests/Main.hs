@@ -36,24 +36,59 @@ prop_bitfieldMinJust n =
   if n == 0 then m == Nothing
   else m == Just 0
 
+prop_bitfieldUnionIdentity :: Bitfield -> Bool
+prop_bitfieldUnionIdentity b =
+      ((b `union` empty (8 * bitfieldByteCount b)) == b)
+  &&  ((empty (8 * bitfieldByteCount b) `union` b) == b)
+
+prop_bitfieldUnionCommutative :: Bitfield -> Bitfield -> Bool
+prop_bitfieldUnionCommutative a b = union a b == union b a
+
+prop_bitfieldUnionAssociative :: Bitfield -> Bitfield -> Bitfield -> Bool
+prop_bitfieldUnionAssociative a b c = union a (union b c) == union (union a b) c
+
+prop_bitfieldUnionIdempotent :: Bitfield -> Bitfield -> Bool
+prop_bitfieldUnionIdempotent a b = union a b == union a (union a b)
+
+prop_bitfieldIntersectionIdentity :: Bitfield -> Bool
+prop_bitfieldIntersectionIdentity b =
+      ((b `intersection` full (8 * bitfieldByteCount b)) == b)
+  &&  ((full (8 * bitfieldByteCount b) `intersection` b) == b)
+
+prop_bitfieldIntersectionCommutative :: Bitfield -> Bitfield -> Bool
+prop_bitfieldIntersectionCommutative a b = intersection a b == intersection b a
+
+prop_bitfieldIntersectionAssociative :: Bitfield -> Bitfield -> Bitfield -> Bool
+prop_bitfieldIntersectionAssociative a b c =
+  intersection a (intersection b c) == intersection (intersection a b) c
+
+prop_bitfieldIntersectionIndempotent :: Bitfield -> Bitfield -> Bool
+prop_bitfieldIntersectionIndempotent a b = f b == f (f b)
+  where
+    f = intersection a
 
 main :: IO ()
 main = defaultMain $
-       [ testProperty "Message encode <-> decode" $
-            prop_encoding (T :: T Message)
-
-       , testProperty "PeerID encode <-> decode" $
-            prop_encoding (T :: T PeerID)
-
-       , testProperty "Handshake encode <-> decode" $
-            prop_encoding (T :: T Handshake)
+       [ testProperty "Message encode <-> decode"   $ prop_encoding (T :: T Message)
+       , testProperty "PeerID encode <-> decode"    $ prop_encoding (T :: T PeerID)
+       , testProperty "Handshake encode <-> decode" $ prop_encoding (T :: T Handshake)
        ]
        ++ test_scrape_url ++
        [
          testProperty "bitfield `difference` empty bitfield" prop_bitfieldDiff0
        , testProperty "empty bitfield `difference` bitfield" prop_bitfieldDiff1
-       , testProperty "prop_bitfieldMinNothing" prop_bitfieldMinNothing
-       , testProperty "prop_bitfieldMaxNothing" prop_bitfieldMaxNothing
-       , testProperty "prop_bitfieldMaxJust"    prop_bitfieldMaxJust
-       , testProperty "prop_bitfieldMinJust"    prop_bitfieldMinJust
+       , testProperty "prop_bitfieldMinNothing"              prop_bitfieldMinNothing
+       , testProperty "prop_bitfieldMaxNothing"              prop_bitfieldMaxNothing
+       , testProperty "prop_bitfieldMaxJust"                 prop_bitfieldMaxJust
+       , testProperty "prop_bitfieldMinJust"                 prop_bitfieldMinJust
+
+       , testProperty "prop_bitfieldUnionIdentity"           prop_bitfieldUnionIdentity
+       , testProperty "prop_bitfieldUnionCommutative"        prop_bitfieldUnionCommutative
+       , testProperty "prop_bitfieldUnionAssociative"        prop_bitfieldUnionAssociative
+       , testProperty "prop_bitfieldUnionIdempotent"         prop_bitfieldUnionIdempotent
+
+       , testProperty "prop_bitfieldIntersectionIdentity"    prop_bitfieldIntersectionIdentity
+       , testProperty "prop_bitfieldIntersectionCommutative" prop_bitfieldIntersectionCommutative
+       , testProperty "prop_bitfieldIntersectionAssociative" prop_bitfieldIntersectionAssociative
+       , testProperty "prop_bitfieldIntersectionIndempotent" prop_bitfieldIntersectionIndempotent
        ]
