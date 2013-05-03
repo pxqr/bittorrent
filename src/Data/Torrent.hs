@@ -222,10 +222,12 @@ instance BEncodable FileInfo where
 
   fromBEncode _ = decodingError "FileInfo"
 
-sizeInBase :: Integer -> Int -> Int
+sizeInBase :: Integral a => a -> Int -> Int
 sizeInBase n b = fromIntegral (n `div` fromIntegral b) + align
   where
     align = if n `mod` fromIntegral b == 0 then 0 else 1
+{-# SPECIALIZE sizeInBase :: Int -> Int -> Int #-}
+{-# SPECIALIZE sizeInBase :: Integer -> Int -> Int #-}
 
 contentLength :: ContentInfo -> Integer
 contentLength SingleFile { ciLength = len } = len
