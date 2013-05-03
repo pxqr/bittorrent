@@ -1,15 +1,14 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -fno-warn-orphans #-}
-module Main (main) where
+module Encoding where
 
 import Control.Applicative
 import Data.Word
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Serialize
-
-import Test.Framework (defaultMain, Test)
+import Test.Framework (Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck
 
@@ -85,17 +84,3 @@ test_scrape_url = zipWith mkTest [1 :: Int ..] (check `map` tests)
       ]
 
     mkTest i = testProperty ("scrape test #" ++ show i)
-
-main :: IO ()
-main = defaultMain $
-       [ testProperty "Message encode <-> decode" $
-            prop_encoding (T :: T Message)
-
-       , testProperty "PeerID encode <-> decode" $
-            prop_encoding (T :: T PeerID)
-
-       , testProperty "Handshake encode <-> decode" $
-            prop_encoding (T :: T Handshake)
-       ] ++ test_scrape_url ++
-       [
-       ]

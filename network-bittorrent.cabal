@@ -49,6 +49,7 @@ library
                      , stm        >= 2.4
 
                        -- Data packages
+                     , array      >= 0.4
                      , bytestring >= 0.10.2
                      , containers >= 0.4
                      , text       >= 0.11.0
@@ -91,9 +92,11 @@ test-suite info-hash
 
 
 
-test-suite encoding
+test-suite properties
   type:                exitcode-stdio-1.0
-  main-is:             encoding.hs
+  main-is:             Main.hs
+  other-modules:       Encoding
+
   hs-source-dirs:      tests
 
   build-depends:       base       == 4.*
