@@ -23,9 +23,13 @@ source-repository head
 library
   exposed-modules:     Data.Torrent
                      , Data.Torrent.InfoHash
+
                      , Network.BitTorrent
+
                      , Network.BitTorrent.Peer
-                     , Network.BitTorrent.PeerID
+                     , Network.BitTorrent.Peer.Addr
+                     , Network.BitTorrent.Peer.ID
+                     , Network.BitTorrent.Peer.ClientInfo
 
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Tracker.Protocol
@@ -34,7 +38,6 @@ library
                      , Network.BitTorrent.PeerWire
                      , Network.BitTorrent.PeerWire.Bitfield
                      , Network.BitTorrent.PeerWire.Block
-                     , Network.BitTorrent.PeerWire.ClientInfo
                      , Network.BitTorrent.PeerWire.Message
                      , Network.BitTorrent.PeerWire.Handshake
 

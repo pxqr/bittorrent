@@ -29,8 +29,8 @@ import Data.Torrent.InfoHash
 import Network
 import Network.Socket.ByteString
 
-import Network.BitTorrent.PeerID
-import Network.BitTorrent.PeerWire.ClientInfo
+import Network.BitTorrent.Peer.ID
+import Network.BitTorrent.Peer.ClientInfo
 
 
 data Handshake = Handshake {

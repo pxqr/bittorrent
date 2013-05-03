@@ -37,7 +37,6 @@ import Network
 import Network.URI
 
 import Network.BitTorrent.Peer
-import Network.BitTorrent.PeerID
 import Network.BitTorrent.Tracker.Protocol
 import Network.BitTorrent.Tracker.Scrape
 
@@ -137,13 +136,13 @@ completedReq ses pr = (genericReq ses pr) {
 data TSession = TSession {
     seProgress   :: TVar Progress
   , seInterval   :: IORef Int
-  , sePeers      :: TVar [Peer]
+  , sePeers      :: TVar [PeerAddr]
   }
 
-newSession :: Progress -> Int -> [Peer] -> IO TSession
+newSession :: Progress -> Int -> [PeerAddr] -> IO TSession
 newSession pr i ps = TSession <$> newTVarIO pr <*> newIORef i <*> newTVarIO ps
 
-getPeerList :: TSession -> IO [Peer]
+getPeerList :: TSession -> IO [PeerAddr]
 getPeerList = readTVarIO . sePeers
 
 getProgress :: TSession -> IO Progress

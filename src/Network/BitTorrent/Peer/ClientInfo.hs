@@ -12,10 +12,14 @@
 --  > See http://bittorrent.org/beps/bep_0020.html for more information.
 --
 {-# LANGUAGE OverloadedStrings #-}
-module Network.BitTorrent.PeerWire.ClientInfo
-       ( ClientInfo(..), clientInfo, ppClientInfo, unknownClient
+module Network.BitTorrent.Peer.ClientInfo
+       ( -- * Info
+         ClientInfo(..), clientInfo, ppClientInfo, unknownClient
 
+         -- * Version
        , ClientVersion, ppClientVersion
+
+         -- * Implementation
        , ClientImpl(..), ppClientImpl
 
 --       , mkEnumTyDef, mkPars, nameMap
@@ -27,7 +31,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BC
 import Data.Serialize.Get
 
-import Network.BitTorrent.PeerID
+import Network.BitTorrent.Peer.ID
 
 
 -- | All known client versions.

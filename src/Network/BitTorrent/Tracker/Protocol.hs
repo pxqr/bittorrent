@@ -53,7 +53,6 @@ import Network.HTTP
 import Network.URI
 
 import Network.BitTorrent.Peer
-import Network.BitTorrent.PeerID
 import Network.BitTorrent.Tracker.Scrape
 
 
@@ -84,26 +83,8 @@ data TResponse =
      , respMinInterval :: Maybe Int -- ^ Minimal amount of time between requests.
      , respComplete    :: Maybe Int -- ^ Number of peers completed the torrent. (seeders)
      , respIncomplete  :: Maybe Int -- ^ Number of peers downloading the torrent.
-     , respPeers       :: [Peer]    -- ^ Peers that must be contacted.
+     , respPeers       :: [PeerAddr]    -- ^ Peers that must be contacted.
      } deriving Show
-
-instance BEncodable PortNumber where
-  toBEncode = toBEncode . fromEnum
-  fromBEncode b = toEnum <$> fromBEncode b
-
-instance BEncodable Peer where
-  toBEncode (Peer pid pip pport) = fromAssocs
-    [ "peer id" -->? pid
-    , "ip"      -->  pip
-    , "port"    -->  pport
-    ]
-
-  fromBEncode (BDict d) =
-    Peer <$> d >--? "peer id"
-         <*> d >--  "ip"
-         <*> d >--  "port"
-
-  fromBEncode _ = decodingError "Peer"
 
 instance BEncodable TResponse where
   toBEncode (Failure t)  = fromAssocs ["failure reason" --> t]
@@ -125,7 +106,7 @@ instance BEncodable TResponse where
                      <*> getPeers (M.lookup "peers" d)
 
       where
-        getPeers :: Maybe BEncode -> Result [Peer]
+        getPeers :: Maybe BEncode -> Result [PeerAddr]
         getPeers (Just (BList l))     = fromBEncode (BList l)
         getPeers (Just (BString s))
             | B.length s `mod` 6 == 0 =
@@ -136,7 +117,7 @@ instance BEncodable TResponse where
             peerG = do
               pip   <- getWord32be
               pport <- getWord16be
-              return (Peer Nothing (fromIntegral pip) (fromIntegral pport))
+              return (PeerAddr Nothing (fromIntegral pip) (fromIntegral pport))
 
         getPeers _ = decodingError "Peers"
 

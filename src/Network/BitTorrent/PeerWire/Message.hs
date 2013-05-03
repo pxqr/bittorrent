@@ -5,7 +5,6 @@ module Network.BitTorrent.PeerWire.Message
        ) where
 
 import Control.Applicative
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 
 import Data.Serialize
