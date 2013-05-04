@@ -18,6 +18,7 @@ module Network.BitTorrent.PeerWire.Bitfield
 
          -- * Construction
        , empty, full
+       , toList
        , fromByteString, toByteString
 
          -- * Query
@@ -61,6 +62,13 @@ empty n = MkBitfield $ B.replicate (sizeInBase n 8) 0
 full :: Int -> Bitfield
 full n = MkBitfield $ B.replicate (sizeInBase n 8)  (complement 0)
 {-# INLINE full #-}
+
+toList :: Bitfield -> [Bool]
+toList (MkBitfield bs) = concatMap unpkg (B.unpack bs)
+  where
+    unpkg :: Word8 -> [Bool]
+    unpkg byte = L.map (testBit byte) [0..bitSize (undefined :: Word8) - 1]
+{-# INLINE toList #-}
 
 fromByteString :: ByteString -> Bitfield
 fromByteString = MkBitfield
@@ -278,5 +286,5 @@ findMax (MkBitfield b) = do
 
 {-# INLINE findMax #-}
 
-frequencies :: [Bitfield] -> UArray PieceIx Int
-frequencies = undefined
+frequencies :: [Bitfield] -> [Int]
+frequencies xs = foldr1 (zipWith (+)) $ map (map fromEnum . toList) xs

@@ -55,6 +55,13 @@ selectionStrictFirst n = strictFirst (BT.empty n) (BT.empty n) []
 selectionStrictLast :: Int -> Maybe Int
 selectionStrictLast n = strictLast (BT.empty n) (BT.empty n) []
 
+selectionRarestFirst :: Int -> Maybe Int
+selectionRarestFirst n = rarestFirst (BT.empty n) (BT.empty n)
+                                     (replicate 10 (BT.empty n))
+
+selectionEndGame :: Int -> Maybe Int
+selectionEndGame n = endGame (BT.empty n) (BT.empty n) []
+
 main :: IO ()
 main = do
   let blockixs  = replicate 5000 (Request (BlockIx 0 0 0))
@@ -71,7 +78,7 @@ main = do
     , ("choke",    chokes)
     , ("havenone", havenones)
     ]
-     ++ -- 256KiB * 10M = 2.5TiB
+     ++ -- 256KiB * 10M = 2.5TiB bitfield for 10 ms
     [ bench "bitfield/min"          $ nf bitfieldMin   (10 * m)
     , bench "bitfield/max"          $ nf bitfieldMax   (10 * m)
     , bench "bitfield/difference"   $ nf bitfieldDiff  (10 * m)
@@ -79,7 +86,9 @@ main = do
     , bench "bitfield/union"        $ nf bitfieldUnion (10 * m)
 
     , bench "selection/strictFirst" $ nf selectionStrictFirst  (10 * m)
-    , bench "selection/strictFirst" $ nf selectionStrictLast   (10 * m)
+    , bench "selection/strictLast"  $ nf selectionStrictLast   (10 * m)
+    , bench "selection/rarestFirst" $ nf selectionRarestFirst  (10 * m)
+    , bench "selection/endGame"     $ nf selectionEndGame      (10 * m)
     ]
  where
     mkMsgBench name msgs =

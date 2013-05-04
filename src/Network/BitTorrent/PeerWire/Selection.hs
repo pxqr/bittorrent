@@ -48,11 +48,10 @@ strictLast h a _ = findMax (difference a h)
 
 -- |
 rarestFirst :: Selector
-rarestFirst h a xs = error "rarestFirst"
-    -- rarest (frequencies (map (intersection want) xs))
+rarestFirst h a xs = rarest (frequencies (map (intersection want) xs))
   where
     want = difference h a
-    rarest = undefined
+    rarest = Just . head
 
 -- | In general random first is faster than rarest first strategy but
 --    only if all pieces are available.
@@ -62,7 +61,7 @@ randomFirst = do
   error "randomFirst"
 
 endGame :: Selector
-endGame = undefined
+endGame = strictLast
 
 autoSelector :: Selector
 autoSelector = undefined
