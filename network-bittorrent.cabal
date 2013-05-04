@@ -112,9 +112,9 @@ test-suite properties
 
 
 
-benchmark serialization
+benchmark benchmarks
   type:                exitcode-stdio-1.0
-  main-is:             serialization.hs
+  main-is:             Main.hs
   hs-source-dirs:      bench
 
   build-depends:       base == 4.*
