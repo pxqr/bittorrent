@@ -1,0 +1,2 @@
+#!/bin/sh
+cabal-dev build && cabal-dev test || echo "ERROR: Some tests failed."

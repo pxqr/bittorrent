@@ -1,0 +1,4 @@
+#!/bin/sh
+cabal-dev build &&
+    ./dist/build/benchmarks/benchmarks -o dist/build/benchmarks/result.html &&
+    xdg-open dist/build/benchmarks/result.html
