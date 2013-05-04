@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
 import Data.Word
@@ -29,6 +30,22 @@ prop_bitfieldMaxJust n =
     else m == Just ((s * 8) - 1)
   where
     s = fromIntegral n `mod` 1024
+
+prop_bitfieldMinCases :: Bool
+prop_bitfieldMinCases = all mkTestCase
+    [ ("\x0\x3", Just 8)
+    , ("\x0\x127", Just 8)
+    ]
+  where
+    mkTestCase (bs, res) = findMin (MkBitfield bs) == res
+
+prop_bitfieldMaxCases :: Bool
+prop_bitfieldMaxCases = all mkTestCase
+    [ ("\x0\x3", Just 9)
+    , ("\x0\x127", Just 13)
+    ]
+  where
+    mkTestCase (bs, res) = findMax (MkBitfield bs) == res
 
 prop_bitfieldMinJust :: Word -> Bool
 prop_bitfieldMinJust n =
@@ -77,10 +94,13 @@ main = defaultMain $
        [
          testProperty "bitfield `difference` empty bitfield" prop_bitfieldDiff0
        , testProperty "empty bitfield `difference` bitfield" prop_bitfieldDiff1
+
        , testProperty "prop_bitfieldMinNothing"              prop_bitfieldMinNothing
        , testProperty "prop_bitfieldMaxNothing"              prop_bitfieldMaxNothing
        , testProperty "prop_bitfieldMaxJust"                 prop_bitfieldMaxJust
        , testProperty "prop_bitfieldMinJust"                 prop_bitfieldMinJust
+       , testProperty "prop_bitfieldMinCases"                prop_bitfieldMinCases
+       , testProperty "prop_bitfieldMaxCases"                prop_bitfieldMaxCases
 
        , testProperty "prop_bitfieldUnionIdentity"           prop_bitfieldUnionIdentity
        , testProperty "prop_bitfieldUnionCommutative"        prop_bitfieldUnionCommutative
