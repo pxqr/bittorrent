@@ -48,19 +48,25 @@ bitfieldInter n = BT.empty n `intersection` BT.empty n
 bitfieldUnion :: Int -> Bitfield
 bitfieldUnion n = BT.empty n `union` BT.empty n
 
+selectionStrictFirst :: Int -> Maybe Int
+selectionStrictFirst n = strictFirst (BT.empty n) (BT.empty n) []
 
 main :: IO ()
 main = do
   let datas = replicate 10000 (Request (BlockIx 0 0 0))
+  let m = 1024 * 1024
 
   defaultMain
     [ datas `deepseq` bench "message/encode"   $ nf encodeMessages datas
     , let binary = encodeMessages datas in
       binary `deepseq` bench "message/decode"  $ nf decodeMessages binary
 
-    , bench "bitfield/min"          $ nf bitfieldMin   10000000
-    , bench "bitfield/max"          $ nf bitfieldMax   10000000
-    , bench "bitfield/difference"   $ nf bitfieldDiff  10000000
-    , bench "bitfield/intersection" $ nf bitfieldInter 10000000
-    , bench "bitfield/union"        $ nf bitfieldUnion 10000000
+      -- ~ 256KiB * 10M = 2.5TiB
+    , bench "bitfield/min"          $ nf bitfieldMin   (10 * m)
+    , bench "bitfield/max"          $ nf bitfieldMax   (10 * m)
+    , bench "bitfield/difference"   $ nf bitfieldDiff  (10 * m)
+    , bench "bitfield/intersection" $ nf bitfieldInter (10 * m)
+    , bench "bitfield/union"        $ nf bitfieldUnion (10 * m)
+
+    , bench "selection/strictFirst" $ nf selectionStrictFirst  (10 * m)
     ]
