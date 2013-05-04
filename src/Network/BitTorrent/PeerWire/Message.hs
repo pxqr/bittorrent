@@ -12,6 +12,7 @@ import Data.Serialize
 import Network.BitTorrent.PeerWire.Block
 import Network.BitTorrent.PeerWire.Bitfield
 
+import Data.Array
 
 -- | Messages used in communication between peers.
 --
@@ -78,7 +79,7 @@ data Message = KeepAlive
 instance Serialize Message where
   get = do
     len <- getInt
-    _   <- lookAhead $ ensure len
+--    _   <- lookAhead $ ensure len
     if len == 0 then return KeepAlive
       else do
         mid <- getWord8

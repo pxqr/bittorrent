@@ -23,7 +23,8 @@
 --
 module Network.BitTorrent.PeerWire.Selection
        ( Selector
-       , strictFirst, rarestFirst, randomFirst, endGame, autoSelector
+       , strictFirst, strictLast
+       , rarestFirst, randomFirst, endGame, autoSelector
        ) where
 
 import Network.BitTorrent.PeerWire.Block
@@ -41,6 +42,9 @@ type Selector =  Bitfield      -- ^ Indices of client "have" pieces.
 strictFirst :: Selector
 strictFirst h a _ = findMin (difference a h)
 
+-- | Select the last available piece.
+strictLast :: Selector
+strictLast h a _ = findMax (difference a h)
 
 -- |
 rarestFirst :: Selector
