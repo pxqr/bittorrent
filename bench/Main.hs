@@ -60,7 +60,7 @@ main = do
 
     , bench "bitfield/min"          $ nf bitfieldMin   10000000
     , bench "bitfield/max"          $ nf bitfieldMax   10000000
-    , bench "bitfield/difference"   $ nf bitfieldDiff  1000000
-    , bench "bitfield/intersection" $ nf bitfieldInter 1000000
-    , bench "bitfield/union"        $ nf bitfieldUnion 1000000
+    , bench "bitfield/difference"   $ nf bitfieldDiff  10000000
+    , bench "bitfield/intersection" $ nf bitfieldInter 10000000
+    , bench "bitfield/union"        $ nf bitfieldUnion 10000000
     ]

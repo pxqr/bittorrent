@@ -11,6 +11,7 @@
 --   defined here as well.
 --
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RankNTypes #-}
 module Network.BitTorrent.PeerWire.Bitfield
 -- TODO: move to Data.Bitfield
        ( Bitfield(..)
@@ -26,7 +27,9 @@ module Network.BitTorrent.PeerWire.Bitfield
 
          -- * Serialization
        , getBitfield, putBitfield, bitfieldByteCount
-       , aligned
+
+
+       , aligned, alignLow, alignedZip
        ) where
 
 import Control.Applicative hiding (empty)
@@ -80,8 +83,25 @@ bitfieldByteCount = B.length . bfBits
 {-# INLINE bitfieldByteCount #-}
 
 
+align :: Storable a => Ptr a -> (Ptr a, Int)
+align p = tie (alignPtr p) undefined
+  where
+    tie :: Storable a => (Int -> Ptr a) -> a -> (Ptr a, Int)
+    tie f a = (f (alignment a), (alignment a))
 
-type Mem a = (Ptr a, Int)
+alignLow :: Ptr Word8 -> Ptr Word
+alignLow ptr =
+  let alg  = alignment (undefined :: Word)
+      aptr = alignPtr (castPtr ptr) alg :: Ptr Word
+  in
+    if ptr == castPtr aptr
+    then aptr
+    else castPtr ((castPtr aptr :: Ptr Word8) `advancePtr` negate alg)
+
+isAlignedBy :: Storable a => Ptr a -> Int -> Bool
+isAlignedBy ptr alg = alignPtr ptr alg == ptr
+
+type Mem a    = (Ptr a, Int)
 
 aligned :: Storable a => Mem Word8 -> (Mem Word8, Mem a, Mem Word8)
 aligned (ptr, len) =
@@ -97,36 +117,75 @@ aligned (ptr, len) =
    in
      ((lowPtr, lowLen), (midPtr, midLenA), (hghPtr, hghLen))
   where
-    align :: Storable a => Ptr a -> (Ptr a, Int)
-    align p = tie (alignPtr p) undefined
-      where
-        tie :: Storable a => (Int -> Ptr a) -> a -> (Ptr a, Int)
-        tie f a = (f (alignment a), (alignment a))
 {-# INLINE aligned #-}
 
-zipWithBS :: (Word8 -> Word8 -> Word8) -> ByteString -> ByteString -> ByteString
-zipWithBS f a b =
+type Mem3 a = (Ptr a, Ptr a, Ptr a, Int)
+
+emptyMem3 :: Mem3 a
+emptyMem3 = (nullPtr, nullPtr, nullPtr, 0)
+
+-- assume resulting memory is aligned
+alignedZip :: Ptr Word8 -> Ptr Word8 -> Ptr Word8 -> Int
+              -> (Mem3 Word, Mem3 Word8)
+alignedZip aptr bptr cptr size =
+  let alg = alignment (undefined :: Word) in
+  if (aptr `isAlignedBy` alg) && (bptr `isAlignedBy` alg)
+  then
+    let asize = alignLow (nullPtr `plusPtr` size) `minusPtr` nullPtr
+    in
+       ( (castPtr aptr, castPtr bptr, castPtr cptr, asize `div` alg)
+       , ( aptr `advancePtr` asize
+         , bptr `advancePtr` asize
+         , cptr `advancePtr` asize
+         , (size - asize)
+         )
+       )
+  else (emptyMem3, (aptr, bptr, cptr, size))
+
+-- force specialization
+zipWithBS :: (Word -> Word -> Word)
+          -> (Word8 -> Word8 -> Word8)
+          -> ByteString -> ByteString -> ByteString
+zipWithBS f g a b =
     let (afptr, aoff, asize) = B.toForeignPtr a
         (bfptr, boff, bsize) = B.toForeignPtr b
         size                = min asize bsize in
-    B.unsafeCreate size $ \ptr -> do
-      withForeignPtr afptr $ \aptr -> do
-        withForeignPtr bfptr $ \bptr ->
-          zipBytes (aptr `plusPtr` aoff) (bptr `plusPtr` boff) ptr size
+    B.unsafeCreate size $ \rptr -> do
+      withForeignPtr afptr $ \_aptr -> do
+        withForeignPtr bfptr $ \_bptr -> do
+          let aptr = _aptr `advancePtr` aoff
+          let bptr = _bptr `advancePtr` boff
+
+          let (mid, hgh) = alignedZip aptr bptr rptr size
+          zipWords mid
+          zipBytes hgh
   where
-    zipBytes :: Ptr Word8 -> Ptr Word8 -> Ptr Word8 -> Int -> IO ()
-    zipBytes aptr bptr rptr n = go 0
+    zipBytes :: (Ptr Word8, Ptr Word8, Ptr Word8, Int) -> IO ()
+    zipBytes (aptr, bptr, rptr, n) = go 0
       where
         go :: Int -> IO ()
         go i |   i < n   = do -- TODO unfold
-               av <- peekByteOff aptr i
-               bv <- peekByteOff bptr i
-               pokeByteOff rptr i (f av bv)
+               av <- peekElemOff aptr i
+               bv <- peekElemOff bptr i
+               pokeElemOff rptr i (g av bv)
                go (succ i)
              | otherwise = return ()
 
-zipWithBF :: (Word8 -> Word8 -> Word8) -> Bitfield -> Bitfield -> Bitfield
-zipWithBF f a b = MkBitfield $ zipWithBS f (bfBits a) (bfBits b)
+    zipWords :: (Ptr Word, Ptr Word, Ptr Word, Int) -> IO ()
+    zipWords (aptr, bptr, rptr, n) = go 0
+      where
+        go :: Int -> IO ()
+        go i |   i < n   = do -- TODO unfold
+               av <- peekElemOff aptr i
+               bv <- peekElemOff bptr i
+               pokeElemOff rptr i (f av bv)
+               go (succ i)
+             | otherwise = return ()
+
+
+
+zipWithBF :: (forall a. Bits a => a -> a -> a) -> Bitfield -> Bitfield -> Bitfield
+zipWithBF f a b = MkBitfield $ zipWithBS f f (bfBits a) (bfBits b)
 {-# INLINE zipWithBF #-}
 
 findSet :: ByteString -> Maybe Int
@@ -169,6 +228,7 @@ findSet b =
              | otherwise = Nothing
 
 
+
 union :: Bitfield -> Bitfield -> Bitfield
 union = zipWithBF (.|.)
 {-# INLINE union #-}
@@ -180,7 +240,7 @@ intersection = zipWithBF (.&.)
 difference :: Bitfield -> Bitfield -> Bitfield
 difference = zipWithBF diffWord8
   where
-    diffWord8 :: Word8 -> Word8 -> Word8
+    diffWord8 :: Bits a => a -> a -> a
     diffWord8 a b = a .&. (a `xor` b)
     {-# INLINE diffWord8 #-}
 {-# INLINE difference #-}
