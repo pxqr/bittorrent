@@ -75,9 +75,13 @@ ppHandshake :: Handshake -> String
 ppHandshake hs = BC.unpack (hsProtocol hs) ++ " "
               ++ ppClientInfo (clientInfo (hsPeerID hs))
 
+-- | Get handshake message size in bytes from the length of protocol string.
+handshakeSize :: Word8 -> Int
+handshakeSize n = 1 + fromIntegral n + 8 + 20 + 20
+
 -- | Maximum size of handshake message in bytes.
 handshakeMaxSize :: Int
-handshakeMaxSize = 1 + 256 + 8 + 20 + 20
+handshakeMaxSize = handshakeSize 255
 
 -- | Default protocol string "BitTorrent protocol" as is.
 defaultBTProtocol :: ByteString
@@ -97,8 +101,14 @@ defaultHandshake = Handshake defaultBTProtocol defaultReserved
 handshake :: Socket -> Handshake -> IO (Either String Handshake)
 handshake sock hs = do
     sendAll sock (S.encode hs)
-    r <- recv sock handshakeMaxSize
-    return (checkIH (S.decode r))
+
+    header <- recv sock 1
+    let protocolLen = B.head header
+    let restLen     = handshakeSize protocolLen - 1
+    body <- recv sock restLen
+    let resp = B.cons protocolLen body
+
+    return (checkIH (S.decode resp))
   where
     checkIH (Right hs')
       | hsInfoHash hs /= hsInfoHash hs' = Left "Handshake info hash do not match."

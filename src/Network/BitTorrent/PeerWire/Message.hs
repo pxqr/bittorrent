@@ -99,7 +99,10 @@ instance Serialize Message where
           0x0D -> SuggestPiece  <$> getInt
           0x10 -> RejectRequest <$> get
           0x11 -> AllowedFast   <$> getInt
-          _    -> fail $ "unknown message ID: " ++ show mid
+          _    -> do
+            rm <- remaining >>= getBytes
+            fail $ "unknown message ID: " ++ show mid ++ "\n"
+                ++ "remaining available bytes: " ++ show rm
 
     where
       getBlock :: Int -> Get Block
