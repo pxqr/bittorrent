@@ -8,6 +8,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Serialize
 import Network.BitTorrent as BT
+import Data.Bitfield as BT
 
 
 instance NFData BlockIx where

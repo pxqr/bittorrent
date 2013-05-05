@@ -8,7 +8,9 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 import Encoding
 
+import Data.Bitfield as BT
 import Network.BitTorrent as BT
+
 
 prop_bitfieldDiff0 :: Bitfield -> Bool
 prop_bitfieldDiff0 b = (b `difference` empty (8 * bitfieldByteCount b)) == b

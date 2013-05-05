@@ -29,9 +29,10 @@ module Network.BitTorrent.PeerWire.Selection
        , autoSelector
        ) where
 
+import Data.Bitfield
 import Network.BitTorrent.PeerWire.Block
 import Network.BitTorrent.PeerWire.Message
-import Network.BitTorrent.PeerWire.Bitfield
+
 
 
 type Selector =  Bitfield      -- ^ Indices of client "have" pieces.

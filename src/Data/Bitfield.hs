@@ -12,7 +12,7 @@
 --
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RankNTypes #-}
-module Network.BitTorrent.PeerWire.Bitfield
+module Data.Bitfield
 -- TODO: move to Data.Bitfield
        ( Bitfield(..)
 
@@ -51,7 +51,7 @@ import Foreign
 --import Network.BitTorrent.PeerWire.Block
 import Data.Torrent
 
--- one good idea is to aggregate frequently used stats in reducer
+-- TODO: one good idea is to aggregate frequently used stats in reducer
 -- it should give a big boost
 newtype Bitfield = MkBitfield {
     bfBits :: ByteString

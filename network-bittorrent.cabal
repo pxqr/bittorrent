@@ -22,6 +22,7 @@ source-repository head
 
 library
   exposed-modules:     Data.Torrent
+                     , Data.Bitfield
                      , Data.Torrent.InfoHash
 
                      , Network.BitTorrent
@@ -37,7 +38,6 @@ library
 
                      , Network.BitTorrent.PeerWire
                      , Network.BitTorrent.PeerWire.Block
-                     , Network.BitTorrent.PeerWire.Bitfield
                      , Network.BitTorrent.PeerWire.Selection
                      , Network.BitTorrent.PeerWire.Message
                      , Network.BitTorrent.PeerWire.Handshake

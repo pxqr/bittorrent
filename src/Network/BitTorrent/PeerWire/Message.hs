@@ -10,7 +10,7 @@ import qualified Data.ByteString as B
 import Data.Serialize
 
 import Network.BitTorrent.PeerWire.Block
-import Network.BitTorrent.PeerWire.Bitfield
+import Data.Bitfield
 
 import Data.Array
 

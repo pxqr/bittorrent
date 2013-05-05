@@ -14,6 +14,7 @@ import Test.QuickCheck
 
 import Network.URI
 
+import Data.Bitfield
 import Data.Torrent
 import Network.BitTorrent
 
