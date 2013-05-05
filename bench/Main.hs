@@ -49,6 +49,9 @@ bitfieldInter n = BT.empty n `intersection` BT.empty n
 bitfieldUnion :: Int -> Bitfield
 bitfieldUnion n = BT.empty n `union` BT.empty n
 
+bitfieldHaveCount :: Int -> Int
+bitfieldHaveCount n = haveCount (BT.full n)
+
 selectionStrictFirst :: Int -> Maybe Int
 selectionStrictFirst n = strictFirst (BT.empty n) (BT.empty n) []
 
@@ -84,6 +87,7 @@ main = do
     , bench "bitfield/difference"   $ nf bitfieldDiff  (10 * m)
     , bench "bitfield/intersection" $ nf bitfieldInter (10 * m)
     , bench "bitfield/union"        $ nf bitfieldUnion (10 * m)
+    , bench "bitfield/haveCount"    $ nf bitfieldHaveCount (10 * m)
 
     , bench "selection/strictFirst" $ nf selectionStrictFirst  (10 * m)
     , bench "selection/strictLast"  $ nf selectionStrictLast   (10 * m)

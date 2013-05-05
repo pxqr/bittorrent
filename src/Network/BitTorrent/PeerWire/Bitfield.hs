@@ -22,12 +22,14 @@ module Network.BitTorrent.PeerWire.Bitfield
        , fromByteString, toByteString
 
          -- * Query
+       , haveCount, completeness
        , findMin, findMax
        , union, intersection, difference, combine
        , frequencies
 
          -- * Serialization
-       , getBitfield, putBitfield, bitfieldByteCount
+       , getBitfield, putBitfield
+       , bitfieldByteCount, bitfieldBitCount
 
 
        , aligned, alignLow, alignedZip
@@ -46,9 +48,11 @@ import Data.Word
 
 import Foreign
 
-import Network.BitTorrent.PeerWire.Block
+--import Network.BitTorrent.PeerWire.Block
 import Data.Torrent
 
+-- one good idea is to aggregate frequently used stats in reducer
+-- it should give a big boost
 newtype Bitfield = MkBitfield {
     bfBits :: ByteString
 --  , bfSize :: Int
@@ -90,6 +94,11 @@ bitfieldByteCount :: Bitfield -> Int
 bitfieldByteCount = B.length . bfBits
 {-# INLINE bitfieldByteCount #-}
 
+-- WARN
+-- TODO
+bitfieldBitCount :: Bitfield -> Int
+bitfieldBitCount bf = bitSize (undefined :: Word8) * bitfieldByteCount bf
+{-# INLINE bitfieldBitCount #-}
 
 align :: Storable a => Ptr a -> (Ptr a, Int)
 align p = tie (alignPtr p) undefined
@@ -235,7 +244,44 @@ findSet b =
                  else go (succ i)
              | otherwise = Nothing
 
+foldBS :: (Word8 -> Int -> Int) -> (Word -> Int -> Int) -> Int -> ByteString -> Int
+foldBS f g acc b =
+    let (fptr, off, len) = B.toForeignPtr b in
+    B.inlinePerformIO $ withForeignPtr fptr $ \_ptr -> do
+      let ptr = _ptr `advancePtr` off
 
+      let (low, mid, hgh) = aligned (ptr, len)
+      let resL = goFold   low acc
+      let resM = goFoldW (mid :: Mem Word) resL
+      let resH = goFold   hgh resM
+
+      -- computation of res should not escape withForeignPtr
+      case resH of
+        0 -> return ()
+        _ -> return ()
+
+      return resH
+
+  where
+    goFold :: Mem Word8 -> Int -> Int
+    goFold (ptr, n) = go 0
+      where
+        go :: Int -> Int -> Int
+        go i !a
+          |   i < n   =
+            let v = B.inlinePerformIO (peekElemOff ptr i)
+            in go (succ i) (f v a)
+          | otherwise = a
+
+    goFoldW :: Mem Word -> Int -> Int
+    goFoldW (ptr, n) = go 0
+      where
+        go :: Int -> Int -> Int
+        go i !a
+          |   i < n   =
+            let v = B.inlinePerformIO (peekElemOff ptr i)
+            in go (succ i) (g v a)
+          | otherwise = a
 
 union :: Bitfield -> Bitfield -> Bitfield
 union = zipWithBF (.|.)
@@ -257,8 +303,16 @@ combine :: [Bitfield] -> Maybe Bitfield
 combine [] = Nothing
 combine as = return $ foldr1 intersection as
 
+haveCount :: Bitfield -> Int
+haveCount (MkBitfield b) = foldBS f f 0 b
+  where
+    f byte count = popCount byte + count
+
+completeness :: Bitfield -> (Int, Int)
+completeness bf = (haveCount bf, bitfieldBitCount bf)
+
 -- | Get min index of piece that the peer have.
-findMin :: Bitfield -> Maybe PieceIx
+findMin :: Bitfield -> Maybe Int
 findMin (MkBitfield b) = do
     byteIx <- findSet b
     bitIx  <- findMinWord8 (B.index b byteIx)
@@ -271,7 +325,7 @@ findMin (MkBitfield b) = do
 {-# INLINE findMin #-}
 
 
-findMax :: Bitfield -> Maybe PieceIx
+findMax :: Bitfield -> Maybe Int
 findMax (MkBitfield b) = do
     -- TODO avoid reverse
     byteIx <- (pred (B.length b) -) <$> findSet (B.reverse b)

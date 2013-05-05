@@ -24,7 +24,9 @@
 module Network.BitTorrent.PeerWire.Selection
        ( Selector
        , strictFirst, strictLast
-       , rarestFirst, randomFirst, endGame, autoSelector
+       , rarestFirst, randomFirst, endGame
+
+       , autoSelector
        ) where
 
 import Network.BitTorrent.PeerWire.Block

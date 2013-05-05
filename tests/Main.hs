@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
+import Data.Bits
 import Data.Word
 import Test.Framework (defaultMain)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -84,6 +85,17 @@ prop_bitfieldIntersectionIndempotent a b = f b == f (f b)
   where
     f = intersection a
 
+prop_bitfieldHaveCount :: Bitfield -> Bool
+prop_bitfieldHaveCount b = listHaveCount (toList b) == haveCount b
+  where
+    listHaveCount = foldr f 0
+
+    f :: Bool -> Int -> Int
+    f byte count = fromEnum byte + count
+
+prop_bitfieldCompeteness :: Bitfield -> Bool
+prop_bitfieldCompeteness b = let (have, total) = completeness b in have <= total
+
 main :: IO ()
 main = defaultMain $
        [ testProperty "Message encode <-> decode"   $ prop_encoding (T :: T Message)
@@ -111,4 +123,7 @@ main = defaultMain $
        , testProperty "prop_bitfieldIntersectionCommutative" prop_bitfieldIntersectionCommutative
        , testProperty "prop_bitfieldIntersectionAssociative" prop_bitfieldIntersectionAssociative
        , testProperty "prop_bitfieldIntersectionIndempotent" prop_bitfieldIntersectionIndempotent
+
+       , testProperty "prop_bitfieldHaveCount"               prop_bitfieldHaveCount
+       , testProperty "prop_bitfieldCompeteness"             prop_bitfieldCompeteness
        ]
