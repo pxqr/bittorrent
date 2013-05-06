@@ -14,3 +14,4 @@ module Network.BitTorrent.Peer
 import Network.BitTorrent.Peer.Addr as P
 import Network.BitTorrent.Peer.ClientInfo as P
 import Network.BitTorrent.Peer.ID as P
+import Network.BitTorrent.Peer.Status as P

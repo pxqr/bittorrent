@@ -31,6 +31,7 @@ library
                      , Network.BitTorrent.Peer.Addr
                      , Network.BitTorrent.Peer.ID
                      , Network.BitTorrent.Peer.ClientInfo
+                     , Network.BitTorrent.Peer.Status
 
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Tracker.Protocol
