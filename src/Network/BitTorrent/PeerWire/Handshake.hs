@@ -12,7 +12,7 @@
 --
 {-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.PeerWire.Handshake
-       ( Handshake
+       ( Handshake, handshakeCaps
        , handshake
        , ppHandshake
        , defaultHandshake, defaultBTProtocol, defaultReserved
@@ -29,6 +29,7 @@ import Data.Torrent.InfoHash
 import Network
 import Network.Socket.ByteString
 
+import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer.ID
 import Network.BitTorrent.Peer.ClientInfo
 
@@ -69,6 +70,10 @@ instance Serialize Handshake where
               <*> get
               <*> get
 
+
+handshakeCaps :: Handshake -> Capabilities
+handshakeCaps = hsReserved
+
 -- TODO add reserved bits info
 -- | Format handshake in human readable form.
 ppHandshake :: Handshake -> String
@@ -95,7 +100,7 @@ defaultReserved = 0
 defaultHandshake :: InfoHash -> PeerID -> Handshake
 defaultHandshake = Handshake defaultBTProtocol defaultReserved
 
-
+-- TODO exceptions instead of Either
 -- | Handshaking with a peer specified by the second argument.
 --
 handshake :: Socket -> Handshake -> IO (Either String Handshake)
@@ -103,12 +108,15 @@ handshake sock hs = do
     sendAll sock (S.encode hs)
 
     header <- recv sock 1
-    let protocolLen = B.head header
-    let restLen     = handshakeSize protocolLen - 1
-    body <- recv sock restLen
-    let resp = B.cons protocolLen body
+    if B.length header == 0 then
+        return $ Left ""
+      else do
+        let protocolLen = B.head header
+        let restLen     = handshakeSize protocolLen - 1
+        body <- recv sock restLen
+        let resp = B.cons protocolLen body
 
-    return (checkIH (S.decode resp))
+        return (checkIH (S.decode resp))
   where
     checkIH (Right hs')
       | hsInfoHash hs /= hsInfoHash hs' = Left "Handshake info hash do not match."

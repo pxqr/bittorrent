@@ -1,5 +1,7 @@
 module Network.BitTorrent.PeerWire.Block
-       ( BlockIx(..), Block(..), PieceIx
+       ( BlockIx(..)
+       , Block(..), blockSize
+       , PieceIx
        , BlockLIx, PieceLIx
        , defaultBlockSize
        , pieceIx, blockIx
@@ -67,6 +69,9 @@ data Block = Block {
 
 ppBlock :: Block -> String
 ppBlock = ppBlockIx . blockIx
+
+blockSize :: Block -> Int
+blockSize blk = B.length (blkData blk)
 
 -- | Widely used semi-official block size.
 defaultBlockSize :: Int
