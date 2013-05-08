@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
-import Data.Bits
 import Data.Word
 import Test.Framework (defaultMain)
 import Test.Framework.Providers.QuickCheck2 (testProperty)

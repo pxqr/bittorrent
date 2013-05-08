@@ -20,6 +20,8 @@ module Network.BitTorrent.PeerWire.Handshake
        ) where
 
 import Control.Applicative
+import Control.Monad
+import Control.Exception
 import Data.Word
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -74,7 +76,6 @@ instance Serialize Handshake where
 handshakeCaps :: Handshake -> Capabilities
 handshakeCaps = hsReserved
 
--- TODO add reserved bits info
 -- | Format handshake in human readable form.
 ppHandshake :: Handshake -> String
 ppHandshake hs = BC.unpack (hsProtocol hs) ++ " "
@@ -100,23 +101,23 @@ defaultReserved = 0
 defaultHandshake :: InfoHash -> PeerID -> Handshake
 defaultHandshake = Handshake defaultBTProtocol defaultReserved
 
--- TODO exceptions instead of Either
 -- | Handshaking with a peer specified by the second argument.
---
-handshake :: Socket -> Handshake -> IO (Either String Handshake)
+handshake :: Socket -> Handshake -> IO Handshake
 handshake sock hs = do
     sendAll sock (S.encode hs)
 
     header <- recv sock 1
-    if B.length header == 0 then
-        return $ Left ""
-      else do
-        let protocolLen = B.head header
-        let restLen     = handshakeSize protocolLen - 1
-        body <- recv sock restLen
-        let resp = B.cons protocolLen body
+    when (B.length header == 0) $
+      throw $ userError "Unable to receive handshake."
 
-        return (checkIH (S.decode resp))
+    let protocolLen = B.head header
+    let restLen     = handshakeSize protocolLen - 1
+    body <- recv sock restLen
+    let resp = B.cons protocolLen body
+
+    case checkIH (S.decode resp) of
+      Right hs' -> return hs'
+      Left msg  -> throw $ userError msg
   where
     checkIH (Right hs')
       | hsInfoHash hs /= hsInfoHash hs' = Left "Handshake info hash do not match."
