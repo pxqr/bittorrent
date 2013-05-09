@@ -12,7 +12,7 @@
 --
 {-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.PeerWire.Handshake
-       ( Handshake, handshakeCaps
+       ( Handshake(..), handshakeCaps
        , handshake
        , ppHandshake
        , defaultHandshake, defaultBTProtocol, defaultReserved
@@ -41,7 +41,7 @@ data Handshake = Handshake {
     hsProtocol    :: ByteString
 
     -- | Reserved bytes used to specify supported BEP's.
-  , hsReserved    :: Word64
+  , hsReserved    :: Capabilities
 
     -- | Info hash of the info part of the metainfo file. that is
     -- transmitted in tracker requests. Info hash of the initiator
