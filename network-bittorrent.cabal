@@ -22,8 +22,8 @@ source-repository head
 
 library
   exposed-modules:     Data.Torrent
-                     , Data.Bitfield
                      , Data.Torrent.InfoHash
+                     , Data.Bitfield
 
                      , Network.BitTorrent
                      , Network.BitTorrent.Extension
@@ -43,6 +43,10 @@ library
                      , Network.BitTorrent.PeerWire.Selection
                      , Network.BitTorrent.PeerWire.Message
                      , Network.BitTorrent.PeerWire.Handshake
+
+                       -- DHT
+                     , Data.Kademlia.RoutingTable
+                     , Network.DHT.Kademlia
 
   other-modules:
 
@@ -69,8 +73,9 @@ library
                        -- network related packages
                      , network    >= 2.4
                      , HTTP       >= 4000.2
-                     , cryptohash
+                     , krpc
 
+                     , cryptohash
                      , filepath   == 1.*
 
 
