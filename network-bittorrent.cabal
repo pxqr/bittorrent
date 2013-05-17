@@ -44,12 +44,6 @@ library
                      , Network.BitTorrent.PeerWire.Message
                      , Network.BitTorrent.PeerWire.Handshake
 
-                       -- DHT
-                     , Data.Kademlia.Routing.Bucket
-                     , Data.Kademlia.Routing.Tree
-                     , Data.Kademlia.Routing.Table
-                     , Network.DHT.Kademlia
-
   other-modules:
 
 
