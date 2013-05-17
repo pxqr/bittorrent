@@ -1,4 +1,3 @@
--- TODO move to Network.DHT.Kademlia
 {-# LANGUAGE OverloadedStrings #-}
 module Network.DHT.Kademlia
        (
@@ -8,7 +7,8 @@ import Data.ByteString
 import Network
 import Remote.KRPC
 
-
+import Data.Kademlia.Routing.Table
+{-
 
 -- | Global unique identifier of the node. Size of the identifier
 -- should(!) be equal to the size of DHT keys. This limitation arises
@@ -32,11 +32,7 @@ type Token    = ByteString
 ping :: Method NodeID NodeID
 ping = method "ping" ["id"] ["id"]
 
-type PeerContact = ()
-data NodeContact = NodeContact {
-    peerContact :: PeerContact
-  , nodeID :: NodeID
-  }
+
 
 -- | Used to lookup peer ID from node ID.
 --
@@ -47,15 +43,15 @@ find_node = method "find_node" ["id", "target"] ["id", "nodes"]
 announce_peer :: Method (NodeID, InfoHash, PortNumber, Token) NodeID
 announce_peer = undefined
 
+-- WARN is the 'system' random suitable for this?
+-- | Generate random NodeID used for the entire session.
+--   Distribution of ID's should be as uniform as possible.
+--
 genNodeID :: IO NodeID
-genNodeID = undefined
+genNodeID = randomIO
 
 {-
-type InfoHash = Int
 type Token = Int
-
-ping :: Method NodeId NodeId
-ping = method "ping" ["id"] ["id"]
 
 get_peers :: Method (NodeId :*: InfoHash) (NodeId, Token, NodeAddr :|: NodeAddr)
 get_peers = method "get_peers"
@@ -65,4 +61,5 @@ get_peers = method "get_peers"
 
 
 
+-}
 -}

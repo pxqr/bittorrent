@@ -45,7 +45,9 @@ library
                      , Network.BitTorrent.PeerWire.Handshake
 
                        -- DHT
-                     , Data.Kademlia.RoutingTable
+                     , Data.Kademlia.Routing.Bucket
+                     , Data.Kademlia.Routing.Tree
+                     , Data.Kademlia.Routing.Table
                      , Network.DHT.Kademlia
 
   other-modules:

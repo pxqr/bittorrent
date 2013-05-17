@@ -28,7 +28,7 @@ data PeerAddr = PeerAddr {
       peerID   :: Maybe PeerID
     , peerIP   :: HostAddress
     , peerPort :: PortNumber
-    } deriving Show
+    } deriving (Show, Eq)
 
 instance BEncodable PortNumber where
   toBEncode = toBEncode . fromEnum
