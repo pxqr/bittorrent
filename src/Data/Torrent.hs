@@ -8,6 +8,7 @@
 --   This module provides torrent metainfo serialization.
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 module Data.Torrent
        ( module Data.Torrent.InfoHash
        , Torrent(..), ContentInfo(..), FileInfo(..)
@@ -142,17 +143,17 @@ instance BEncodable URI where
   {-# INLINE fromBEncode #-}
 
 instance BEncodable Torrent where
-  toBEncode t = fromAscAssocs
-    [ "announce"      -->  tAnnounce t
-    , "announce-list" -->? tAnnounceList t
-    , "comment"       -->? tComment t
-    , "created by"    -->? tCreatedBy t
-    , "creation date" -->? tCreationDate t
-    , "encoding"      -->? tEncoding t
-    , "info"          -->  tInfo t
-    , "publisher"     -->? tPublisher t
-    , "publisher-url" -->? tPublisherURL t
-    , "signature"     -->? tSignature t
+  toBEncode Torrent {..} = fromAscAssocs
+    [ "announce"      -->  tAnnounce
+    , "announce-list" -->? tAnnounceList
+    , "comment"       -->? tComment
+    , "created by"    -->? tCreatedBy
+    , "creation date" -->? tCreationDate
+    , "encoding"      -->? tEncoding
+    , "info"          -->  tInfo
+    , "publisher"     -->? tPublisher
+    , "publisher-url" -->? tPublisherURL
+    , "signature"     -->? tSignature
     ]
 
   fromBEncode (BDict d) | Just info <- M.lookup "info" d =
@@ -172,23 +173,23 @@ instance BEncodable Torrent where
 
 
 instance BEncodable ContentInfo where
-  toBEncode ti@(SingleFile { })  = fromAscAssocs
-    [ "length"       -->  ciLength ti
-    , "md5sum"       -->? ciMD5sum ti
-    , "name"         -->  ciName   ti
+  toBEncode SingleFile {..}  = fromAscAssocs
+    [ "length"       -->  ciLength
+    , "md5sum"       -->? ciMD5sum
+    , "name"         -->  ciName
 
-    , "piece length" -->  ciPieceLength ti
-    , "pieces"       -->  ciPieces  ti
-    , "private"      -->? ciPrivate ti
+    , "piece length" -->  ciPieceLength
+    , "pieces"       -->  ciPieces
+    , "private"      -->? ciPrivate
     ]
 
-  toBEncode ti@(MultiFile {}) = fromAscAssocs
-    [ "files"        -->  ciFiles ti
-    , "name"         -->  ciName  ti
+  toBEncode MultiFile {..} = fromAscAssocs
+    [ "files"        -->  ciFiles
+    , "name"         -->  ciName
 
-    , "piece length" -->  ciPieceLength ti
-    , "pieces"       -->  ciPieces  ti
-    , "private"      -->? ciPrivate ti
+    , "piece length" -->  ciPieceLength
+    , "pieces"       -->  ciPieces
+    , "private"      -->? ciPrivate
     ]
 
   fromBEncode (BDict d)
@@ -209,10 +210,10 @@ instance BEncodable ContentInfo where
 
 
 instance BEncodable FileInfo where
-  toBEncode tf = fromAssocs
-                 [ "length" -->  fiLength tf
-                 , "md5sum" -->? fiMD5sum tf
-                 , "path"   -->  fiPath tf
+  toBEncode FileInfo {..} = fromAssocs
+                 [ "length" -->  fiLength
+                 , "md5sum" -->? fiMD5sum
+                 , "path"   -->  fiPath
                  ]
 
   fromBEncode (BDict d) =
