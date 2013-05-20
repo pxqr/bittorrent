@@ -15,13 +15,13 @@
 --     * Insertion, deletion are atomic, waitfree and failfree.
 --
 --     * You can avoid copying in conversion if you don't care about
---       referencial transparency or sure that after conversion bitfields
---       never modified.
+--     referencial transparency or sure that after conversion
+--     bitfields never modified.
 --
 --
 {-# OPTIONS -fno-warn-unused-do-bind #-}
 module Data.Bitfield.Mutable
-       ( IntSet
+       ( Bitfield
 
          -- * Construction
        , empty, full
@@ -51,7 +51,7 @@ import Foreign
 
 
 -- | Basically 'BitSet' is a wrapper on the 'ForeignPtr'.
-data IntSet = IntSet {
+data Bitfield = Bitfield {
     sBasePtr  :: {-# UNPACK #-} !(ForeignPtr Word8)
   , sOffset   :: {-# UNPACK #-} !Int
   , sByteSize :: {-# UNPACK #-} !Int
@@ -59,40 +59,40 @@ data IntSet = IntSet {
   } deriving Show
 
 
-maxSize :: IntSet -> Int
+maxSize :: Bitfield -> Int
 maxSize = sMaxSize
 
 
-create :: Int -> (Int -> Ptr Word8 -> IO a) -> IO IntSet
+create :: Int -> (Int -> Ptr Word8 -> IO a) -> IO Bitfield
 create n f = do
   let byteSize = sizeInBytes n
   fptr <- mallocForeignPtrBytes byteSize
   withForeignPtr fptr (f byteSize)
-  return (IntSet fptr 0 byteSize n)
+  return (Bitfield fptr 0 byteSize n)
 
 -- | Create a 'IntSet' with a given size in /bits/.
-empty :: Int -> IO IntSet
+empty :: Int -> IO Bitfield
 empty n = create n $ \bn ptr ->
   B.memset ptr 0 (fromIntegral bn)
 
-full :: Int -> IO IntSet
+full :: Int -> IO Bitfield
 full n = create n $ \bn ptr ->
   B.memset ptr (error "IntSet.full") (fromIntegral bn)
 
 
 -- | Should be used to free scarce resources immediately.
 --
---   WARNING: After this call 'BitField' should not be used.
---   Also you can avoid using it at all if resource is not too scarce.
+--   WARNING: After this call 'BitField' should not be used.  Also you
+--   can avoid using it at all if resource is not too scarce.
 --
-releaseIntSet :: IntSet -> IO ()
+releaseIntSet :: Bitfield -> IO ()
 releaseIntSet = finalizeForeignPtr . sBasePtr
 
 -- | Set nth bit in the given BifField to 1.
 --
 --   UNSAFE: no bound checking.
 --
-insertUnsafe :: Int -> IntSet -> IO ()
+insertUnsafe :: Int -> Bitfield -> IO ()
 insertUnsafe i s =
   withByte s i $ \ptr -> do
     fetchAndOr ptr (bit (bitLoc i))
@@ -100,7 +100,7 @@ insertUnsafe i s =
 {-# INLINE insertUnsafe #-}
 
 
-deleteUnsafe :: Int -> IntSet -> IO ()
+deleteUnsafe :: Int -> Bitfield -> IO ()
 deleteUnsafe i s =
   withByte s i $ \ptr -> do
     fetchAndAnd ptr (complement (bit (bitLoc i)))
@@ -111,38 +111,39 @@ deleteUnsafe i s =
 --
 --   UNSAFE: no bound checking.
 --
-lookupUnsafe :: Int -> IntSet -> IO Bool
+lookupUnsafe :: Int -> Bitfield -> IO Bool
 lookupUnsafe n s = withByte s n $ \ptr -> (`testBit` bitLoc n) <$> peek ptr
 {-# INLINE lookupUnsafe #-}
 
-fromByteString :: Int -> ByteString -> IntSet
+fromByteString :: Int -> ByteString -> Bitfield
 fromByteString n = fromByteStringUnsafe n . B.copy
 {-# INLINE fromByteString #-}
 
-toByteString :: IntSet -> ByteString
+toByteString :: Bitfield -> ByteString
 toByteString = B.copy . toByteStringUnsafe
 {-# INLINE toByteString #-}
 
 -- | Convert a 'BitField' to the 'ByteString' /without/ copying,
 --   so we can write it to a socket or a file for exsample.
 --
---   WARNING: Note that using the resulting 'ByteString' might (and even should)
---   BREAK REFERENCIAL TRANSPARENCY since we can change bits using 'setBitN'
---   after the conversion. Use this function wisely and if and only if
---   you understand the consequences, otherwise the really BAD THINGS WILL HAPPEN
---   or use safe version instead.
+--   WARNING: Note that using the resulting 'ByteString' might (and
+--   even should) BREAK REFERENCIAL TRANSPARENCY since we can change
+--   bits using 'setBitN' after the conversion. Use this function
+--   wisely and if and only if you understand the consequences,
+--   otherwise the really BAD THINGS WILL HAPPEN or use safe version
+--   instead.
 --
-toByteStringUnsafe :: IntSet -> ByteString
+toByteStringUnsafe :: Bitfield -> ByteString
 toByteStringUnsafe = B.fromForeignPtr <$> sBasePtr <*> pure 0 <*> sByteSize
 
 
--- | Convert a 'ByteString' to 'BitField' /without/ copying,
---   so we can read it from a file or a socket.
+-- | Convert a 'ByteString' to 'BitField' /without/ copying, so we can
+-- read it from a file or a socket.
 --
 --   WARNING: Please see 'toByteString' doc, the same apply to this function.
 --
-fromByteStringUnsafe :: Int -> ByteString -> IntSet
-fromByteStringUnsafe n (B.PS fptr a b) = IntSet fptr a b n
+fromByteStringUnsafe :: Int -> ByteString -> Bitfield
+fromByteStringUnsafe n (B.PS fptr a b) = Bitfield fptr a b n
 
 baseSize :: (Bits a, Integral a) =>
             a -- ^ Base, should be power of two.
@@ -168,7 +169,7 @@ bitLoc :: Int -> Int
 bitLoc i = i `mod` 8 * sizeOf (error "bitLoc" :: Word8)
 {-# INLINE byteLoc #-}
 
-withByte :: IntSet -> Int -> (Ptr Word8 -> IO a) -> IO a
+withByte :: Bitfield -> Int -> (Ptr Word8 -> IO a) -> IO a
 withByte s n action = do
   let offset = sOffset s + byteLoc n
   withForeignPtr (sBasePtr s) $ \ptr ->
