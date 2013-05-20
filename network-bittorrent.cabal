@@ -24,6 +24,7 @@ library
   exposed-modules:     Data.Torrent
                      , Data.Torrent.InfoHash
                      , Data.Bitfield
+                     , Data.Bitfield.Mutable
 
                      , Network.BitTorrent
                      , Network.BitTorrent.Extension
@@ -72,7 +73,8 @@ library
                      , krpc
 
                      , cryptohash
-                     , filepath   == 1.*
+                     , filepath    == 1.*
+                     , bits-atomic == 0.1.*
 
 
   extensions:          PatternGuards
