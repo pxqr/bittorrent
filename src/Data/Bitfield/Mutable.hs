@@ -52,15 +52,15 @@ import Foreign
 
 -- | Basically 'BitSet' is a wrapper on the 'ForeignPtr'.
 data Bitfield = Bitfield {
-    sBasePtr  :: {-# UNPACK #-} !(ForeignPtr Word8)
-  , sOffset   :: {-# UNPACK #-} !Int
-  , sByteSize :: {-# UNPACK #-} !Int
-  , sMaxSize  :: {-# UNPACK #-} !Int
+    bfBasePtr  :: {-# UNPACK #-} !(ForeignPtr Word8)
+  , bfOffset   :: {-# UNPACK #-} !Int
+  , bfByteSize :: {-# UNPACK #-} !Int
+  , bfMaxSize  :: {-# UNPACK #-} !Int
   } deriving Show
 
 
 maxSize :: Bitfield -> Int
-maxSize = sMaxSize
+maxSize = bfMaxSize
 
 
 create :: Int -> (Int -> Ptr Word8 -> IO a) -> IO Bitfield
@@ -86,7 +86,7 @@ full n = create n $ \bn ptr ->
 --   can avoid using it at all if resource is not too scarce.
 --
 releaseIntSet :: Bitfield -> IO ()
-releaseIntSet = finalizeForeignPtr . sBasePtr
+releaseIntSet = finalizeForeignPtr . bfBasePtr
 
 -- | Set nth bit in the given BifField to 1.
 --
@@ -134,7 +134,7 @@ toByteString = B.copy . toByteStringUnsafe
 --   instead.
 --
 toByteStringUnsafe :: Bitfield -> ByteString
-toByteStringUnsafe = B.fromForeignPtr <$> sBasePtr <*> pure 0 <*> sByteSize
+toByteStringUnsafe = B.fromForeignPtr <$> bfBasePtr <*> pure 0 <*> bfByteSize
 
 
 -- | Convert a 'ByteString' to 'BitField' /without/ copying, so we can
@@ -171,7 +171,7 @@ bitLoc i = i `mod` 8 * sizeOf (error "bitLoc" :: Word8)
 
 withByte :: Bitfield -> Int -> (Ptr Word8 -> IO a) -> IO a
 withByte s n action = do
-  let offset = sOffset s + byteLoc n
-  withForeignPtr (sBasePtr s) $ \ptr ->
+  let offset = bfOffset s + byteLoc n
+  withForeignPtr (bfBasePtr s) $ \ptr ->
     action (ptr `advancePtr` offset)
 {-# INLINE withByte #-}
