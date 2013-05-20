@@ -25,31 +25,21 @@ module Data.Bitfield.Mutable
 
          -- * Construction
        , empty, full
+       , create, releaseIntSet
 
          -- * Query
 --       , lookup, member, notMember
 --       , size
        , maxSize
+       , lookupUnsafe
 
          -- * Modification
 --       , insert, delete
+       , insertUnsafe, deleteUnsafe
 
          -- * Conversion
        , fromByteString, toByteString
-
-         -- * Unsafe operations
-         -- ** Construction
-       , create, releaseIntSet
-
-         -- ** Modification
-       , insertUnsafe, deleteUnsafe
-
-         -- ** Query
-       , lookupUnsafe
-
-         -- ** Conversion
        , fromByteStringUnsafe, toByteStringUnsafe
-
        ) where
 
 import Control.Applicative hiding (empty)

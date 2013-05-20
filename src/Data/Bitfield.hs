@@ -18,10 +18,10 @@ module Data.Bitfield
 
          -- * Construction
        , empty, full
-       , toList
-       , fromByteString, toByteString
 
          -- * Query
+       , bitfieldByteCount, bitfieldBitCount
+
        , haveCount, completeness
        , findMin, findMax
        , union, intersection, difference, combine
@@ -29,20 +29,21 @@ module Data.Bitfield
 
          -- * Serialization
        , getBitfield, putBitfield
-       , bitfieldByteCount, bitfieldBitCount
 
+         -- * Conversion
+       , toList
+       , fromByteString, toByteString
 
+         -- * Debug
        , aligned, alignLow, alignedZip
        ) where
 
 import Control.Applicative hiding (empty)
-import Data.Array.Unboxed
 import Data.Bits
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B
 import Data.List as L hiding (union)
-import Data.Maybe
 import Data.Serialize
 import Data.Word
 
