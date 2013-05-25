@@ -127,6 +127,7 @@ benchmark benchmarks
   build-depends:       base == 4.*
                      , bytestring >= 0.10.2.0
                      , cereal
+                     , network
 
                      , criterion
                      , deepseq

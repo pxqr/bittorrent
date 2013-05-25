@@ -7,9 +7,14 @@ import Criterion.Main
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Serialize
+import Network
+
 import Network.BitTorrent as BT
 import Data.Bitfield as BT
 
+
+instance NFData PortNumber where
+  rnf = rnf . (fromIntegral :: PortNumber -> Int)
 
 instance NFData BlockIx where
   rnf (BlockIx a b c) = a `deepseq` b `deepseq` rnf c

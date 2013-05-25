@@ -13,6 +13,8 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck
 
 import Network.URI
+import Network
+
 
 import Data.Bitfield
 import Data.Torrent
@@ -33,6 +35,9 @@ instance Arbitrary Block where
 
 deriving instance Arbitrary Bitfield
 
+instance Arbitrary PortNumber where
+  arbitrary = fromIntegral <$> (arbitrary :: Gen Word16)
+
 instance Arbitrary Message where
   arbitrary = oneof
     [ pure KeepAlive
@@ -45,7 +50,7 @@ instance Arbitrary Message where
     , Request <$> arbitrary
     , Piece <$> arbitrary
     , Cancel <$> arbitrary
-    , Port <$> choose (0, fromIntegral (maxBound :: Word16))
+    , Port <$> arbitrary
     ]
 
 instance Arbitrary PeerID where

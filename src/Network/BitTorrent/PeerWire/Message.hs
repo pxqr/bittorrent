@@ -6,13 +6,13 @@ module Network.BitTorrent.PeerWire.Message
 
 import Control.Applicative
 import qualified Data.ByteString as B
-
 import Data.Serialize
+import Network
 
 import Network.BitTorrent.PeerWire.Block
 import Data.Bitfield
 
-import Data.Array
+
 
 -- | Messages used in communication between peers.
 --
@@ -48,7 +48,7 @@ data Message = KeepAlive
                -- used during "End Game".
              | Cancel   BlockIx
 
-             | Port     Int
+             | Port     PortNumber
 
                -- | BEP 6: Then peer have all pieces it might send the
                --   'HaveAll' message instead of 'Bitfield'
