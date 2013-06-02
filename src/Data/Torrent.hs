@@ -52,6 +52,7 @@ import qualified Data.ByteString.Lazy as Lazy
 import qualified Data.List as L
 import           Data.Text (Text)
 import           Data.Serialize as S hiding (Result)
+import           Text.PrettyPrint
 import qualified Crypto.Hash.SHA1 as C
 import Network.URI
 import System.FilePath
@@ -307,9 +308,10 @@ newtype InfoHash = InfoHash { getInfoHash :: ByteString }
 
 instance BEncodable InfoHash where
   toBEncode = toBEncode . getInfoHash
+  fromBEncode be = InfoHash <$> fromBEncode be
 
 instance Show InfoHash where
-  show = BC.unpack . ppInfoHash
+  show = render . ppInfoHash
 
 instance Serialize InfoHash where
   put = putByteString . getInfoHash
@@ -329,9 +331,11 @@ hash = InfoHash . C.hash
 hashlazy :: Lazy.ByteString -> InfoHash
 hashlazy = InfoHash . C.hashlazy
 
-ppInfoHash :: InfoHash -> ByteString
-ppInfoHash = Lazy.toStrict . B.toLazyByteString .
-        foldMap (B.primFixed B.word8HexFixed) . B.unpack . getInfoHash
+ppInfoHash :: InfoHash -> Doc
+ppInfoHash = text . BC.unpack . Lazy.toStrict . ppHex . getInfoHash
+
+ppHex :: ByteString -> Lazy.ByteString
+ppHex = B.toLazyByteString . foldMap (B.primFixed B.word8HexFixed) . B.unpack
 
 addHashToURI :: URI -> InfoHash -> URI
 addHashToURI uri s = uri {

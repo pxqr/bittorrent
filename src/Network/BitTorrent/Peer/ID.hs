@@ -44,6 +44,7 @@ import Data.URLEncoded
 import Data.Version     (Version(Version), versionBranch)
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
+import Text.PrettyPrint (text, Doc)
 import System.Locale    (defaultTimeLocale)
 
 
@@ -64,8 +65,8 @@ instance Serialize PeerID where
 instance URLShow PeerID where
   urlShow = BC.unpack . getPeerID
 
-ppPeerID :: PeerID -> String
-ppPeerID = BC.unpack . getPeerID
+ppPeerID :: PeerID -> Doc
+ppPeerID = text . BC.unpack . getPeerID
 
 
 -- | Azureus-style encoding have the following layout:

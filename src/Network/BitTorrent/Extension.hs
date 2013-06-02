@@ -9,20 +9,21 @@
 --
 --   > See http://www.bittorrent.org/beps/bep_0004.html
 --
+{-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.Extension
        ( Capabilities, ppCaps, defaultCaps, enabledCaps
        , Extension, ppExtension, encodeExts, decodeExts
        ) where
 
 import Data.Bits
-import Data.List
 import Data.Word
+import Text.PrettyPrint
 
 
 type Capabilities = Word64
 
-ppCaps :: Capabilities -> String
-ppCaps = intercalate ", " . map ppExtension . decodeExts
+ppCaps :: Capabilities -> Doc
+ppCaps = hcat . punctuate ", " . map ppExtension . decodeExts
 
 defaultCaps :: Capabilities
 defaultCaps = 0
@@ -38,7 +39,7 @@ data Extension = ExtDHT  -- ^ BEP 5
                | ExtFast -- ^ BEP 6
                  deriving (Show, Eq, Ord, Enum, Bounded)
 
-ppExtension :: Extension -> String
+ppExtension :: Extension -> Doc
 ppExtension ExtDHT  = "DHT"
 ppExtension ExtFast = "Fast Extension"
 

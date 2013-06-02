@@ -12,6 +12,7 @@
 --  > See http://bittorrent.org/beps/bep_0020.html for more information.
 --
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.Peer.ClientInfo
        ( -- * Info
          ClientInfo(..), clientInfo, ppClientInfo, unknownClient
@@ -30,6 +31,7 @@ import Control.Applicative
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BC
 import Data.Serialize.Get
+import Text.PrettyPrint
 
 import Network.BitTorrent.Peer.ID
 
@@ -163,8 +165,8 @@ parseImpl = f . BC.unpack
   f _    = IUnknown
 
 -- | Format client implementation info in human readable form.
-ppClientImpl :: ClientImpl -> String
-ppClientImpl = tail . show
+ppClientImpl :: ClientImpl -> Doc
+ppClientImpl = text . tail . show
 
 unknownImpl :: ClientImpl
 unknownImpl = IUnknown
@@ -174,8 +176,8 @@ unknownImpl = IUnknown
 type ClientVersion = ByteString
 
 -- | Format client implementation version in human readable form.
-ppClientVersion :: ClientVersion -> String
-ppClientVersion = BC.unpack
+ppClientVersion :: ClientVersion -> Doc
+ppClientVersion = text . BC.unpack
 
 unknownVersion :: ClientVersion
 unknownVersion = "0000"
@@ -189,9 +191,10 @@ data ClientInfo = ClientInfo {
   } deriving (Show, Eq, Ord)
 
 -- | Format client implementation in human readable form.
-ppClientInfo :: ClientInfo -> String
-ppClientInfo ci = ppClientImpl    (ciImpl ci) ++ " version "
-               ++ ppClientVersion (ciVersion ci)
+ppClientInfo :: ClientInfo -> Doc
+ppClientInfo ClientInfo {..} =
+  ppClientImpl ciImpl <+> "version" <+> ppClientVersion ciVersion
+
 
 -- | Unrecognized client implementation.
 unknownClient :: ClientInfo

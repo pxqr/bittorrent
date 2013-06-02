@@ -6,6 +6,7 @@
 --   Portability :  non-portable
 --
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS  -fno-warn-orphans #-}
 module Network.BitTorrent.Peer.Addr
        ( PeerAddr(..)
@@ -17,6 +18,7 @@ import Control.Applicative
 import Data.BEncode
 import Data.Bits
 import Data.Word
+import Text.PrettyPrint
 import Network
 import Network.Socket
 
@@ -73,6 +75,9 @@ connectToPeer p = do
   connect sock (peerSockAddr p)
   return sock
 
-ppPeer :: PeerAddr -> String
-ppPeer p = maybe ""  (++ " at ") ((ppClientInfo . clientInfo) <$> peerID p)
-        ++ show (peerSockAddr p)
+ppPeer :: PeerAddr -> Doc
+ppPeer p @ PeerAddr {..} = case peerID of
+    Just pid -> ppClientInfo (clientInfo pid) <+> "at" <+> paddr
+    Nothing  -> paddr
+  where
+    paddr = text (show (peerSockAddr p))

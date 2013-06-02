@@ -75,6 +75,7 @@ library
                      , cryptohash
                      , filepath    >= 1
                      , bits-atomic >= 0.1
+                     , pretty
 
   extensions:          PatternGuards
   hs-source-dirs:      src

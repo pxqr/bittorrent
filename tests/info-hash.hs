@@ -8,8 +8,7 @@ import Data.Torrent
 import System.Environment
 import System.Exit
 
-
-checkInfo :: ByteString
+checkInfo :: String
 checkInfo = "0221caf96aa3cb94f0f58d458e78b0fc344ad8bf"
 
 torrentFileName :: String
@@ -23,8 +22,9 @@ main = do
   Right t <- fromFile path
 
   BC.putStr "info hash: "
-  BC.putStrLn (ppInfoHash (tInfoHash t))
+  print (ppInfoHash (tInfoHash t))
 
-  let passed = checkInfo == ppInfoHash (tInfoHash t)
+  let passed = checkInfo == show (ppInfoHash (tInfoHash t))
+
   print passed
   if passed then exitSuccess else exitFailure

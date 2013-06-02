@@ -11,6 +11,7 @@
 --   peer.
 --
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.PeerWire.Handshake
        ( Handshake(..), handshakeCaps
        , handshake
@@ -27,6 +28,8 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Serialize as S
+import Text.PrettyPrint
+
 import Network
 import Network.Socket.ByteString
 
@@ -77,9 +80,9 @@ handshakeCaps :: Handshake -> Capabilities
 handshakeCaps = hsReserved
 
 -- | Format handshake in human readable form.
-ppHandshake :: Handshake -> String
-ppHandshake hs = BC.unpack (hsProtocol hs) ++ " "
-              ++ ppClientInfo (clientInfo (hsPeerID hs))
+ppHandshake :: Handshake -> Doc
+ppHandshake Handshake {..} =
+  text (BC.unpack hsProtocol) <+> ppClientInfo (clientInfo hsPeerID)
 
 -- | Get handshake message size in bytes from the length of protocol string.
 handshakeSize :: Word8 -> Int

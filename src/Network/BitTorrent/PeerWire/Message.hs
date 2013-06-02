@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.PeerWire.Message
        ( Message(..)
        , Bitfield
@@ -7,6 +8,7 @@ module Network.BitTorrent.PeerWire.Message
 import Control.Applicative
 import qualified Data.ByteString as B
 import Data.Serialize
+import Text.PrettyPrint
 import Network
 
 import Network.BitTorrent.PeerWire.Block
@@ -141,10 +143,10 @@ instance Serialize Message where
 --   compact and suitable for logging: only useful information but not
 --   payload bytes.
 --
-ppMessage :: Message -> String
-ppMessage (Bitfield _)       = "Bitfield "
-ppMessage (Piece blk)        = "Piece "    ++ ppBlock blk
-ppMessage (Cancel ix)        = "Cancel "   ++ ppBlockIx ix
-ppMessage (SuggestPiece pix) = "Suggest"   ++ show pix
-ppMessage (RejectRequest ix) = "Reject"    ++ ppBlockIx ix
-ppMessage msg = show msg
+ppMessage :: Message -> Doc
+ppMessage (Bitfield _)       = "Bitfield"
+ppMessage (Piece blk)        = "Piece"    <+> ppBlock blk
+ppMessage (Cancel ix)        = "Cancel"   <+> ppBlockIx ix
+ppMessage (SuggestPiece pix) = "Suggest"  <+> int pix
+ppMessage (RejectRequest ix) = "Reject"   <+> ppBlockIx ix
+ppMessage msg = text (show msg)

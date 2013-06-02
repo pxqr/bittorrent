@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.PeerWire.Block
        ( BlockIx(..)
        , Block(..), blockSize
@@ -16,6 +18,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Int
 import Data.Serialize
+import Text.PrettyPrint
 
 
 type BlockLIx = Int
@@ -51,10 +54,11 @@ instance Serialize BlockIx where
               putInt (ixLength ix)
   {-# INLINE put #-}
 
-ppBlockIx :: BlockIx -> String
-ppBlockIx ix = "piece = "  ++ show (ixPiece ix)  ++ ", "
-            ++ "offset = " ++ show (ixOffset ix) ++ ", "
-            ++ "length = " ++ show (ixLength ix)
+ppBlockIx :: BlockIx -> Doc
+ppBlockIx BlockIx {..} =
+  "piece  = " <> int ixPiece  <> "," <+>
+  "offset = " <> int ixOffset <> "," <+>
+  "length = " <> int ixLength
 
 data Block = Block {
     -- | Zero-based piece index.
@@ -67,7 +71,7 @@ data Block = Block {
   , blkData   :: ByteString
   } deriving (Show, Eq)
 
-ppBlock :: Block -> String
+ppBlock :: Block -> Doc
 ppBlock = ppBlockIx . blockIx
 
 blockSize :: Block -> Int
