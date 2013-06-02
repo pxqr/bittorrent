@@ -28,9 +28,11 @@ import qualified Data.ByteString.Char8 as BC
 import           Data.Map (Map)
 import qualified Data.Map as M
 import Data.Monoid
-import Data.Torrent.InfoHash
 import Network.URI
 import Network.HTTP
+
+import Data.Torrent
+
 
 -- | Information about particular torrent.
 data ScrapeInfo = ScrapeInfo {

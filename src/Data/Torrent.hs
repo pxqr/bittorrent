@@ -6,31 +6,57 @@
 --   Portability :  portable
 --
 --   This module provides torrent metainfo serialization.
+--
 {-# OPTIONS -fno-warn-orphans #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+-- TODO refine interface
 module Data.Torrent
-       ( module Data.Torrent.InfoHash
-       , Torrent(..), ContentInfo(..), FileInfo(..)
+       ( -- * Torrent
+         Torrent(..), ContentInfo(..), FileInfo(..)
        , contentLength, pieceCount, blockCount
-       , Layout, contentLayout
-       , isSingleFile, isMultiFile
        , fromFile
 
+         -- * Files layout
+       , Layout, contentLayout
+       , isSingleFile, isMultiFile
+
+         -- * Info hash
+       , InfoHash, ppInfoHash
+       , hash, hashlazy
+       , addHashToURI
+
+         -- * Extra
        , sizeInBase
+
+         -- * Internal
+       , InfoHash(..)
        ) where
+
+import Prelude hiding (sum)
 
 import Control.Applicative
 import Control.Arrow
+import Data.BEncode as BE
+import Data.Char
+import Data.Foldable
+import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
+import qualified Data.ByteString.Builder as B
+import qualified Data.ByteString.Builder.Prim as B
+import qualified Data.ByteString.Lazy as Lazy
+import qualified Data.List as L
 import           Data.Text (Text)
-import Data.BEncode
-import Data.Torrent.InfoHash
+import           Data.Serialize as S hiding (Result)
+import qualified Crypto.Hash.SHA1 as C
 import Network.URI
 import System.FilePath
+import Numeric
+
 
 type Time = Text
 
@@ -157,7 +183,7 @@ instance BEncodable Torrent where
     ]
 
   fromBEncode (BDict d) | Just info <- M.lookup "info" d =
-    Torrent <$> pure (hashlazy (encode info)) -- WARN
+    Torrent <$> pure (hashlazy (BE.encode info)) -- WARN
             <*> d >--  "announce"
             <*> d >--? "announce-list"
             <*> d >--? "comment"
@@ -267,7 +293,60 @@ isMultiFile :: ContentInfo -> Bool
 isMultiFile MultiFile {} = True
 isMultiFile _            = False
 
-
 -- | Read and decode a .torrent file.
 fromFile :: FilePath -> IO (Result Torrent)
 fromFile filepath = decoded <$> B.readFile filepath
+
+{-----------------------------------------------------------------------
+    Serialization
+-----------------------------------------------------------------------}
+
+-- | Exactly 20 bytes long SHA1 hash.
+newtype InfoHash = InfoHash { getInfoHash :: ByteString }
+                   deriving (Eq, Ord)
+
+instance BEncodable InfoHash where
+  toBEncode = toBEncode . getInfoHash
+
+instance Show InfoHash where
+  show = BC.unpack . ppInfoHash
+
+instance Serialize InfoHash where
+  put = putByteString . getInfoHash
+  get = InfoHash <$> getBytes 20
+
+instance BEncodable a => BEncodable (Map InfoHash a) where
+  {-# SPECIALIZE instance BEncodable a => BEncodable (Map InfoHash a)  #-}
+  fromBEncode b = M.mapKeys InfoHash <$> fromBEncode b
+  {-# INLINE fromBEncode #-}
+
+  toBEncode = toBEncode . M.mapKeys getInfoHash
+  {-# INLINE toBEncode #-}
+
+hash :: ByteString -> InfoHash
+hash = InfoHash . C.hash
+
+hashlazy :: Lazy.ByteString -> InfoHash
+hashlazy = InfoHash . C.hashlazy
+
+ppInfoHash :: InfoHash -> ByteString
+ppInfoHash = Lazy.toStrict . B.toLazyByteString .
+        foldMap (B.primFixed B.word8HexFixed) . B.unpack . getInfoHash
+
+addHashToURI :: URI -> InfoHash -> URI
+addHashToURI uri s = uri {
+    uriQuery = uriQuery uri ++ mkPref (uriQuery uri) ++
+               "info_hash=" ++ rfc1738Encode (BC.unpack (getInfoHash s))
+  }
+  where
+    mkPref [] = "?"
+    mkPref ('?' : _) = "&"
+    mkPref _ = error "addHashToURI"
+
+    rfc1738Encode = L.concatMap (\c -> if unreservedS c then [c] else encodeHex c)
+      where
+        unreservedS = (`L.elem` chars)
+        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_./"
+        encodeHex c = '%' : pHex c
+        pHex c = let p = (showHex . ord $ c) ""
+                 in if L.length p == 1 then '0' : p else p

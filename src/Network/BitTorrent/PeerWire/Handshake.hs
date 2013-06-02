@@ -27,10 +27,10 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Serialize as S
-import Data.Torrent.InfoHash
 import Network
 import Network.Socket.ByteString
 
+import Data.Torrent
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer.ID
 import Network.BitTorrent.Peer.ClientInfo

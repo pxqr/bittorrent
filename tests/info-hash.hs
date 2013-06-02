@@ -23,8 +23,8 @@ main = do
   Right t <- fromFile path
 
   BC.putStr "info hash: "
-  BC.putStrLn (ppHex (tInfoHash t))
+  BC.putStrLn (ppInfoHash (tInfoHash t))
 
-  let passed = checkInfo == ppHex (tInfoHash t)
+  let passed = checkInfo == ppInfoHash (tInfoHash t)
   print passed
   if passed then exitSuccess else exitFailure
