@@ -28,27 +28,27 @@ data Message = KeepAlive
 
                -- | Zero-based index of a piece that has just been
                -- successfully downloaded and verified via the hash.
-             | Have     PieceIx
+             | Have     !PieceIx
 
                -- | The bitfield message may only be sent immediately
                -- after the handshaking sequence is complete, and
                -- before any other message are sent. If client have no
                -- pieces then bitfield need not to be sent.
-             | Bitfield Bitfield
+             | Bitfield !Bitfield
 
                -- | Request for a particular block. If a client is
                -- requested a block that another peer do not have the
                -- peer might not answer at all.
-             | Request  BlockIx
+             | Request  !BlockIx
 
                -- | Response for a request for a block.
-             | Piece    Block
+             | Piece    !Block
 
                -- | Used to cancel block requests. It is typically
                -- used during "End Game".
-             | Cancel   BlockIx
+             | Cancel   !BlockIx
 
-             | Port     PortNumber
+             | Port     !PortNumber
 
                -- | BEP 6: Then peer have all pieces it might send the
                --   'HaveAll' message instead of 'Bitfield'
@@ -63,16 +63,16 @@ data Message = KeepAlive
                -- | BEP 6: This is an advisory message meaning "you
                -- might like to download this piece." Used to avoid
                -- excessive disk seeks and amount of IO.
-             | SuggestPiece PieceIx
+             | SuggestPiece !PieceIx
 
                -- | BEP 6: Notifies a requesting peer that its request
                -- will not be satisfied.
-             | RejectRequest BlockIx
+             | RejectRequest !BlockIx
 
                -- | BEP 6: This is an advisory messsage meaning "if
                -- you ask for this piece, I'll give it to you even if
                -- you're choked." Used to shorten starting phase.
-             | AllowedFast PieceIx
+             | AllowedFast !PieceIx
                deriving (Show, Eq)
 
 

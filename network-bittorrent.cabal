@@ -24,7 +24,6 @@ library
   exposed-modules:     Data.Torrent
                      , Data.Torrent.InfoHash
                      , Data.Bitfield
-                     , Data.Bitfield.Mutable
 
                      , Network.BitTorrent
                      , Network.BitTorrent.Extension
@@ -56,7 +55,9 @@ library
                      , array      >= 0.4
                      , bytestring >= 0.10.2
                      , containers >= 0.4
+                     , intset     >= 0.1
                      , text       >= 0.11.0
+                     , vector
 
                        -- encoding/serialization packages
                      , bencoding  >= 0.1

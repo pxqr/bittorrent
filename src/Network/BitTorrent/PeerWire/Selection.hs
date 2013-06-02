@@ -33,6 +33,7 @@ module Network.BitTorrent.PeerWire.Selection
        ) where
 
 import Data.Bitfield
+import Data.Ratio
 import Network.BitTorrent.PeerWire.Block
 
 
@@ -42,10 +43,8 @@ type Selector =  Bitfield      -- ^ Indices of client /have/ pieces.
              -> Maybe PieceIx  -- ^ Zero-based index of piece to request
                                --   to, if any.
 
-type PieceThreshold = Int
-
 selector :: Selector       -- ^ Selector to use at the start.
-         -> PieceThreshold
+         -> Ratio PieceCount
          -> Selector       -- ^ Selector to use after the client have the C pieces.
          -> Selector       -- ^ Selector that changes behaviour based on completeness.
 selector start pt ready   h a xs =
@@ -60,16 +59,14 @@ data StartegyClass
   | SCEnd
     deriving (Show, Eq, Ord, Enum, Bounded)
 
-endThreshold :: PieceThreshold
-endThreshold = 1
 
-strategyClass :: PieceThreshold -> Bitfield -> StartegyClass
-strategyClass pt = classify . completeness
+strategyClass :: Ratio PieceCount -> Bitfield -> StartegyClass
+strategyClass threshold = classify . completeness
   where
-    classify (have, total)
-      | have < pt                   = SCBeginning
-      | total - have > endThreshold = SCReady
-      | otherwise                   = SCEnd
+    classify have
+      |          have < threshold     = SCBeginning
+      | have + 1 % numerator have < 1 = SCReady -- FIXME numerator have is not total count
+      |           otherwise           = SCEnd
 
 
 -- | Select the first available piece.
@@ -82,10 +79,9 @@ strictLast h a _ = findMax (difference a h)
 
 -- |
 rarestFirst :: Selector
-rarestFirst h a xs = rarest (frequencies (map (intersection want) xs))
+rarestFirst h a xs = rarest (map (intersection want) xs)
   where
     want = difference h a
-    rarest = Just . head
 
 -- | In average random first is faster than rarest first strategy but
 --    only if all pieces are available.

@@ -12,6 +12,7 @@ import Test.Framework (Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck
 
+
 import Network.URI
 import Network
 
@@ -33,7 +34,8 @@ instance Arbitrary BlockIx where
 instance Arbitrary Block where
   arbitrary = Block <$> positive <*> positive <*> arbitrary
 
-deriving instance Arbitrary Bitfield
+instance Arbitrary Bitfield where
+  arbitrary = mkBitfield <$> positive <*> arbitrary
 
 instance Arbitrary PortNumber where
   arbitrary = fromIntegral <$> (arbitrary :: Gen Word16)

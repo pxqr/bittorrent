@@ -22,8 +22,7 @@ instance NFData BlockIx where
 instance NFData Block where
   rnf (Block a b c) = a `deepseq` b `deepseq` rnf c
 
-instance NFData Bitfield where
-  rnf = rnf . bfBits
+instance NFData Bitfield
 
 instance NFData Message where
   rnf (Have i)     = rnf i
@@ -40,69 +39,5 @@ encodeMessages xs = runPut (mapM_ put xs)
 decodeMessages :: ByteString -> Either String [Message]
 decodeMessages = runGet (many get)
 
-bitfieldMin :: Int -> Maybe Int
-bitfieldMin n = findMin (BT.empty n)
-
-bitfieldMax :: Int -> Maybe Int
-bitfieldMax n = findMax (BT.empty n)
-
-bitfieldDiff :: Int -> Bitfield
-bitfieldDiff n = BT.empty n `difference` BT.empty n
-
-bitfieldInter :: Int -> Bitfield
-bitfieldInter n = BT.empty n `intersection` BT.empty n
-
-bitfieldUnion :: Int -> Bitfield
-bitfieldUnion n = BT.empty n `union` BT.empty n
-
-bitfieldHaveCount :: Int -> Int
-bitfieldHaveCount n = haveCount (BT.full n)
-
-selectionStrictFirst :: Int -> Maybe Int
-selectionStrictFirst n = strictFirst (BT.empty n) (BT.empty n) []
-
-selectionStrictLast :: Int -> Maybe Int
-selectionStrictLast n = strictLast (BT.empty n) (BT.empty n) []
-
-selectionRarestFirst :: Int -> Maybe Int
-selectionRarestFirst n = rarestFirst (BT.empty n) (BT.empty n)
-                                     (replicate 10 (BT.empty n))
-
-selectionEndGame :: Int -> Maybe Int
-selectionEndGame n = endGame (BT.empty n) (BT.empty n) []
-
 main :: IO ()
-main = do
-  let blockixs  = replicate 5000 (Request (BlockIx 0 0 0))
-  let bitfields = replicate 5000 (Bitfield (MkBitfield (B.replicate 1000 0)))
-  let chokes    = replicate 5000 Choke
-  let havenones = replicate 5000 HaveNone
-
-  let m = 1024 * 1024
-
-  defaultMain $
-    concatMap (uncurry mkMsgBench)
-    [ ("blockIx",  blockixs)
-    , ("bitfield", bitfields)
-    , ("choke",    chokes)
-    , ("havenone", havenones)
-    ]
-     ++ -- 256KiB * 10M = 2.5TiB bitfield for 10 ms
-    [ bench "bitfield/min"          $ nf bitfieldMin   (10 * m)
-    , bench "bitfield/max"          $ nf bitfieldMax   (10 * m)
-    , bench "bitfield/difference"   $ nf bitfieldDiff  (10 * m)
-    , bench "bitfield/intersection" $ nf bitfieldInter (10 * m)
-    , bench "bitfield/union"        $ nf bitfieldUnion (10 * m)
-    , bench "bitfield/haveCount"    $ nf bitfieldHaveCount (10 * m)
-
-    , bench "selection/strictFirst" $ nf selectionStrictFirst  (10 * m)
-    , bench "selection/strictLast"  $ nf selectionStrictLast   (10 * m)
-    , bench "selection/rarestFirst" $ nf selectionRarestFirst  (10 * m)
-    , bench "selection/endGame"     $ nf selectionEndGame      (10 * m)
-    ]
- where
-    mkMsgBench name msgs =
-      [ msgs `deepseq` bench ("message/" ++ name ++ "/encode") $ nf encodeMessages msgs
-      , let binary = encodeMessages msgs in
-        binary `deepseq` bench ("message/" ++ name ++ "/decode") $ nf decodeMessages binary
-      ]
+main = defaultMain []
