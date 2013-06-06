@@ -9,6 +9,7 @@
 --   bitfields. Bitfields are used to keep track indices of complete
 --   pieces either peer have or client have.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 module Data.Bitfield
@@ -32,8 +33,10 @@ module Data.Bitfield
        , getBitfield, putBitfield
        , bitfieldByteCount
 
+-- #ifdef TESTING
        , -- * Debug
          mkBitfield
+-- #endif
        ) where
 
 import Control.Monad
@@ -143,11 +146,13 @@ frequencies xs = runST $ do
   where
     size = maximum (map bfSize xs)
 
+-- TODO it seems like this operation is veeery slow
+
 -- | Find least available piece index. If no piece available return 'Nothing'.
 rarest :: [Bitfield] -> Maybe PieceIx
 rarest xs
     | V.null freqMap = Nothing
-    |     otherwise  = Just $ fst $ V.ifoldr minIx (0, freqMap V.! 0) freqMap
+    |     otherwise  = Just $ fst $ V.ifoldr' minIx (0, freqMap V.! 0) freqMap
   where
     freqMap = frequencies xs
 
@@ -210,5 +215,5 @@ bitfieldByteCount = error "bitfieldByteCount"
 mkBitfield :: PieceCount -> [PieceIx] -> Bitfield
 mkBitfield s ixs = Bitfield {
     bfSize = s
-  , bfSet  = S.splitLT s $ S.fromList ixs
+  , bfSet  = S.splitGT (-1) $ S.splitLT s $ S.fromList ixs
   }

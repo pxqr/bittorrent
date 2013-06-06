@@ -119,6 +119,7 @@ test-suite properties
                      , QuickCheck
 
                      , bittorrent
+                     , intset
 
   ghc-options:         -Wall -fno-warn-orphans
 

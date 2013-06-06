@@ -35,7 +35,7 @@ instance Arbitrary Block where
   arbitrary = Block <$> positive <*> positive <*> arbitrary
 
 instance Arbitrary Bitfield where
-  arbitrary = mkBitfield <$> positive <*> arbitrary
+  arbitrary = mkBitfield <$> (succ <$> positive) <*> arbitrary
 
 instance Arbitrary PortNumber where
   arbitrary = fromIntegral <$> (arbitrary :: Gen Word16)
