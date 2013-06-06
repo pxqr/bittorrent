@@ -5,7 +5,16 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   This module provides torrent metainfo serialization.
+--   Torrent file contains metadata about files and folders but not
+--   content itself. The files are bencoded dictionaries. There is
+--   also other info which is used to help join the swarm.
+--
+--   This module provides torrent metainfo serialization and info hash
+--   extraction.
+--
+--   For more info see:
+--   <http://www.bittorrent.org/beps/bep_0003.html#metainfo-files>,
+--   <https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure>
 --
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -15,11 +24,11 @@
 module Data.Torrent
        ( -- * Torrent
          Torrent(..), ContentInfo(..), FileInfo(..)
-       , contentLength, pieceCount, blockCount
        , fromFile
 
          -- * Files layout
        , Layout, contentLayout
+       , contentLength, pieceCount, blockCount
        , isSingleFile, isMultiFile
 
          -- * Info hash
@@ -156,8 +165,14 @@ data FileInfo = FileInfo {
       -- ^ One or more string elements that together represent the path and
       --   filename. Each element in the list corresponds to either a directory
       --   name or (in the case of the last element) the filename.
-      --   For example, the file "dir1/dir2/file.ext" would consist of three
-      --   string elements ["dir1", "dir2", "file.ext"]
+      --   For example, the file
+      --
+      --   > "dir1/dir2/file.ext"
+      --
+      --   would consist of three string elements:
+      --
+      --   > ["dir1", "dir2", "file.ext"]
+      --
     } deriving (Show, Read, Eq)
 
 
@@ -250,6 +265,8 @@ instance BEncodable FileInfo where
 
   fromBEncode _ = decodingError "FileInfo"
 
+
+-- | Divide and round up.
 sizeInBase :: Integral a => a -> Int -> Int
 sizeInBase n b = fromIntegral (n `div` fromIntegral b) + align
   where
@@ -257,14 +274,22 @@ sizeInBase n b = fromIntegral (n `div` fromIntegral b) + align
 {-# SPECIALIZE sizeInBase :: Int -> Int -> Int #-}
 {-# SPECIALIZE sizeInBase :: Integer -> Int -> Int #-}
 
+
+-- | Find sum of sizes of the all torrent files.
 contentLength :: ContentInfo -> Integer
 contentLength SingleFile { ciLength = len } = len
 contentLength MultiFile  { ciFiles  = tfs } = sum (map fiLength tfs)
 
+-- | Find count of pieces in the torrent. If torrent size is not a
+-- multiple of piece size then the count is rounded up.
 pieceCount :: ContentInfo -> Int
 pieceCount ci = contentLength ci `sizeInBase` ciPieceLength ci
 
-blockCount :: Int -> ContentInfo -> Int
+-- | Find number of blocks of the specified size. If torrent size is
+-- not a multiple of block size then the count is rounded up.
+blockCount :: Int         -- ^ Block size.
+           -> ContentInfo -- ^ Torrent content info.
+           -> Int         -- ^ Number of blocks.
 blockCount blkSize ci = contentLength ci `sizeInBase` blkSize
 
 -- | File layout specifies the order and the size of each file in the storage.
@@ -273,7 +298,10 @@ blockCount blkSize ci = contentLength ci `sizeInBase` blkSize
 --
 type Layout = [(FilePath, Int)]
 
-contentLayout :: FilePath -> ContentInfo -> Layout
+-- | Extract files layout from torrent info with the given root path.
+contentLayout :: FilePath    -- ^ Root path for the all torrent files.
+              -> ContentInfo -- ^ Torrent content information.
+              -> Layout      -- ^ The all file paths prefixed with the given root.
 contentLayout rootPath = filesLayout
   where
     filesLayout   (SingleFile { ciName = name, ciLength = len })
@@ -285,11 +313,12 @@ contentLayout rootPath = filesLayout
 
     fl (FileInfo { fiPath = p, fiLength = len }) = (p, fromIntegral len)
 
-
+-- | Test if this is single file torrent.
 isSingleFile :: ContentInfo -> Bool
 isSingleFile SingleFile {} = True
 isSingleFile _             = False
 
+-- | Test if this is multifile torrent.
 isMultiFile :: ContentInfo -> Bool
 isMultiFile MultiFile {} = True
 isMultiFile _            = False
@@ -299,10 +328,10 @@ fromFile :: FilePath -> IO (Result Torrent)
 fromFile filepath = decoded <$> B.readFile filepath
 
 {-----------------------------------------------------------------------
-    Serialization
+    Info hash
 -----------------------------------------------------------------------}
 
--- | Exactly 20 bytes long SHA1 hash.
+-- | Exactly 20 bytes long SHA1 hash of the info part of torrent file.
 newtype InfoHash = InfoHash { getInfoHash :: ByteString }
                    deriving (Eq, Ord)
 
@@ -325,18 +354,25 @@ instance BEncodable a => BEncodable (Map InfoHash a) where
   toBEncode = toBEncode . M.mapKeys getInfoHash
   {-# INLINE toBEncode #-}
 
+-- | Hash strict bytestring using SHA1 algorithm.
 hash :: ByteString -> InfoHash
 hash = InfoHash . C.hash
 
+-- | Hash lazy bytestring using SHA1 algorithm.
 hashlazy :: Lazy.ByteString -> InfoHash
 hashlazy = InfoHash . C.hashlazy
 
+-- | Pretty print info hash in hexadecimal format.
 ppInfoHash :: InfoHash -> Doc
 ppInfoHash = text . BC.unpack . Lazy.toStrict . ppHex . getInfoHash
 
 ppHex :: ByteString -> Lazy.ByteString
 ppHex = B.toLazyByteString . foldMap (B.primFixed B.word8HexFixed) . B.unpack
 
+-- | Add query info hash parameter to uri.
+--
+--   > info_hash=<url_encoded_info_hash>
+--
 addHashToURI :: URI -> InfoHash -> URI
 addHashToURI uri s = uri {
     uriQuery = uriQuery uri ++ mkPref (uriQuery uri) ++
