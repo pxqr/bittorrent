@@ -15,14 +15,13 @@ module Data.Bitfield
        ( Bitfield, PieceCount
 
          -- * Construction
-       , empty
-       , insert
        , haveAll, haveNone, have
 
          -- * Query
        , haveCount, totalCount, completeness
        , findMin, findMax
-       , frequencies, rarest
+
+       , Frequency, frequencies, rarest
 
          -- * Combine
        , union
@@ -51,14 +50,17 @@ import           Data.Serialize
 import Network.BitTorrent.PeerWire.Block
 
 
+-- | Used to represent max set bound. Min set bound is always set to
+-- zero.
 type PieceCount = Int
 
 -- TODO cache some operations
 
 -- | Bitfields are represented just as integer sets but with
 -- restriction: the each set should be within given interval (or
--- subset of). Size is used to specify interval, so bitfield of size
--- 10 might contain only indices in interval [0..9].
+-- subset of the specified interval). Size is used to specify
+-- interval, so bitfield of size 10 might contain only indices in
+-- interval [0..9].
 --
 data Bitfield = Bitfield {
     bfSize :: !PieceCount
@@ -69,61 +71,65 @@ data Bitfield = Bitfield {
 
 instance Monoid Bitfield where
   {-# SPECIALIZE instance Monoid Bitfield #-}
-  mempty  = empty 0
+  mempty  = haveNone 0
   mappend = union
   mconcat = unions
 
--- TODO documentation
 {-----------------------------------------------------------------------
     Construction
 -----------------------------------------------------------------------}
 
-empty :: PieceCount -> Bitfield
-empty s = Bitfield s S.empty
-
-insert :: PieceIx -> Bitfield -> Bitfield
-insert ix Bitfield {..}
-  | 0 <= ix && ix < bfSize = Bitfield bfSize (S.insert ix bfSet)
-  |      otherwise         = Bitfield bfSize bfSet
-
+-- | The empty bitfield of the given size.
 haveNone :: PieceCount -> Bitfield
-haveNone = empty
+haveNone s = Bitfield s S.empty
 
+-- | The full bitfield containing all piece indices for the given size.
 haveAll :: PieceCount -> Bitfield
 haveAll s = Bitfield s (S.interval 0 (s - 1))
 
+-- | Insert the index in the set ignoring out of range indices.
 have :: PieceIx -> Bitfield -> Bitfield
-have = insert
+have ix Bitfield {..}
+  | 0 <= ix && ix < bfSize = Bitfield bfSize (S.insert ix bfSet)
+  |      otherwise         = Bitfield bfSize bfSet
 
 {-----------------------------------------------------------------------
     Query
 -----------------------------------------------------------------------}
 
+-- | Count of peer have pieces.
 haveCount :: Bitfield -> PieceCount
 haveCount = S.size . bfSet
 
+-- | Total count of pieces and its indices.
 totalCount :: Bitfield -> PieceCount
 totalCount = bfSize
 
--- |
+-- | Ratio of /have/ piece count to the /total/ piece count.
 --
 --   > forall bf. 0 <= completeness bf <= 1
 --
 completeness :: Bitfield -> Ratio PieceCount
 completeness b = haveCount b % totalCount b
 
+-- | Find first available piece index.
 findMin :: Bitfield -> Maybe PieceIx
 findMin Bitfield {..}
   | S.null bfSet = Nothing
   |   otherwise  = Just (S.findMin bfSet)
 
+-- | Find last available piece index.
 findMax :: Bitfield -> Maybe PieceIx
 findMax Bitfield {..}
   | S.null bfSet = Nothing
   |   otherwise  = Just (S.findMax bfSet)
 
+-- | Frequencies are needed in piece selection startegies which use
+-- availability quantity to find out the optimal next piece index to
+-- download.
 type Frequency = Int
 
+-- | How many times each piece index occur in the given bitfield set.
 frequencies :: [Bitfield] -> Vector Frequency
 frequencies [] = V.fromList []
 frequencies xs = runST $ do
@@ -137,6 +143,7 @@ frequencies xs = runST $ do
   where
     size = maximum (map bfSize xs)
 
+-- | Find least available piece index. If no piece available return 'Nothing'.
 rarest :: [Bitfield] -> Maybe PieceIx
 rarest xs
     | V.null freqMap = Nothing
@@ -150,42 +157,48 @@ rarest xs
       |     otherwise      = acc
 
 
-
 {-----------------------------------------------------------------------
     Combine
 -----------------------------------------------------------------------}
 
+-- | Find indices at least one peer have.
 union :: Bitfield -> Bitfield -> Bitfield
 union a b = Bitfield {
     bfSize = bfSize a `max` bfSize b
   , bfSet  = bfSet a `S.union` bfSet b
   }
 
+-- | Find indices both peers have.
 intersection :: Bitfield -> Bitfield -> Bitfield
 intersection a b = Bitfield {
     bfSize = bfSize a `min` bfSize b
   , bfSet  = bfSet a `S.intersection` bfSet b
   }
 
+-- | Find indices which have first peer but do not have the second peer.
 difference :: Bitfield -> Bitfield -> Bitfield
 difference a b = Bitfield {
-    bfSize = bfSize a -- FIXME is it more reasonable?
+    bfSize = bfSize a -- FIXME is it reasonable?
   , bfSet  = bfSet a `S.difference` bfSet b
   }
 
+-- |
 unions :: [Bitfield] -> Bitfield
-unions = foldl' union (empty 0)
+unions = foldl' union (haveNone 0)
 
 {-----------------------------------------------------------------------
     Serialization
 -----------------------------------------------------------------------}
 
+-- |
 getBitfield :: Int -> Get Bitfield
 getBitfield = error "getBitfield"
 
+-- |
 putBitfield :: Bitfield -> Put
 putBitfield = error "putBitfield"
 
+-- |
 bitfieldByteCount :: Bitfield -> Int
 bitfieldByteCount = error "bitfieldByteCount"
 
@@ -193,6 +206,7 @@ bitfieldByteCount = error "bitfieldByteCount"
     Debug
 -----------------------------------------------------------------------}
 
+-- | For internal use only.
 mkBitfield :: PieceCount -> [PieceIx] -> Bitfield
 mkBitfield s ixs = Bitfield {
     bfSize = s
