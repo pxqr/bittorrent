@@ -7,7 +7,8 @@
 --
 --   This module provides peer capabilities detection.
 --
---   > See http://www.bittorrent.org/beps/bep_0004.html
+--   See <http://www.bittorrent.org/beps/bep_0004.html> for more
+--   information.
 --
 {-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.Extension

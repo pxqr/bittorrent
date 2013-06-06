@@ -9,7 +9,8 @@
 --  implementation that can be later printed in human frienly
 --  form. Useful for debugging and logging.
 --
---  > See http://bittorrent.org/beps/bep_0020.html for more information.
+--  See <http://bittorrent.org/beps/bep_0020.html> for more
+--  information.
 --
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}

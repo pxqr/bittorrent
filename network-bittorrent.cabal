@@ -1,4 +1,4 @@
-name:                  network-bittorrent
+name:                  bittorrent
 version:               0.1.0.0
 license:               MIT
 license-file:          LICENSE
@@ -8,16 +8,16 @@ copyright:             (c) 2013, Sam T.
 category:              Network, Data
 build-type:            Simple
 cabal-version:         >= 1.8
-homepage:              https://github.com/pxqr/network-bittorrent
-bug-reports:           https://github.com/pxqr/network-bittorrent/issues
+homepage:              https://github.com/pxqr/bittorrent
+bug-reports:           https://github.com/pxqr/bittorrent/issues
 synopsis:              Bittorrent protocol implementation.
 description:
-  Straightforward and incomplete implementation of bittorrent protocol.
 
+  Straightforward and incomplete implementation of bittorrent protocol.
 
 source-repository head
   type:                git
-  location:            https://github.com/pxqr/network-bittorrent.git
+  location:            https://github.com/pxqr/bittorrent.git
 
 
 library
@@ -91,7 +91,7 @@ test-suite info-hash
                      , bytestring >= 0.10.2.0
                      , containers >= 0.4.2.1
                      , bencoding  >= 0.1.0.0
-                     , network-bittorrent
+                     , bittorrent
                      , Diff
 
   ghc-options:         -Wall
@@ -114,7 +114,7 @@ test-suite properties
                      , test-framework-quickcheck2
                      , QuickCheck
 
-                     , network-bittorrent
+                     , bittorrent
 
   ghc-options:         -Wall -fno-warn-orphans
 
@@ -133,6 +133,6 @@ benchmark benchmarks
                      , criterion
                      , deepseq
 
-                     , network-bittorrent
+                     , bittorrent
 
   ghc-options:         -O2 -Wall -fno-warn-orphans
