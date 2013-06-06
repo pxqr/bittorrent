@@ -17,6 +17,7 @@
 --   <https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure>
 --
 {-# OPTIONS -fno-warn-orphans #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -24,6 +25,7 @@
 module Data.Torrent
        ( -- * Torrent
          Torrent(..), ContentInfo(..), FileInfo(..)
+       , torrent, simpleTorrent
        , fromFile
 
          -- * Files layout
@@ -32,15 +34,21 @@ module Data.Torrent
        , isSingleFile, isMultiFile
 
          -- * Info hash
-       , InfoHash, ppInfoHash
-       , hash, hashlazy
+#if defined (TESTING)
+       , InfoHash(..)
+#else
+       , InfoHash
+#endif
+       , ppInfoHash
        , addHashToURI
 
          -- * Extra
        , sizeInBase
 
+#if defined (TESTING)
          -- * Internal
-       , InfoHash(..)
+       , hash, hashlazy
+#endif
        ) where
 
 import Prelude hiding (sum)
@@ -79,6 +87,10 @@ data Torrent = Torrent {
     , tAnnounce     ::       URI
       -- ^ The URL of the tracker.
 
+      -- NOTE: out of lexicographic order!
+    , tInfo         :: ContentInfo
+      -- ^ Info about each content file.
+
     , tAnnounceList :: Maybe [[URI]]
       -- ^ Announce list add multiple tracker support.
       --
@@ -97,9 +109,6 @@ data Torrent = Torrent {
       -- ^ String encoding format used to generate the pieces part of
       --   the info dictionary in the .torrent metafile.
 
-    , tInfo         :: ContentInfo
-      -- ^ Info about each content file.
-
     , tPublisher    :: Maybe URI
       -- ^ Containing the RSA public key of the publisher of the torrent.
       --   Private counterpart of this key that has the authority to allow
@@ -109,7 +118,26 @@ data Torrent = Torrent {
     , tSignature    :: Maybe ByteString
       -- ^ The RSA signature of the info dictionary (specifically,
       --   the encrypted SHA-1 hash of the info dictionary).
-    } deriving Show
+    } deriving (Show, Eq)
+
+{- note that info hash is actually reduntant field
+   but it's better to keep it here to avoid heavy recomputations
+-}
+
+-- | Smart constructor for 'Torrent' which compute info hash.
+torrent :: URI            -> ContentInfo
+        -> Maybe [[URI]]  -> Maybe Text       -> Maybe ByteString
+        -> Maybe Time     -> Maybe ByteString -> Maybe URI
+        -> Maybe URI      -> Maybe ByteString
+        -> Torrent
+torrent announce info = Torrent (hashlazy (BE.encoded info)) announce info
+
+-- | A simple torrent contains only required fields.
+simpleTorrent :: URI -> ContentInfo -> Torrent
+simpleTorrent announce info = torrent announce info
+                              Nothing Nothing Nothing
+                              Nothing Nothing Nothing
+                              Nothing Nothing
 
 -- | Info part of the .torrent file contain info about each content file.
 data ContentInfo =
@@ -133,8 +161,9 @@ data ContentInfo =
       -- ^ Concatenation of all 20-byte SHA1 hash values.
 
     , ciPrivate      :: Maybe Bool
-      -- ^ If set the client MUST publish its presence to get other peers ONLY
-      --   via the trackers explicity described in the metainfo file.
+      -- ^ If set the client MUST publish its presence to get other
+      -- peers ONLY via the trackers explicity described in the
+      -- metainfo file.
       --
       --   BEP 27: <http://www.bittorrent.org/beps/bep_0027.html>
     }
@@ -162,10 +191,10 @@ data FileInfo = FileInfo {
       --   Used by third-party tools, not by bittorrent protocol itself.
 
     , fiPath        :: [ByteString]
-      -- ^ One or more string elements that together represent the path and
-      --   filename. Each element in the list corresponds to either a directory
-      --   name or (in the case of the last element) the filename.
-      --   For example, the file
+      -- ^ One or more string elements that together represent the
+      --   path and filename. Each element in the list corresponds to
+      --   either a directory name or (in the case of the last
+      --   element) the filename.  For example, the file:
       --
       --   > "dir1/dir2/file.ext"
       --
@@ -201,15 +230,15 @@ instance BEncodable Torrent where
   fromBEncode (BDict d) | Just info <- M.lookup "info" d =
     Torrent <$> pure (hashlazy (BE.encode info)) -- WARN
             <*> d >--  "announce"
+            <*> d >--  "info"
             <*> d >--? "announce-list"
             <*> d >--? "comment"
             <*> d >--? "created by"
             <*> d >--? "creation date"
             <*> d >--? "encoding"
-            <*> d >--  "info"
             <*> d >--? "publisher"
             <*> d >--? "publisher-url"
-            <*> d >--? "singature"
+            <*> d >--? "signature"
 
   fromBEncode _ = decodingError "Torrent"
 

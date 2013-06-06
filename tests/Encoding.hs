@@ -48,12 +48,12 @@ instance Arbitrary Message where
     , pure Unchoke
     , pure Interested
     , pure NotInterested
-    , Have <$> positive
+    , Have     <$> positive
     , Bitfield <$> arbitrary
-    , Request <$> arbitrary
-    , Piece <$> arbitrary
-    , Cancel <$> arbitrary
-    , Port <$> arbitrary
+    , Request  <$> arbitrary
+    , Piece    <$> arbitrary
+    , Cancel   <$> arbitrary
+    , Port     <$> arbitrary
     ]
 
 instance Arbitrary PeerID where
@@ -66,6 +66,7 @@ instance Arbitrary InfoHash where
 
 instance Arbitrary Handshake where
   arbitrary = defaultHandshake <$> arbitrary <*> arbitrary
+
 
 data T a = T
 

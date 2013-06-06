@@ -2,19 +2,34 @@
 module Main (main) where
 
 import Control.Applicative
+import qualified Data.ByteString.Lazy as Lazy
 import Data.IntervalSet
 import Data.List as L
 import Data.Ord
+import Data.Maybe
 import Data.Word
+import Data.Text as T
+import Network.URI
 
 import Test.Framework (defaultMain)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck
 
+import Data.BEncode
 import Data.Bitfield as BF
+import Data.Torrent
 import Network.BitTorrent as BT
 
+import Debug.Trace
 import Encoding
+
+
+instance Arbitrary URI where
+  arbitrary = pure $ fromJust
+              $ parseURI "http://exsample.com:80/123365_asd"
+
+instance Arbitrary Text where
+  arbitrary = T.pack <$> arbitrary
 
 {-----------------------------------------------------------------------
     Bitfield
@@ -51,8 +66,29 @@ prop_differenceDeMorgan a b c =
     Torrent
 -----------------------------------------------------------------------}
 
--- TODO tests for torrent: encoding <-> decoding
+prop_properBEncode :: Show a => BEncodable a => Eq a => T a -> a -> Bool
+prop_properBEncode _ expected = actual == Right expected
+  where
+    actual = decoded $ Lazy.toStrict $ encoded expected
 
+
+-- TODO tests for torrent: encoding <-> decoding
+instance Arbitrary FileInfo where
+  arbitrary = FileInfo <$> arbitrary <*> arbitrary <*> arbitrary
+
+instance Arbitrary ContentInfo where
+  arbitrary = oneof
+    [ SingleFile <$> arbitrary <*> arbitrary <*> arbitrary
+                 <*> arbitrary <*> arbitrary <*> arbitrary
+    , MultiFile  <$> arbitrary <*> arbitrary <*> arbitrary
+                 <*> arbitrary <*> arbitrary
+    ]
+
+instance Arbitrary Torrent where
+  arbitrary = torrent <$> arbitrary
+                 <*> arbitrary <*> arbitrary <*> arbitrary
+                 <*> arbitrary <*> arbitrary <*> arbitrary
+                 <*> arbitrary <*> pure Nothing <*> arbitrary
 
 main :: IO ()
 main = defaultMain
@@ -60,4 +96,11 @@ main = defaultMain
   , testProperty "rarest in range"         prop_rarestInRange
   , testProperty "min less that max"       prop_minMax
   , testProperty "difference de morgan"    prop_differenceDeMorgan
+
+  , testProperty "file info encoding"      $
+      prop_properBEncode (T :: T FileInfo)
+  , testProperty "content info encoding"   $
+      prop_properBEncode (T :: T ContentInfo)
+  , testProperty "torrent encoding" $
+      prop_properBEncode (T :: T Torrent)
   ]
