@@ -34,10 +34,10 @@ module Data.Bitfield
        , getBitfield, putBitfield
        , bitfieldByteCount
 
--- #ifdef TESTING
-       , -- * Debug
-         mkBitfield
--- #endif
+#if  defined (TESTING)
+         -- * Debug
+       , mkBitfield
+#endif
        ) where
 
 import Control.Monad

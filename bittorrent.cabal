@@ -24,6 +24,9 @@ source-repository head
   type:                git
   location:            git://github.com/pxqr/bittorrent.git
 
+flag testing
+  description:         Expose debug stuff in export declarations.
+  default:             False
 
 library
   exposed-modules:     Data.Torrent
@@ -79,7 +82,10 @@ library
 
   extensions:          PatternGuards
   hs-source-dirs:      src
+  if flag(testing)
+    cpp-options:       -DTESTING
   ghc-options:         -Wall
+
 
 
 test-suite info-hash
@@ -95,6 +101,9 @@ test-suite info-hash
                      , Diff
 
   ghc-options:         -Wall
+
+  if !flag(testing)
+     buildable:        False
 
 
 
@@ -119,6 +128,9 @@ test-suite properties
 
   ghc-options:         -Wall -fno-warn-orphans
 
+  if !flag(testing)
+     buildable:        False
+
 
 
 benchmark benchmarks
@@ -137,3 +149,6 @@ benchmark benchmarks
                      , bittorrent
 
   ghc-options:         -O2 -Wall -fno-warn-orphans
+
+  if !flag(testing)
+     buildable:        False
