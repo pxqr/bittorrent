@@ -19,6 +19,7 @@ module Data.Bitfield
        , haveAll, haveNone, have
 
          -- * Query
+       , Data.Bitfield.null
        , haveCount, totalCount, completeness
        , findMin, findMax
 
@@ -99,6 +100,10 @@ have ix Bitfield {..}
 {-----------------------------------------------------------------------
     Query
 -----------------------------------------------------------------------}
+
+-- | Test if bitifield have no one index: peer do not have anything.
+null :: Bitfield -> Bool
+null Bitfield {..} = S.null bfSet
 
 -- | Count of peer have pieces.
 haveCount :: Bitfield -> PieceCount
