@@ -1,27 +1,24 @@
-# Synopsis
+### Synopsis
 
-This package aims to provide a thin layer for bittorrent protocol.
-Basically it provides serialization\deserealization and some widely
-used routines.
+A library for making Haskell applications which use bittorrent
+protocol easy. This package aims to be a fast thin layer and at the
+same time provide both:
 
-# Description
+* Concise high level API for typical usage scenarious.
+* More straightforward API if you need more fine grained control.
 
-## Modules
+Currently it provides serialization and deserealization of core
+datatypes, some widely used routines and core types.
 
-The module hierarhy is tend to be:
 
-* Data.Torrent — for torrent metainfo, data verification, etc
-* Network.BitTorrent.Peer     — common peer related types.
-* Network.BitTorrent.PeerWire — peer wire TCP message passing.
-* Network.BitTorrent.Tracker  — tracker HTTP message passing.
+### Status
 
-# Status
-
-The protocol has many extensions[1] and it's seems like no one want to
-use just core protocol, at least I'm not. Any modern application that
-uses bittorrent protocol in any way will use some subset of extensions
-anyway. Thus it's reasonable to implement at least some part of widely
-used extensions here, so we could provide nice high level API and well
+The protocol has many extensions(more precisely enchancements, but
+we'll use that word) and it's seems like no one will want to use just
+core protocol, at least I'm not. Any modern application that uses
+bittorrent protocol in any way will use some subset of extensions.
+Thus it's reasonable to implement at least some part of widely used
+extensions here, so we could provide nice high level API and well
 integrated interface.
 
 This section should keep track current state of package in respect of
@@ -62,14 +59,25 @@ too)
 | 5     | DHT                                        |                                     | Want
 | 6     | Fast Extension                             | Network.BitTorrent.PeerWire.Message | Want -> Implemented
 
-# Build Status
+
+### Documentation
+
+For documentation see haddock generated documentation.
+
+
+### Build Status
 
 [![Build Status][1]][2]
 
-[1]: https://travis-ci.org/pxqr/network-bittorrent.png
-[2]: https://travis-ci.org/pxqr/network-bittorrent
+[1]: https://travis-ci.org/pxqr/bittorrent.png
+[2]: https://travis-ci.org/pxqr/bittorrent
 
 
-### Footnotes
+### Maintainer
 
-[1] More precisely enchancements, but we'll use that word.
+This library is written and maintained by Sam T. <pxqr.sta@gmail.com>
+
+Feel free to report bugs and suggestions via
+[github issue tracker][issues] or the mail.
+
+[issues]:      https://github.com/pxqr/bittorrent/issues/new

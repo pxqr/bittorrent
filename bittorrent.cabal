@@ -13,11 +13,15 @@ bug-reports:           https://github.com/pxqr/bittorrent/issues
 synopsis:              Bittorrent protocol implementation.
 description:
 
-  Straightforward and incomplete implementation of bittorrent protocol.
+  A library for making applications which use bittorrent protocol in Haskell easy.
+  .
+  See <https://github.com/pxqr/bittorrent/blob/master/README.md> for more information.
+
+
 
 source-repository head
   type:                git
-  location:            https://github.com/pxqr/bittorrent.git
+  location:            git://github.com/pxqr/bittorrent.git
 
 
 library
