@@ -13,9 +13,10 @@ bug-reports:           https://github.com/pxqr/bittorrent/issues
 synopsis:              Bittorrent protocol implementation.
 description:
 
-  A library for making applications which use bittorrent protocol in Haskell easy.
+  A library for making Haskell bittorrent applications easy.
   .
-  See <https://github.com/pxqr/bittorrent/blob/master/README.md> for more information.
+  For more information see:
+  <https://github.com/pxqr/bittorrent/blob/master/README.md>
 
 
 
@@ -30,12 +31,7 @@ library
 
                      , Network.BitTorrent
                      , Network.BitTorrent.Extension
-
                      , Network.BitTorrent.Peer
-                     , Network.BitTorrent.Peer.Addr
-                     , Network.BitTorrent.Peer.ID
-                     , Network.BitTorrent.Peer.ClientInfo
-                     , Network.BitTorrent.Peer.Status
 
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Tracker.Protocol
