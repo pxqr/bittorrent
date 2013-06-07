@@ -17,6 +17,7 @@ module Data.Bitfield
 
          -- * Construction
        , haveAll, haveNone, have
+       , adjustSize
 
          -- * Query
        , Data.Bitfield.null
@@ -31,8 +32,7 @@ module Data.Bitfield
        , difference
 
          -- * Serialization
-       , getBitfield, putBitfield
-       , bitfieldByteCount
+       , fromBitmap, toBitmap
 
 #if  defined (TESTING)
          -- * Debug
@@ -42,15 +42,18 @@ module Data.Bitfield
 
 import Control.Monad
 import Control.Monad.ST
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as Lazy
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Unboxed.Mutable as VM
 import           Data.IntervalSet (IntSet)
 import qualified Data.IntervalSet as S
+import qualified  Data.IntervalSet.ByteString as S
 import           Data.List (foldl')
 import           Data.Monoid
 import           Data.Ratio
-import           Data.Serialize
 import Network.BitTorrent.PeerWire.Block
 
 
@@ -96,6 +99,11 @@ have :: PieceIx -> Bitfield -> Bitfield
 have ix Bitfield {..}
   | 0 <= ix && ix < bfSize = Bitfield bfSize (S.insert ix bfSet)
   |      otherwise         = Bitfield bfSize bfSet
+
+-- | Assign new size to bitfield. FIXME Normally, size should be only
+-- decreased, otherwise exception raised.
+adjustSize :: PieceCount -> Bitfield -> Bitfield
+adjustSize s Bitfield {..} = Bitfield s bfSet
 
 {-----------------------------------------------------------------------
     Query
@@ -200,17 +208,22 @@ unions = foldl' union (haveNone 0)
     Serialization
 -----------------------------------------------------------------------}
 
--- |
-getBitfield :: Int -> Get Bitfield
-getBitfield = error "getBitfield"
+-- | Unpack 'Bitfield' from tightly packed bit array. Note resulting
+-- size might be more than real bitfield size, use 'adjustSize'.
+fromBitmap :: ByteString -> Bitfield
+fromBitmap bs = Bitfield {
+    bfSize = B.length bs * 8
+  , bfSet  = S.fromByteString bs
+  }
+{-# INLINE fromBitmap #-}
 
--- |
-putBitfield :: Bitfield -> Put
-putBitfield = error "putBitfield"
-
--- |
-bitfieldByteCount :: Bitfield -> Int
-bitfieldByteCount = error "bitfieldByteCount"
+-- | Pack a 'Bitfield' to tightly packed bit array.
+toBitmap :: Bitfield -> Lazy.ByteString
+toBitmap Bitfield {..} = Lazy.fromChunks [intsetBM, alignment]
+  where
+    byteSize  = bfSize `div` 8 + if bfSize `mod` 8 == 0 then 0 else 1
+    alignment = B.replicate (byteSize - B.length intsetBM) 0
+    intsetBM  = S.toByteString bfSet
 
 {-----------------------------------------------------------------------
     Debug

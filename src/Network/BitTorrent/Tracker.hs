@@ -145,7 +145,7 @@ data TSession = TSession {
 newSession :: Progress -> Int -> [PeerAddr] -> IO TSession
 newSession pr i ps = TSession <$> newTVarIO pr
                               <*> newIORef i
-                              <*> newTVarIO psx
+                              <*> newTVarIO ps
 
 getPeerList :: TSession -> IO [PeerAddr]
 getPeerList = readTVarIO . sePeers

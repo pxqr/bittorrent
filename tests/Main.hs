@@ -185,6 +185,15 @@ instance Arbitrary Message where
     , Cancel   <$> arbitrary
     , Port     <$> arbitrary
     ]
+-- todo add all messages
+
+prop_messageEncoding :: Message -> Bool
+prop_messageEncoding msg @ (Bitfield bf)
+  = case S.decode (S.encode msg) of
+      Right (Bitfield bf') -> bf == adjustSize (totalCount bf) bf'
+      Left  _   -> False
+prop_messageEncoding msg
+  = S.decode (S.encode msg) == Right msg
 
 {-----------------------------------------------------------------------
     Main
@@ -209,7 +218,6 @@ main = defaultMain $
     -- handshake module
   , testProperty "handshake encoding" $
       prop_cerealEncoding  (T :: T Handshake)
-  , testProperty "message encoding" $
-      prop_cerealEncoding (T :: T Message)
+  , testProperty "message encoding" prop_messageEncoding
 
   ] ++ test_scrape_url

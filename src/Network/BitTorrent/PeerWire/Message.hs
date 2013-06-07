@@ -7,6 +7,7 @@ module Network.BitTorrent.PeerWire.Message
 
 import Control.Applicative
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as Lazy
 import Data.Serialize
 import Text.PrettyPrint
 import Network
@@ -91,7 +92,7 @@ instance Serialize Message where
           0x02 -> return Interested
           0x03 -> return NotInterested
           0x04 -> Have     <$> getInt
-          0x05 -> Bitfield <$> getBitfield (pred len)
+          0x05 -> (Bitfield . fromBitmap) <$> getByteString (pred len)
           0x06 -> Request  <$> get
           0x07 -> Piece    <$> getBlock (len - 9)
           0x08 -> Cancel   <$> get
@@ -118,8 +119,9 @@ instance Serialize Message where
   put Interested    = putInt 1  >> putWord8 0x02
   put NotInterested = putInt 1  >> putWord8 0x03
   put (Have i)      = putInt 5  >> putWord8 0x04 >> putInt i
-  put (Bitfield b)  = putInt l  >> putWord8 0x05 >> putBitfield b
-    where l = succ (bitfieldByteCount b)
+  put (Bitfield bf) = putInt l  >> putWord8 0x05 >> putLazyByteString b
+    where b = toBitmap bf
+          l = succ (fromIntegral (Lazy.length b))
           {-# INLINE l #-}
   put (Request blk) = putInt 13 >> putWord8 0x06 >> put blk
   put (Piece   blk) = putInt l  >> putWord8 0x07 >> putBlock

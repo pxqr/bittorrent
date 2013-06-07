@@ -59,7 +59,8 @@ library
 
                        -- Data packages
                      , array      >= 0.4
-                     , bytestring >= 0.10.2
+                     , bytestring
+ -- >= 0.10.2
                      , containers >= 0.4
                      , intset     >= 0.1
                      , text       >= 0.11.0
@@ -94,11 +95,12 @@ library
 
 test-suite info-hash
   type:                exitcode-stdio-1.0
-  main-is:             info-hash.hs
+  main-is:             InfoHash.hs
   hs-source-dirs:      tests
 
   build-depends:       base       == 4.*
-                     , bytestring >= 0.10.2.0
+                     , bytestring
+ -- >= 0.10.2.0
                      , containers >= 0.4.2.1
                      , bencoding  >= 0.1.0.0
                      , bittorrent
@@ -116,7 +118,8 @@ test-suite properties
   main-is:             Main.hs
   hs-source-dirs:      tests
   build-depends:       base       == 4.*
-                     , bytestring >= 0.10.2
+                     , bytestring
+-- >= 0.10.2
                      , cereal     >= 0.3.5.2
                      , network    >= 2.4.0.13
                      , text
@@ -141,7 +144,7 @@ benchmark benchmarks
   hs-source-dirs:      bench
 
   build-depends:       base == 4.*
-                     , bytestring >= 0.10.2.0
+                     , bytestring
                      , cereal
                      , network
 
