@@ -78,6 +78,11 @@ library
                      , HTTP       >= 4000.2
                      , krpc
 
+                       -- conduits
+                     , conduit              == 1.*
+                     , network-conduit      == 1.*
+                     , cereal-conduit       >= 0.5
+
                      , cryptohash
                      , filepath    >= 1
                      , bits-atomic >= 0.1

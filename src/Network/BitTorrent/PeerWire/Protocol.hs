@@ -22,7 +22,7 @@ module Network.BitTorrent.PeerWire.Protocol
        , handshakeMaxSize
 
          -- * Block
-       , BlockLIx, PieceLIx
+       , PieceIx, BlockLIx, PieceLIx
        , BlockIx(..), ppBlockIx
        , Block(..),  ppBlock ,blockSize
        , pieceIx, blockIx
