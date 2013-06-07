@@ -178,8 +178,8 @@ sendRequest req = do
 
   rawResp  <- simpleHTTP r
   respBody <- getResponseBody rawResp
-  return (decoded (BC.pack respBody))
+  return (decoded respBody)
 
   where
-    mkHTTPRequest :: URI -> Request String
+    mkHTTPRequest :: URI -> Request ByteString
     mkHTTPRequest uri = Request uri GET [] ""
