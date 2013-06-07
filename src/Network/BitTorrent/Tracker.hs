@@ -112,7 +112,8 @@ regularReq numWant ses pr = (genericReq ses pr) {
   , reqEvent      = Nothing
   }
 
--- | Must be sent to the tracker if the client is shutting down gracefully.
+-- | Must be sent to the tracker if the client is shutting down
+-- gracefully.
 --
 stoppedReq :: TConnection -> Progress -> TRequest
 stoppedReq ses pr = (genericReq ses pr) {
@@ -122,7 +123,8 @@ stoppedReq ses pr = (genericReq ses pr) {
   }
 
 -- | Must be sent to the tracker when the download completes.
---   However, must not be sent if the download was already 100% complete.
+-- However, must not be sent if the download was already 100%
+-- complete.
 --
 completedReq :: TConnection -> Progress -> TRequest
 completedReq ses pr = (genericReq ses pr) {
@@ -141,7 +143,9 @@ data TSession = TSession {
   }
 
 newSession :: Progress -> Int -> [PeerAddr] -> IO TSession
-newSession pr i ps = TSession <$> newTVarIO pr <*> newIORef i <*> newTVarIO ps
+newSession pr i ps = TSession <$> newTVarIO pr
+                              <*> newIORef i
+                              <*> newTVarIO psx
 
 getPeerList :: TSession -> IO [PeerAddr]
 getPeerList = readTVarIO . sePeers
