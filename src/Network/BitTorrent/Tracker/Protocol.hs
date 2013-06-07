@@ -24,7 +24,7 @@ module Network.BitTorrent.Tracker.Protocol
        ( module Network.BitTorrent.Tracker.Scrape
 
        , Event(..), TRequest(..), TResponse(..)
-       , sendRequest
+       , askTracker
 
          -- * Defaults
        , defaultPorts, defaultNumWant
@@ -220,16 +220,21 @@ defaultPorts = [6881..6889]
 defaultNumWant :: Int
 defaultNumWant = 25
 
--- | TODO rename to ask for peers
+-- | Send request and receive response from the tracker specified in
+-- announce list. This function throws 'IOException' if it couldn't
+-- send request or receive response or decode response.
 --
-sendRequest :: TRequest -> IO (Result TResponse)
-sendRequest req = do
-  let r = mkHTTPRequest (encodeRequest req)
+askTracker :: TRequest -> IO TResponse
+askTracker req = do
+    let r = mkHTTPRequest (encodeRequest req)
 
-  rawResp  <- simpleHTTP r
-  respBody <- getResponseBody rawResp
-  return (decoded respBody)
-
+    rawResp  <- simpleHTTP r
+    respBody <- getResponseBody rawResp
+    checkResult $ decoded respBody
   where
     mkHTTPRequest :: URI -> Request ByteString
     mkHTTPRequest uri = Request uri GET [] ""
+
+    checkResult (Left err)            = ioError (userError err)
+    checkResult (Right (Failure err)) = ioError (userError (show err))
+    checkResult (Right resp)          = return resp

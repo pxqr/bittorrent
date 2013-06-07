@@ -8,6 +8,7 @@
 --   This module provides high level API for peer->tracker
 --   communication.
 --
+{-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.Tracker
        ( module Network.BitTorrent.Tracker.Scrape
 
@@ -155,28 +156,26 @@ withTracker :: Progress -> TConnection -> (TSession -> IO a) -> IO a
 withTracker initProgress conn action = bracket start end (action . fst)
   where
     start = do
-      res <- sendRequest (startedReq conn initProgress)
-      case res of
-        Left err -> ioError (userError err)
-        Right (Failure err) -> ioError (userError (show err))
-        Right resp -> do
-          se  <- newSession initProgress (respInterval resp) (respPeers resp)
-          tid <- forkIO (syncSession se)
-          return (se, tid)
+      resp <- askTracker (startedReq conn initProgress)
+      se   <- newSession initProgress (respInterval resp) (respPeers resp)
+      tid  <- forkIO (syncSession se)
+      return (se, tid)
 
-
-    syncSession se = do
-      waitInterval se
-      pr    <- getProgress se
-      eresp <- sendRequest (regularReq defaultNumWant conn pr)
-      case eresp of
-        Right (OK { respInterval = i, respPeers = ps }) -> do
-          writeIORef (seInterval se) i
-          atomically $ writeTVar (sePeers se) ps
-        _             -> return ()
-      syncSession se
-
+    syncSession se @ TSession {..} = forever $ do
+        waitInterval se
+        pr   <- getProgress se
+        resp <- tryJust isIOException $ do
+                    askTracker (regularReq defaultNumWant conn pr)
+        case resp of
+          Right (OK {..}) -> do
+            writeIORef seInterval respInterval
+            atomically $ writeTVar sePeers respPeers
+          _ -> return ()
+      where
+        isIOException :: IOException -> Maybe IOException
+        isIOException = return
 
     end (se, tid) = do
       killThread tid
-      getProgress se >>= sendRequest . stoppedReq conn
+      pr <- getProgress se
+      askTracker $ stoppedReq conn pr
