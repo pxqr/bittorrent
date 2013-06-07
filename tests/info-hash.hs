@@ -12,7 +12,7 @@ checkInfo :: String
 checkInfo = "0221caf96aa3cb94f0f58d458e78b0fc344ad8bf"
 
 torrentFileName :: String
-torrentFileName = "tests/dapper-dvd-amd64.iso.torrent"
+torrentFileName = "res/dapper-dvd-amd64.iso.torrent"
 
 main :: IO ()
 main = do
