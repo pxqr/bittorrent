@@ -7,17 +7,15 @@
 --
 --
 --   This module provides straigthforward Tracker protocol
---   implementation. The tracker is an HTTP/HTTPS service:
+--   implementation. The tracker is an HTTP/HTTPS service used to
+--   discovery peers for a particular existing torrent and keep
+--   statistics about the swarm.
 --
---     * A tracker request is HTTP GET request; used to include
---   metrics from clients that help the tracker keep overall
---   statistics about the torrent.
+--   For more convenient high level API see
+--   "Network.BitTorrent.Tracker" module.
 --
---     * The tracker response includes a peer list that helps the
---   client participate in the torrent.
---
---   For more convenient high level API see Network.BitTorrent.Tracker
---   module.
+--   For more information see:
+--   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
 --
 {-# OPTIONS -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -41,7 +39,6 @@ import Data.Map  as M
 import Data.Monoid
 import Data.BEncode
 import Data.ByteString as B
-import           Data.ByteString.Char8 as BC
 import           Data.Text as T
 import Data.Serialize.Get hiding (Result)
 import Data.URLEncoded as URL
@@ -56,35 +53,89 @@ import Network.BitTorrent.Peer
 import Network.BitTorrent.Tracker.Scrape
 
 
-data Event = Started   -- ^ For first request.
-           | Stopped   -- ^ Sent when the peer is shutting down.
-           | Completed -- ^ To be sent when the peer completes a download.
+
+-- | Events used to specify which kind of tracker request is performed.
+data Event = Started
+             -- ^ For the first request: when a peer join the swarm.
+           | Stopped
+             -- ^ Sent when the peer is shutting down.
+           | Completed
+             -- ^ To be sent when the peer completes a download.
              deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
+
+-- | A tracker request is HTTP GET request; used to include metrics
+--   from clients that help the tracker keep overall statistics about
+--   the torrent. The most important, requests are used by the tracker
+--   to keep track lists of active peer for a particular torrent.
+--
 data TRequest = TRequest { -- TODO peer here -- TODO detach announce
-     reqAnnounce   :: URI         -- ^ Announce url of the torrent.
-   , reqInfoHash   :: InfoHash    -- ^ Hash of info part of the torrent.
-   , reqPeerID     :: PeerID      -- ^ Id of the peer doing request. ()
-   , reqPort       :: PortNumber  -- ^ Port to listen to for connection from other peers.
-   , reqUploaded   :: Integer     -- ^ # of bytes that the peer has uploaded in the swarm.
-   , reqDownloaded :: Integer     -- ^ # of bytes downloaded in the swarm by the peer.
-   , reqLeft       :: Integer     -- ^ # of bytes needed in order to complete download.
-   , reqIP         :: Maybe HostAddress    -- ^ The peer IP.
-   , reqNumWant    :: Maybe Int   -- ^ Number of peers that the peers wants to receive from.
-   , reqEvent      :: Maybe Event -- ^ If not specified,
-                                  --   the request is regular periodic request.
+     reqAnnounce   :: URI
+     -- ^ Announce url of the torrent usually obtained from 'Torrent'.
+
+   , reqInfoHash   :: InfoHash
+     -- ^ Hash of info part of the torrent usually obtained from
+     -- 'Torrent'.
+
+   , reqPeerID     :: PeerID
+     -- ^ ID of the peer doing request.
+
+   , reqPort       :: PortNumber
+     -- ^ Port to listen to for connections from other
+     -- peers. Normally, tracker should respond with this port when
+     -- some peer request the tracker with the same info hash.
+
+   , reqUploaded   :: Integer
+     -- ^ Number of bytes that the peer has uploaded in the swarm.
+
+   , reqDownloaded :: Integer
+     -- ^ Number of bytes downloaded in the swarm by the peer.
+
+   , reqLeft       :: Integer
+     -- ^ Number of bytes needed in order to complete download.
+
+   , reqIP         :: Maybe HostAddress
+     -- ^ The peer IP. Needed only when client communicated with
+     -- tracker throught a proxy.
+
+   , reqNumWant    :: Maybe Int
+     -- ^ Number of peers that the peers wants to receive from. See
+     -- note for 'defaultNumWant'.
+
+   , reqEvent      :: Maybe Event
+      -- ^ If not specified, the request is regular periodic request.
    } deriving Show
 
+
+-- | The tracker response includes a peer list that helps the client
+--   participate in the torrent. The most important is 'respPeer' list
+--   used to join the swarm.
+--
 data TResponse =
-     Failure Text           -- ^ Failure reason in human readable form.
+     Failure Text -- ^ Failure reason in human readable form.
    | OK {
        respWarning     :: Maybe Text
-     , respInterval    :: Int       -- ^ Recommended interval to wait between requests.
-     , respMinInterval :: Maybe Int -- ^ Minimal amount of time between requests.
-     , respComplete    :: Maybe Int -- ^ Number of peers completed the torrent. (seeders)
-     , respIncomplete  :: Maybe Int -- ^ Number of peers downloading the torrent.
-     , respPeers       :: [PeerAddr]    -- ^ Peers that must be contacted.
+       -- ^ Human readable warning.
+
+     , respInterval    :: Int
+       -- ^ Recommended interval to wait between requests.
+
+     , respMinInterval :: Maybe Int
+       -- ^ Minimal amount of time between requests. A peer /should/
+       -- make timeout with at least 'respMinInterval' value,
+       -- otherwise tracker might not respond. If not specified the
+       -- same applies to 'respInterval'.
+
+     , respComplete    :: Maybe Int
+       -- ^ Number of peers completed the torrent. (seeders)
+
+     , respIncomplete  :: Maybe Int
+       -- ^ Number of peers downloading the torrent. (leechers)
+
+     , respPeers       :: [PeerAddr]
+       -- ^ Peers that must be contacted.
      } deriving Show
+
 
 instance BEncodable TResponse where
   toBEncode (Failure t)  = fromAssocs ["failure reason" --> t]
@@ -117,8 +168,8 @@ instance BEncodable TResponse where
             peerG = do
               pip   <- getWord32be
               pport <- getWord16be
-              return (PeerAddr Nothing (fromIntegral pip) (fromIntegral pport))
-
+              return $ PeerAddr Nothing (fromIntegral pip)
+                                        (fromIntegral pport)
         getPeers _ = decodingError "Peers"
 
   fromBEncode _ = decodingError "TResponse"
@@ -133,7 +184,7 @@ instance URLShow Word32 where
 instance URLShow Event where
   urlShow e = urlShow (Char.toLower x : xs)
     where
-      -- this is always nonempty list
+      -- INVARIANT: this is always nonempty list
       (x : xs) = show e
 
 instance URLEncode TRequest where
@@ -155,20 +206,19 @@ encodeRequest req = URL.urlEncode req
                     `addHashToURI`  reqInfoHash req
 
 
--- | Ports typically reserved for bittorrent.
+-- | Ports typically reserved for bittorrent P2P communication.
 defaultPorts :: [PortNumber]
 defaultPorts = [6881..6889]
 
--- | Above 25, new peers are highly unlikely to increase download speed.
---   Even 30 peers is _plenty_, the official client version 3 in fact only
---   actively forms new connections if it has less than 30 peers and will
---   refuse connections if it has 55. So default value is set to 25.
+-- | Above 25, new peers are highly unlikely to increase download
+--   speed.  Even 30 peers is /plenty/, the official client version 3
+--   in fact only actively forms new connections if it has less than
+--   30 peers and will refuse connections if it has 55.
+--
+--   So the default value is set to 25.
 --
 defaultNumWant :: Int
 defaultNumWant = 25
-
-
-
 
 -- | TODO rename to ask for peers
 --
