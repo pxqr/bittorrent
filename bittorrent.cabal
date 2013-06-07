@@ -47,8 +47,8 @@ library
                      , Network.BitTorrent.PeerWire
                      , Network.BitTorrent.PeerWire.Block
                      , Network.BitTorrent.PeerWire.Selection
-                     , Network.BitTorrent.PeerWire.Message
                      , Network.BitTorrent.PeerWire.Handshake
+                     , Network.BitTorrent.PeerWire.Protocol
 
   other-modules:
 

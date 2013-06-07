@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Network.BitTorrent.PeerWire.Message
-       ( Message(..)
-       , Bitfield
+module Network.BitTorrent.PeerWire.Protocol
+       (
+         -- * Messages
+         Message(..)
        , ppMessage
        ) where
 
