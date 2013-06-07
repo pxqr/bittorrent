@@ -8,7 +8,5 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 module Network.BitTorrent.PeerWire (module PW) where
 
-import Network.BitTorrent.PeerWire.Block as PW
 import Network.BitTorrent.PeerWire.Selection as PW
 import Network.BitTorrent.PeerWire.Protocol as PW
-import Network.BitTorrent.PeerWire.Handshake as PW

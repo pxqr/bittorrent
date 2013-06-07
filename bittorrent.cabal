@@ -45,9 +45,7 @@ library
                      , Network.BitTorrent.Tracker.Scrape
 
                      , Network.BitTorrent.PeerWire
-                     , Network.BitTorrent.PeerWire.Block
                      , Network.BitTorrent.PeerWire.Selection
-                     , Network.BitTorrent.PeerWire.Handshake
                      , Network.BitTorrent.PeerWire.Protocol
 
   other-modules:

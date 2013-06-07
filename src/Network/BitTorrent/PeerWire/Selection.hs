@@ -34,7 +34,7 @@ module Network.BitTorrent.PeerWire.Selection
 
 import Data.Bitfield
 import Data.Ratio
-import Network.BitTorrent.PeerWire.Block
+import Network.BitTorrent.PeerWire.Protocol
 
 
 type Selector =  Bitfield      -- ^ Indices of client /have/ pieces.

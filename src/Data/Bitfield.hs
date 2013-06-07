@@ -13,7 +13,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 module Data.Bitfield
-       ( Bitfield, PieceCount
+       ( PieceIx, PieceCount, Bitfield
 
          -- * Construction
        , haveAll, haveNone, have
@@ -54,8 +54,9 @@ import qualified  Data.IntervalSet.ByteString as S
 import           Data.List (foldl')
 import           Data.Monoid
 import           Data.Ratio
-import Network.BitTorrent.PeerWire.Block
 
+
+type PieceIx = Int
 
 -- | Used to represent max set bound. Min set bound is always set to
 -- zero.

@@ -1,22 +1,254 @@
+-- |
+--   Copyright   :  (c) Sam T. 2013
+--   License     :  MIT
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   In order to establish the connection between peers we should send
+--   'Handshake' message. The 'Handshake' is a required message and
+--   must be the first message transmitted by the peer to the another
+--   peer.
+--
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.PeerWire.Protocol
-       (
-         -- * Messages
-         Message(..)
+       ( -- * Inital handshake
+         Handshake(..), ppHandshake
+       , handshake , handshakeCaps
+
+         -- ** Defaults
+       , defaultHandshake, defaultBTProtocol, defaultReserved
+       , handshakeMaxSize
+
+         -- * Block
+       , BlockLIx, PieceLIx
+       , BlockIx(..), ppBlockIx
+       , Block(..),  ppBlock ,blockSize
+       , pieceIx, blockIx
+       , blockRange, ixRange, isPiece
+
+         -- ** Defaults
+       , defaultBlockSize
+
+         -- * Regular messages
+       , Message(..)
        , ppMessage
        ) where
 
 import Control.Applicative
+import Control.Monad
+import Control.Exception
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as Lazy
-import Data.Serialize
+import Data.Serialize as S
+import Data.Int
+import Data.Word
 import Text.PrettyPrint
+
 import Network
+import Network.Socket.ByteString
 
-import Network.BitTorrent.PeerWire.Block
 import Data.Bitfield
+import Data.Torrent
+import Network.BitTorrent.Extension
+import Network.BitTorrent.Peer
 
 
+
+{-----------------------------------------------------------------------
+    Handshake
+-----------------------------------------------------------------------}
+
+data Handshake = Handshake {
+    -- | Identifier of the protocol.
+    hsProtocol    :: ByteString
+
+    -- | Reserved bytes used to specify supported BEP's.
+  , hsReserved    :: Capabilities
+
+    -- | Info hash of the info part of the metainfo file. that is
+    -- transmitted in tracker requests. Info hash of the initiator
+    -- handshake and response handshake should match, otherwise
+    -- initiator should break the connection.
+    --
+  , hsInfoHash    :: InfoHash
+
+    -- | Peer id of the initiator. This is usually the same peer id
+    -- that is transmitted in tracker requests.
+    --
+  , hsPeerID      :: PeerID
+
+  } deriving (Show, Eq)
+
+instance Serialize Handshake where
+  put hs = do
+    putWord8 (fromIntegral (B.length (hsProtocol hs)))
+    putByteString (hsProtocol hs)
+    putWord64be   (hsReserved hs)
+    put (hsInfoHash hs)
+    put (hsPeerID hs)
+
+  get = do
+    len  <- getWord8
+    Handshake <$> getBytes (fromIntegral len)
+              <*> getWord64be
+              <*> get
+              <*> get
+
+
+handshakeCaps :: Handshake -> Capabilities
+handshakeCaps = hsReserved
+
+-- | Format handshake in human readable form.
+ppHandshake :: Handshake -> Doc
+ppHandshake Handshake {..} =
+  text (BC.unpack hsProtocol) <+> ppClientInfo (clientInfo hsPeerID)
+
+-- | Get handshake message size in bytes from the length of protocol string.
+handshakeSize :: Word8 -> Int
+handshakeSize n = 1 + fromIntegral n + 8 + 20 + 20
+
+-- | Maximum size of handshake message in bytes.
+handshakeMaxSize :: Int
+handshakeMaxSize = handshakeSize 255
+
+-- | Default protocol string "BitTorrent protocol" as is.
+defaultBTProtocol :: ByteString
+defaultBTProtocol = "BitTorrent protocol"
+
+-- | Default reserved word is 0.
+defaultReserved :: Word64
+defaultReserved = 0
+
+-- | Length of info hash and peer id is unchecked, so it /should/ be equal 20.
+defaultHandshake :: InfoHash -> PeerID -> Handshake
+defaultHandshake = Handshake defaultBTProtocol defaultReserved
+
+-- | Handshaking with a peer specified by the second argument.
+handshake :: Socket -> Handshake -> IO Handshake
+handshake sock hs = do
+    sendAll sock (S.encode hs)
+
+    header <- recv sock 1
+    when (B.length header == 0) $
+      throw $ userError "Unable to receive handshake."
+
+    let protocolLen = B.head header
+    let restLen     = handshakeSize protocolLen - 1
+    body <- recv sock restLen
+    let resp = B.cons protocolLen body
+
+    case checkIH (S.decode resp) of
+      Right hs' -> return hs'
+      Left msg  -> throw $ userError msg
+  where
+    checkIH (Right hs')
+      | hsInfoHash hs /= hsInfoHash hs'
+      = Left "Handshake info hash do not match."
+    checkIH x = x
+
+{-----------------------------------------------------------------------
+    Blocks
+-----------------------------------------------------------------------}
+
+type BlockLIx = Int
+type PieceLIx = Int
+
+
+data BlockIx = BlockIx {
+    -- | Zero-based piece index.
+    ixPiece  :: {-# UNPACK #-} !PieceLIx
+
+    -- | Zero-based byte offset within the piece.
+  , ixOffset :: {-# UNPACK #-} !Int
+
+    -- | Block size starting from offset.
+  , ixLength :: {-# UNPACK #-} !Int
+  } deriving (Show, Eq)
+
+getInt :: Get Int
+getInt = fromIntegral <$> getWord32be
+{-# INLINE getInt #-}
+
+putInt :: Putter Int
+putInt = putWord32be . fromIntegral
+{-# INLINE putInt #-}
+
+instance Serialize BlockIx where
+  {-# SPECIALIZE instance Serialize BlockIx #-}
+  get = BlockIx <$> getInt <*> getInt <*> getInt
+  {-# INLINE get #-}
+
+  put ix = do putInt (ixPiece ix)
+              putInt (ixOffset ix)
+              putInt (ixLength ix)
+  {-# INLINE put #-}
+
+ppBlockIx :: BlockIx -> Doc
+ppBlockIx BlockIx {..} =
+  "piece  = " <> int ixPiece  <> "," <+>
+  "offset = " <> int ixOffset <> "," <+>
+  "length = " <> int ixLength
+
+data Block = Block {
+    -- | Zero-based piece index.
+    blkPiece  :: !PieceLIx
+
+    -- | Zero-based byte offset within the piece.
+  , blkOffset :: !Int
+
+    -- | Payload.
+  , blkData   :: !ByteString
+  } deriving (Show, Eq)
+
+ppBlock :: Block -> Doc
+ppBlock = ppBlockIx . blockIx
+
+blockSize :: Block -> Int
+blockSize blk = B.length (blkData blk)
+
+-- | Widely used semi-official block size.
+defaultBlockSize :: Int
+defaultBlockSize = 16 * 1024
+
+
+isPiece :: Int -> Block -> Bool
+isPiece pieceSize (Block i offset bs) =
+  offset == 0 && B.length bs == pieceSize && i >= 0
+{-# INLINE isPiece #-}
+
+pieceIx :: Int -> Int -> BlockIx
+pieceIx i = BlockIx i 0
+{-# INLINE pieceIx #-}
+
+blockIx :: Block -> BlockIx
+blockIx = BlockIx <$> blkPiece <*> blkOffset <*> B.length . blkData
+
+blockRange :: (Num a, Integral a) => Int -> Block -> (a, a)
+blockRange pieceSize blk = (offset, offset + len)
+  where
+    offset = fromIntegral pieceSize * fromIntegral (blkPiece blk)
+           + fromIntegral (blkOffset blk)
+    len    = fromIntegral (B.length (blkData blk))
+{-# INLINE blockRange #-}
+{-# SPECIALIZE blockRange :: Int -> Block -> (Int64, Int64) #-}
+
+ixRange :: (Num a, Integral a) => Int -> BlockIx -> (a, a)
+ixRange pieceSize ix = (offset, offset + len)
+  where
+    offset = fromIntegral  pieceSize * fromIntegral (ixPiece ix)
+           + fromIntegral (ixOffset ix)
+    len    = fromIntegral (ixLength ix)
+{-# INLINE ixRange #-}
+{-# SPECIALIZE ixRange :: Int -> BlockIx -> (Int64, Int64) #-}
+
+
+{-----------------------------------------------------------------------
+    Handshake
+-----------------------------------------------------------------------}
 
 -- | Messages used in communication between peers.
 --
