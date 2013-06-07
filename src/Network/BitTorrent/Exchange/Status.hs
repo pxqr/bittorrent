@@ -5,7 +5,7 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
-module Network.BitTorrent.Peer.Status
+module Network.BitTorrent.Exchange.Status
        ( PeerStatus(..)
        , setChoking, setInterested
        , initPeerStatus

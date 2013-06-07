@@ -9,5 +9,5 @@ module Network.BitTorrent (module BT) where
 
 import Network.BitTorrent.Extension as BT
 import Network.BitTorrent.Peer as BT
-import Network.BitTorrent.PeerWire as BT
+import Network.BitTorrent.Exchange as BT
 import Network.BitTorrent.Tracker as BT

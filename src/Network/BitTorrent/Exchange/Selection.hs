@@ -21,7 +21,7 @@
 --   Note that BitTorrent applies the strict priority policy for
 --   /subpiece/ or /blocks/ selection.
 --
-module Network.BitTorrent.PeerWire.Selection
+module Network.BitTorrent.Exchange.Selection
        ( Selector
 
        -- * Construction
@@ -34,7 +34,7 @@ module Network.BitTorrent.PeerWire.Selection
 
 import Data.Bitfield
 import Data.Ratio
-import Network.BitTorrent.PeerWire.Protocol
+import Network.BitTorrent.Exchange.Protocol
 
 
 type Selector =  Bitfield      -- ^ Indices of client /have/ pieces.

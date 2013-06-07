@@ -6,10 +6,10 @@
 --   Portability :  portable
 --
 {-# LANGUAGE DoAndIfThenElse #-}
-module Network.BitTorrent.PeerWire (module PW) where
+module Network.BitTorrent.Exchange (module PW) where
 
-import Network.BitTorrent.PeerWire.Selection as PW
-import Network.BitTorrent.PeerWire.Protocol as PW
+import Network.BitTorrent.Exchange.Selection as PW
+import Network.BitTorrent.Exchange.Protocol as PW
 
 {-
 

@@ -12,7 +12,7 @@
 --
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module Network.BitTorrent.PeerWire.Protocol
+module Network.BitTorrent.Exchange.Protocol
        ( -- * Inital handshake
          Handshake(..), ppHandshake
        , handshake , handshakeCaps
