@@ -56,6 +56,7 @@ import           Data.Monoid
 import           Data.Ratio
 
 
+-- | Pieces indexed from zero up to 'PieceCount' value.
 type PieceIx = Int
 
 -- | Used to represent max set bound. Min set bound is always set to
@@ -162,7 +163,8 @@ frequencies xs = runST $ do
 
 -- TODO it seems like this operation is veeery slow
 
--- | Find least available piece index. If no piece available return 'Nothing'.
+-- | Find least available piece index. If no piece available return
+-- 'Nothing'.
 rarest :: [Bitfield] -> Maybe PieceIx
 rarest xs
     | V.null freqMap = Nothing
@@ -170,7 +172,9 @@ rarest xs
   where
     freqMap = frequencies xs
 
-    minIx :: PieceIx -> Frequency -> (PieceIx, Frequency) -> (PieceIx, Frequency)
+    minIx ::  PieceIx -> Frequency
+          -> (PieceIx,   Frequency)
+          -> (PieceIx,   Frequency)
     minIx ix fr acc@(_, fra)
       | fr < fra && fr > 0 = (ix, fr)
       |     otherwise      = acc
@@ -201,7 +205,7 @@ difference a b = Bitfield {
   , bfSet  = bfSet a `S.difference` bfSet b
   }
 
--- |
+-- | Find indices the any of the peers have.
 unions :: [Bitfield] -> Bitfield
 unions = foldl' union (haveNone 0)
 

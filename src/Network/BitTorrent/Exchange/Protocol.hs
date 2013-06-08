@@ -5,10 +5,25 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   In order to establish the connection between peers we should send
---   'Handshake' message. The 'Handshake' is a required message and
---   must be the first message transmitted by the peer to the another
---   peer.
+--   Normally peer to peer communication consisting of the following
+--   steps:
+--
+--   * In order to establish the connection between peers we should
+--   send 'Handshake' message. The 'Handshake' is a required message
+--   and must be the first message transmitted by the peer to the
+--   another peer. Another peer should reply with a handshake as well.
+--
+--   * Next peer might sent bitfield message, but might not. In the
+--   former case we should update bitfield peer have. Again, if we
+--   have some pieces we should send bitfield. Normally bitfield
+--   message should sent after the handshake message.
+--
+--   * Regular exchange messages. TODO docs
+--
+--   For more high level API see "Network.BitTorrent.Exchange" module.
+--
+--   For more infomation see:
+--   <https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29>
 --
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -77,6 +92,9 @@ import Network.BitTorrent.Peer
     Handshake
 -----------------------------------------------------------------------}
 
+-- | Handshake message is used to exchange all information necessary
+-- to establish connection between peers.
+--
 data Handshake = Handshake {
     -- | Identifier of the protocol.
     hsProtocol    :: ByteString
@@ -113,7 +131,7 @@ instance Serialize Handshake where
               <*> get
               <*> get
 
-
+-- | Extract capabilities from a peer handshake message.
 handshakeCaps :: Handshake -> Capabilities
 handshakeCaps = hsReserved
 
@@ -122,7 +140,8 @@ ppHandshake :: Handshake -> Doc
 ppHandshake Handshake {..} =
   text (BC.unpack hsProtocol) <+> ppClientInfo (clientInfo hsPeerID)
 
--- | Get handshake message size in bytes from the length of protocol string.
+-- | Get handshake message size in bytes from the length of protocol
+-- string.
 handshakeSize :: Word8 -> Int
 handshakeSize n = 1 + fromIntegral n + 8 + 20 + 20
 
@@ -138,7 +157,8 @@ defaultBTProtocol = "BitTorrent protocol"
 defaultReserved :: Word64
 defaultReserved = 0
 
--- | Length of info hash and peer id is unchecked, so it /should/ be equal 20.
+-- | Length of info hash and peer id is unchecked, so it /should/ be
+-- equal 20.
 defaultHandshake :: InfoHash -> PeerID -> Handshake
 defaultHandshake = Handshake defaultBTProtocol defaultReserved
 
@@ -202,6 +222,7 @@ instance Serialize BlockIx where
               putInt (ixLength ix)
   {-# INLINE put #-}
 
+-- | Format block index in human readable form.
 ppBlockIx :: BlockIx -> Doc
 ppBlockIx BlockIx {..} =
   "piece  = " <> int ixPiece  <> "," <+>
@@ -219,6 +240,7 @@ data Block = Block {
   , blkData   :: !ByteString
   } deriving (Show, Eq)
 
+-- | Format block in human readable form. Payload is ommitted.
 ppBlock :: Block -> Doc
 ppBlock = ppBlockIx . blockIx
 
@@ -262,7 +284,7 @@ ixRange pieceSize ix = (offset, offset + len)
 
 
 {-----------------------------------------------------------------------
-    Handshake
+    Regular messages
 -----------------------------------------------------------------------}
 
 -- | Messages used in communication between peers.
@@ -405,6 +427,7 @@ ppMessage msg = text (show msg)
     Peer Status
 -----------------------------------------------------------------------}
 
+-- |
 data PeerStatus = PeerStatus {
     psChoking    :: Bool
   , psInterested :: Bool
@@ -414,38 +437,45 @@ data PeerStatus = PeerStatus {
 initPeerStatus :: PeerStatus
 initPeerStatus = PeerStatus True False
 
+-- | Update choking field.
 setChoking :: Bool -> PeerStatus -> PeerStatus
 setChoking b ps = ps { psChoking = b }
 
+-- | Update interested field.
 setInterested :: Bool -> PeerStatus -> PeerStatus
 setInterested b ps = ps { psInterested = b }
 
-
-
+-- |
 data SessionStatus = SessionStatus {
     seClientStatus :: PeerStatus
   , sePeerStatus   :: PeerStatus
   }
 
+-- | Initial session status after two peers handshaked.
 initSessionStatus :: SessionStatus
 initSessionStatus = SessionStatus initPeerStatus initPeerStatus
 
-setClientStatus :: (PeerStatus -> PeerStatus) -> SessionStatus -> SessionStatus
+-- | Update client status.
+setClientStatus :: (PeerStatus -> PeerStatus)
+                -> SessionStatus -> SessionStatus
 setClientStatus f ss = ss { seClientStatus = f (seClientStatus ss) }
 
-setPeerStatus :: (PeerStatus -> PeerStatus) -> SessionStatus -> SessionStatus
+-- | Update peer status.
+setPeerStatus :: (PeerStatus -> PeerStatus)
+              -> SessionStatus -> SessionStatus
 setPeerStatus f ss = ss { sePeerStatus = f (sePeerStatus ss) }
 
 -- | Can the /client/ to upload to the /peer/?
 canUpload :: SessionStatus -> Bool
-canUpload SessionStatus { seClientStatus = client, sePeerStatus = peer}  =
-  psInterested peer && not (psChoking client)
+canUpload SessionStatus {..}
+  = psInterested sePeerStatus && not (psChoking seClientStatus)
 
 -- | Can the /client/ download from the /peer/?
 canDownload :: SessionStatus -> Bool
-canDownload SessionStatus { seClientStatus = client, sePeerStatus = peer }  =
-  psInterested client && not (psChoking peer)
+canDownload SessionStatus {..}
+  = psInterested seClientStatus && not (psChoking sePeerStatus)
 
--- | Indicates have many peers are allowed to download from the client.
+-- | Indicates how many peers are allowed to download from the client
+-- by default.
 defaultUnchokeSlots :: Int
 defaultUnchokeSlots = 4

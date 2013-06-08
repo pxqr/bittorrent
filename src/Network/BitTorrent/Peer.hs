@@ -89,7 +89,8 @@ import Network.Socket
 
 
 
--- TODO we have linker error here, so manual hardcoded version for a while.
+-- TODO we have linker error here, so manual hardcoded version for a
+-- while.
 -- import Paths_network_bittorrent (version)
 version :: Version
 version = Version [0, 10, 0, 0] []
@@ -109,6 +110,7 @@ instance Serialize PeerID where
 instance URLShow PeerID where
   urlShow = BC.unpack . getPeerID
 
+-- | Format peer id in human readable form.
 ppPeerID :: PeerID -> Doc
 ppPeerID = text . BC.unpack . getPeerID
 
@@ -354,11 +356,13 @@ parseImpl = f . BC.unpack
 ppClientImpl :: ClientImpl -> Doc
 ppClientImpl = text . tail . show
 
+-- | Used to represent not recognized implementation
 unknownImpl :: ClientImpl
 unknownImpl = IUnknown
 
+-- TODO use Data.Version
 
-
+-- | Raw version of client, normally extracted from peer id.
 type ClientVersion = ByteString
 
 -- | Format client implementation version in human readable form.
@@ -391,7 +395,8 @@ unknownClient = ClientInfo unknownImpl unknownVersion
 -- 'unknownClient'.
 --
 clientInfo :: PeerID -> ClientInfo
-clientInfo pid = either (const unknownClient) id $ runGet getCI (getPeerID pid)
+clientInfo pid = either (const unknownClient) id $
+                     runGet getCI (getPeerID pid)
   where -- TODO other styles
     getCI = do
       _ <- getWord8
@@ -477,7 +482,8 @@ nameMap =
     Peer address
 -----------------------------------------------------------------------}
 
-
+-- | Peer address info normally extracted from peer list or peer
+-- compact list encoding.
 data PeerAddr = PeerAddr {
       peerID   :: Maybe PeerID
     , peerIP   :: HostAddress
