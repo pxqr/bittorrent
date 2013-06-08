@@ -5,7 +5,11 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
-module Network.BitTorrent (module BT) where
+module Network.BitTorrent
+       (module BT
+
+--       , ClientSession, newClient
+       ) where
 
 import Network.BitTorrent.Extension as BT
 import Network.BitTorrent.Peer as BT

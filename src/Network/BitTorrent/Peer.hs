@@ -488,7 +488,8 @@ data PeerAddr = PeerAddr {
       peerID   :: Maybe PeerID
     , peerIP   :: HostAddress
     , peerPort :: PortNumber
-    } deriving (Show, Eq)
+    } deriving (Show, Eq, Ord)
+               -- TODO verify semantic of ord and eq instances
 
 instance BEncodable PortNumber where
   toBEncode = toBEncode . fromEnum

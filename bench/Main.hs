@@ -10,6 +10,8 @@ import Data.Serialize
 import Network
 
 import Network.BitTorrent as BT
+import Network.BitTorrent.Exchange.Protocol as BT
+import Network.BitTorrent.Tracker.Protocol as BT
 import Data.Bitfield as BT
 
 

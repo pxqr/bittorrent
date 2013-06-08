@@ -25,7 +25,8 @@ import Data.BEncode as BE
 import Data.Bitfield as BF
 import Data.Torrent
 import Network.BitTorrent as BT
-
+import Network.BitTorrent.Exchange.Protocol
+import Network.BitTorrent.Tracker.Protocol
 -- import Debug.Trace
 
 
