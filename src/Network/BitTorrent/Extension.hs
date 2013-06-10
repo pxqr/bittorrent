@@ -12,8 +12,8 @@
 --
 {-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.Extension
-       ( Capabilities, ppCaps, defaultCaps, enabledCaps
-       , Extension, ppExtension, encodeExts, decodeExts
+       ( Capabilities,  ppCaps, defaultCaps, enabledCaps
+       , Extension(..), ppExtension, encodeExts, decodeExts
        ) where
 
 import Data.Bits

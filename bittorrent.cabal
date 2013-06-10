@@ -46,6 +46,8 @@ library
                      , Network.BitTorrent.Exchange
                      , Network.BitTorrent.Exchange.Selection
 
+  other-modules:       Network.BitTorrent.Internal
+
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
@@ -59,6 +61,7 @@ library
   build-depends:
                        base       == 4.*
                      , stm        >= 2.4
+                     , mtl
 
                        -- Data packages
                      , array      >= 0.4
