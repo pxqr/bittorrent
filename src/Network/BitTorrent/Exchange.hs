@@ -60,10 +60,11 @@ waitMessage se = do
     Nothing -> waitMessage se
     Just msg -> do
       liftIO $ updateIncoming se
+      liftIO $ print msg
       return msg
 
-signalMessage :: Message -> PeerSession -> PeerWire ()
-signalMessage msg se = do
+signalMessage :: PeerSession -> Message -> PeerWire ()
+signalMessage se msg = do
   C.yield msg
   liftIO $ updateOutcoming se
 
@@ -71,58 +72,75 @@ signalMessage msg se = do
 getPieceCount :: PeerSession -> IO PieceCount
 getPieceCount = undefined
 
-nextEvent :: PeerSession -> PeerWire Event
-nextEvent se @ PeerSession {..} = waitMessage se >>= diff
-  where
-    -- diff finds difference between
---    diff KeepAlive = nextEvent se
-    diff msg = do
-      liftIO $ print (ppMessage msg)
-      nextEvent se
+canOffer :: PeerSession -> PeerWire Bitfield
+canOffer PeerSession {..} = liftIO $ do
+  pbf <- readIORef $ peerBitfield
+  cbf <- readIORef $ clientBitfield $ swarmSession
+  return $ BF.difference pbf cbf
 
-    handleMessage Choke     = do
+revise :: PeerSession -> PeerWire ()
+revise se @ PeerSession {..} = do
+  isInteresting <- (not . BF.null) <$> canOffer se
+  SessionStatus {..} <- liftIO $ readIORef peerSessionStatus
+
+  when (isInteresting /= _interested seClientStatus) $
+    signalMessage se $ if isInteresting then Interested else NotInterested
+
+
+nextEvent :: PeerSession -> PeerWire Event
+nextEvent se @ PeerSession {..} = waitMessage se >>= go
+  where
+    go KeepAlive = nextEvent se
+    go Choke     = do
       SessionStatus {..} <- liftIO $ readIORef peerSessionStatus
-      if psChoking  sePeerStatus
+      if _choking  sePeerStatus
         then nextEvent se
         else undefined
 
-    handleMessage Unchoke   = undefined
+    go Unchoke   = do
+      SessionStatus {..} <- liftIO $ readIORef peerSessionStatus
+      if not (_choking sePeerStatus)
+        then nextEvent se
+        else if undefined
+             then undefined
+             else undefined
     --return $ Available BF.difference
 
-    handleMessage Interested = return undefined
-    handleMessage NotInterested = return undefined
-    handleMessage (Have ix) = do
+    go Interested = return undefined
+    go NotInterested = return undefined
+
+    go (Have ix) = do
       pc <- liftIO $ getPieceCount se
       haveMessage $ have ix (haveNone pc) -- TODO singleton
 
-    handleMessage (Bitfield bf) = undefined
-    handleMessage (Request  bix) = do
+    go (Bitfield bf) = undefined
+    go (Request  bix) = do
       undefined
 
-    handleMessage msg @ (Piece    blk) = undefined
-    handleMessage msg @ (Port     _)
+    go msg @ (Piece    blk) = undefined
+    go msg @ (Port     _)
       = checkExtension msg ExtDHT $ do
       undefined
 
-    handleMessage msg @ HaveAll
+    go msg @ HaveAll
       = checkExtension msg ExtFast $ do
           pc <- liftIO $ getPieceCount se
           haveMessage (haveAll pc)
 
-    handleMessage msg @ HaveNone
+    go msg @ HaveNone
       = checkExtension msg ExtFast $ do
         pc <- liftIO $ getPieceCount se
         haveMessage (haveNone pc)
 
-    handleMessage msg @ (SuggestPiece ix)
+    go msg @ (SuggestPiece ix)
           = checkExtension msg ExtFast $ do
             undefined
 
-    handleMessage msg @ (RejectRequest ix)
+    go msg @ (RejectRequest ix)
           = checkExtension msg ExtFast $ do
             undefined
 
-    handleMessage msg @ (AllowedFast pix)
+    go msg @ (AllowedFast pix)
           = checkExtension msg ExtFast $ do
             undefined
 
@@ -148,7 +166,10 @@ newtype P2P a = P2P {
     runP2P :: ReaderT PeerSession PeerWire a
   } deriving (Monad, MonadReader PeerSession, MonadIO)
 
-instance MonadState Bitfield P2P where
+instance MonadState SessionStatus P2P where
+  get   = asks peerSessionStatus >>= liftIO . readIORef
+  put x = asks peerSessionStatus >>= liftIO . (`writeIORef` x)
+
 
 runConduit :: Socket -> Conduit Message IO Message -> IO ()
 runConduit sock p2p =

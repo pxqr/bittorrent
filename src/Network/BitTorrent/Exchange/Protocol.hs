@@ -51,16 +51,9 @@ module Network.BitTorrent.Exchange.Protocol
        , ppMessage
 
          -- * Exchange control
-         -- ** Peer status
        , PeerStatus(..)
-       , setChoking, setInterested
-       , initPeerStatus
-
-         -- ** Session status
        , SessionStatus(..)
-       , initSessionStatus
-       , setClientStatus, setPeerStatus
-       , canUpload, canDownload
+--       , canUpload, canDownload
 
        -- ** Defaults
        , defaultUnchokeSlots
@@ -73,6 +66,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as Lazy
+import Data.Default
 import Data.Serialize as S
 import Data.Int
 import Data.Word
@@ -429,21 +423,12 @@ ppMessage msg = text (show msg)
 
 -- |
 data PeerStatus = PeerStatus {
-    psChoking    :: Bool
-  , psInterested :: Bool
+    _choking    :: Bool
+  , _interested :: Bool
   }
 
--- | Any session between peers starts as choking and not interested.
-initPeerStatus :: PeerStatus
-initPeerStatus = PeerStatus True False
-
--- | Update choking field.
-setChoking :: Bool -> PeerStatus -> PeerStatus
-setChoking b ps = ps { psChoking = b }
-
--- | Update interested field.
-setInterested :: Bool -> PeerStatus -> PeerStatus
-setInterested b ps = ps { psInterested = b }
+instance Default PeerStatus where
+  def = PeerStatus True False
 
 -- |
 data SessionStatus = SessionStatus {
@@ -451,20 +436,10 @@ data SessionStatus = SessionStatus {
   , sePeerStatus   :: PeerStatus
   }
 
--- | Initial session status after two peers handshaked.
-initSessionStatus :: SessionStatus
-initSessionStatus = SessionStatus initPeerStatus initPeerStatus
+instance Default SessionStatus where
+  def = SessionStatus def def
 
--- | Update client status.
-setClientStatus :: (PeerStatus -> PeerStatus)
-                -> SessionStatus -> SessionStatus
-setClientStatus f ss = ss { seClientStatus = f (seClientStatus ss) }
-
--- | Update peer status.
-setPeerStatus :: (PeerStatus -> PeerStatus)
-              -> SessionStatus -> SessionStatus
-setPeerStatus f ss = ss { sePeerStatus = f (sePeerStatus ss) }
-
+{-
 -- | Can the /client/ to upload to the /peer/?
 canUpload :: SessionStatus -> Bool
 canUpload SessionStatus {..}
@@ -474,6 +449,7 @@ canUpload SessionStatus {..}
 canDownload :: SessionStatus -> Bool
 canDownload SessionStatus {..}
   = psInterested seClientStatus && not (psChoking sePeerStatus)
+-}
 
 -- | Indicates how many peers are allowed to download from the client
 -- by default.

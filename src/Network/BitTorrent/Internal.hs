@@ -27,6 +27,7 @@ import Control.Concurrent.STM
 import Control.Exception
 
 import Data.IORef
+import Data.Default
 import Data.Function
 import Data.Ord
 import Data.Set as S
@@ -196,7 +197,7 @@ withPeerSession ss @ SwarmSession {..} addr
                 maxOutcomingTime (sendKA sock)
          <*> newChan
          <*> pure clientBitfield
-         <*> newIORef initSessionStatus
+         <*> newIORef def
       return (sock, ps)
 
     closeSession = close . fst
