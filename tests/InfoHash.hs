@@ -19,7 +19,7 @@ main = do
   args <- getArgs
   let path = if length args == 0 then torrentFileName else head args
 
-  Right t <- fromFile path
+  t <- fromFile path
 
   BC.putStr "info hash: "
   print (ppInfoHash (tInfoHash t))

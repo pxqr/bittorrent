@@ -55,6 +55,8 @@ import Prelude hiding (sum)
 
 import Control.Applicative
 import Control.Arrow
+import Control.Exception
+import Control.Monad
 import Data.BEncode as BE
 import Data.Char
 import Data.Foldable
@@ -353,8 +355,8 @@ isMultiFile MultiFile {} = True
 isMultiFile _            = False
 
 -- | Read and decode a .torrent file.
-fromFile :: FilePath -> IO (Result Torrent)
-fromFile filepath = decoded <$> B.readFile filepath
+fromFile :: FilePath -> IO Torrent
+fromFile = B.readFile >=> either (throwIO . userError) return . decoded
 
 {-----------------------------------------------------------------------
     Info hash

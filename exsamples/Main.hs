@@ -8,7 +8,7 @@ import System.Environment
 main :: IO ()
 main = do
   [path] <- getArgs
-  Right torrent <- fromFile path
+  torrent <- fromFile path
 
   client  <- newClient []
   swarm   <- newLeacher  client torrent

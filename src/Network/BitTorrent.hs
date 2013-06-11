@@ -28,6 +28,8 @@ import Network.BitTorrent.Peer as BT
 import Network.BitTorrent.Exchange as BT
 import Network.BitTorrent.Tracker as BT
 
+-- discover should hide tracker and DHT communication under the hood
+-- thus we can obtain unified interface
 
 discover :: SwarmSession -> (TSession -> IO a) -> IO a
 discover SwarmSession {..} action = do
