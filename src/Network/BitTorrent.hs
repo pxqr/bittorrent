@@ -5,6 +5,7 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
+{-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent
        ( module BT
        , module Data.Torrent
@@ -15,7 +16,10 @@ module Network.BitTorrent
        , ClientSession, newClient
        , SwarmSession, newLeacher, newSeeder
        , PeerSession
+       , discover
        ) where
+
+import Data.IORef
 
 import Data.Torrent
 import Network.BitTorrent.Internal
@@ -24,5 +28,12 @@ import Network.BitTorrent.Peer as BT
 import Network.BitTorrent.Exchange as BT
 import Network.BitTorrent.Tracker as BT
 
---discover :: SwarmSession -> ([PeerAddr] -> IO a) -> IO a
---discover = withTracker
+
+discover :: SwarmSession -> (TSession -> IO a) -> IO a
+discover SwarmSession {..} action = do
+  let conn = TConnection (tAnnounce torrentMeta) (tInfoHash torrentMeta)
+                         (clientPeerID clientSession) port
+  progress <- readIORef (currentProgress clientSession)
+  withTracker progress conn action
+
+port = 10000

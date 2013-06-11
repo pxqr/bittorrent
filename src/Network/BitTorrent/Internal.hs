@@ -12,7 +12,8 @@
 --
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.Internal
-       ( ClientSession(..), newClient
+       ( Progress(..), startProgress
+       , ClientSession(..), newClient
        , SwarmSession(..), newLeacher, newSeeder
        , PeerSession(..), withPeerSession
 
@@ -49,6 +50,21 @@ import Network.BitTorrent.Exchange.Protocol as BT
 
 
 
+-- | 'Progress' contains upload/download/left stats about
+--   current client state.
+--
+--   This data is considered as dynamic within one session.
+--
+data Progress = Progress {
+    prUploaded   :: Integer -- ^ Total amount of bytes uploaded.
+  , prDownloaded :: Integer -- ^ Total amount of bytes downloaded.
+  , prLeft       :: Integer -- ^ Total amount of bytes left.
+  } deriving Show
+
+startProgress :: Integer -> Progress
+startProgress = Progress 0 0
+
+
 {-----------------------------------------------------------------------
     Client session
 -----------------------------------------------------------------------}
@@ -59,6 +75,7 @@ data ClientSession = ClientSession {
   , allowedExtensions :: [Extension] -- ^
   , swarmSessions     :: TVar (Set SwarmSession)
   , eventManager      :: EventManager
+  , currentProgress   :: IORef Progress
   }
 
 instance Eq ClientSession where
@@ -72,6 +89,7 @@ newClient exts = ClientSession <$> newPeerID
                                <*> pure exts
                                <*> newTVarIO S.empty
                                <*> Ev.new
+                               <*> newIORef (startProgress 0)
 
 {-----------------------------------------------------------------------
     Swarm session
@@ -80,21 +98,21 @@ newClient exts = ClientSession <$> newPeerID
 -- | Extensions are set globally by
 --   Swarm session are un
 data SwarmSession = SwarmSession {
-    torrentInfoHash   :: InfoHash
+    torrentMeta       :: Torrent
   , clientSession     :: ClientSession
   , clientBitfield    :: IORef Bitfield
   , connectedPeers    :: TVar (Set PeerSession)
   }
 
 instance Eq SwarmSession where
-  (==) = (==) `on` torrentInfoHash
+  (==) = (==) `on` (tInfoHash . torrentMeta)
 
 instance Ord SwarmSession where
-  compare = comparing torrentInfoHash
+  compare = comparing (tInfoHash . torrentMeta)
 
 newSwarmSession :: Bitfield -> ClientSession -> Torrent -> IO SwarmSession
-newSwarmSession bf cs @ ClientSession {..} Torrent {..}
-  = SwarmSession <$> pure tInfoHash
+newSwarmSession bf cs @ ClientSession {..} t @ Torrent {..}
+  = SwarmSession <$> pure t
                  <*> pure cs
                  <*> newIORef bf
                  <*> newTVarIO S.empty
@@ -160,7 +178,7 @@ withPeerSession ss @ SwarmSession {..} addr
     openSession = do
       let caps = encodeExts $ allowedExtensions $ clientSession
       let pid  = clientPeerID $ clientSession
-      let chs  = Handshake defaultBTProtocol caps torrentInfoHash pid
+      let chs  = Handshake defaultBTProtocol caps (tInfoHash torrentMeta) pid
 
       sock <- connectToPeer addr
       phs  <- handshake sock chs `onException` close sock

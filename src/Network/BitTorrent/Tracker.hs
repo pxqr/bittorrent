@@ -37,6 +37,7 @@ import Data.Torrent
 import Network
 import Network.URI
 
+import Network.BitTorrent.Internal
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Tracker.Protocol
 import Network.BitTorrent.Tracker.Scrape
@@ -56,21 +57,6 @@ data TConnection = TConnection {
 
 tconnection :: Torrent -> PeerID -> PortNumber -> TConnection
 tconnection t = TConnection (tAnnounce t) (tInfoHash t)
-
-
--- | 'Progress' contains upload/download/left stats about
---   current client state.
---
---   This data is considered as dynamic within one session.
---
-data Progress = Progress {
-    prUploaded   :: Integer -- ^ Total amount of bytes uploaded.
-  , prDownloaded :: Integer -- ^ Total amount of bytes downloaded.
-  , prLeft       :: Integer -- ^ Total amount of bytes left.
-  } deriving Show
-
-startProgress :: Integer -> Progress
-startProgress = Progress 0 0
 
 
 -- | used to avoid boilerplate; do NOT export me
