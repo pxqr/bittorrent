@@ -27,6 +27,11 @@ import Data.Torrent
 import Network.BitTorrent as BT
 import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker.Protocol
+import Network.BitTorrent.Extension
+import Network.BitTorrent.Exchange
+import Network.BitTorrent.Tracker
+import Network.BitTorrent.Peer
+
 -- import Debug.Trace
 
 

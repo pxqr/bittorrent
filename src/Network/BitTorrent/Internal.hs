@@ -85,11 +85,16 @@ instance Ord ClientSession where
   compare = comparing clientPeerID
 
 newClient :: [Extension] -> IO ClientSession
-newClient exts = ClientSession <$> newPeerID
-                               <*> pure exts
-                               <*> newTVarIO S.empty
-                               <*> Ev.new
-                               <*> newIORef (startProgress 0)
+newClient exts = do
+  mgr <- Ev.new
+  forkIO $ loop mgr
+
+  ClientSession
+    <$> newPeerID
+    <*> pure exts
+    <*> newTVarIO S.empty
+    <*> pure mgr
+    <*> newIORef (startProgress 0)
 
 {-----------------------------------------------------------------------
     Swarm session
@@ -207,7 +212,7 @@ maxIncomingTime :: Int
 maxIncomingTime = 120 * sec
 
 maxOutcomingTime :: Int
-maxOutcomingTime = 60 * sec
+maxOutcomingTime = 1 * sec
 
 -- | Should be called after we have received any message from a peer.
 updateIncoming :: PeerSession -> IO ()
@@ -221,8 +226,13 @@ updateOutcoming PeerSession {..}  =
   updateTimeout (eventManager (clientSession swarmSession))
     outcomingTimeout maxOutcomingTime
 
-sendKA :: Socket -> IO ()
-sendKA sock = sendAll sock (encode BT.KeepAlive)
+sendKA :: Socket -> SwarmSession -> IO ()
+sendKA sock SwarmSession {..} = do
+  print "I'm sending keep alive."
+  sendAll sock (encode BT.KeepAlive)
+  let mgr = eventManager clientSession
+  updateTimeout mgr
+  print "Done.."
 
 abortSession :: IO ()
 abortSession = error "abortSession: not implemented"

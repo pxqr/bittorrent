@@ -45,6 +45,7 @@ import Data.Torrent
 data Event = Available Bitfield
            | Want
            | Block
+             deriving Show
 
 {-----------------------------------------------------------------------
     Peer wire

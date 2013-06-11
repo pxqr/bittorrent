@@ -58,6 +58,7 @@ library
 
 
   build-depends:
+                       -- Basic packages
                        base       == 4.*
                      , stm        >= 2.4
                      , mtl
@@ -90,6 +91,7 @@ library
                      , network-conduit      == 1.*
                      , cereal-conduit       >= 0.5
 
+                       -- Misc
                      , cryptohash
                      , filepath    >= 1
                      , bits-atomic >= 0.1
@@ -106,6 +108,7 @@ executable exsample
   hs-source-dirs:      exsamples
   build-depends:       base == 4.*
                      , bittorrent
+                     , mtl
 
 
 test-suite info-hash

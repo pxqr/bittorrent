@@ -1,8 +1,10 @@
 module Main (main) where
 
+import Control.Concurrent
 import Data.Bitfield
 import Network.BitTorrent
 import System.Environment
+import Control.Monad.Reader
 
 
 main :: IO ()
@@ -13,8 +15,11 @@ main = do
   client  <- newClient []
   swarm   <- newLeacher  client torrent
 
-  discover swarm $ \se -> do
-    peers <- getPeerList se
-    print peers
+  discover swarm $ do
+    addr <- asks connectedPeerAddr
+    liftIO $ print $ "connected to" ++ show addr
+    e <- awaitEvent
+    liftIO $ print e
+    liftIO $ threadDelay (100 * 1000000)
 
-  print "Bye-bye!"
+  print "Bye-bye! =_="
