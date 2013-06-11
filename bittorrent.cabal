@@ -102,6 +102,11 @@ library
     cpp-options:       -DTESTING
   ghc-options:         -Wall
 
+executable exsample
+  main-is:             Main.hs
+  hs-source-dirs:      exsamples
+  build-depends:       base == 4.*
+                     , bittorrent
 
 
 test-suite info-hash
