@@ -11,6 +11,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.Exchange
        ( P2P, withPeer
+       , awaitEvent, signalEvent
        ) where
 
 import Control.Applicative
@@ -41,17 +42,107 @@ import Network.BitTorrent.Peer
 import Data.Bitfield as BF
 import Data.Torrent
 
+
+data Event = Available Bitfield
+           | Want
+           | Block
+
 {-----------------------------------------------------------------------
-    P2P monad
+    Peer wire
 -----------------------------------------------------------------------}
 
 type PeerWire = ConduitM Message Message IO
 
-waitMessage :: PeerWire Message
-waitMessage = await >>= maybe waitMessage return
+waitMessage :: PeerSession -> PeerWire Message
+waitMessage se = do
+  mmsg <- await
+  case mmsg of
+    Nothing -> waitMessage se
+    Just msg -> do
+      liftIO $ updateIncoming se
+      return msg
 
-signalMessage :: Message -> PeerWire ()
-signalMessage = C.yield
+signalMessage :: Message -> PeerSession -> PeerWire ()
+signalMessage msg se = do
+  C.yield msg
+  liftIO $ updateOutcoming se
+
+
+getPieceCount :: PeerSession -> IO PieceCount
+getPieceCount = undefined
+
+nextEvent :: PeerSession -> PeerWire Event
+nextEvent se @ PeerSession {..} = waitMessage se >>= diff
+  where
+    -- diff finds difference between
+--    diff KeepAlive = nextEvent se
+    diff msg = do
+      liftIO $ print (ppMessage msg)
+      nextEvent se
+
+    handleMessage Choke     = do
+      SessionStatus {..} <- liftIO $ readIORef peerSessionStatus
+      if psChoking  sePeerStatus
+        then nextEvent se
+        else undefined
+
+    handleMessage Unchoke   = undefined
+    --return $ Available BF.difference
+
+    handleMessage Interested = return undefined
+    handleMessage NotInterested = return undefined
+    handleMessage (Have ix) = do
+      pc <- liftIO $ getPieceCount se
+      haveMessage $ have ix (haveNone pc) -- TODO singleton
+
+    handleMessage (Bitfield bf) = undefined
+    handleMessage (Request  bix) = do
+      undefined
+
+    handleMessage msg @ (Piece    blk) = undefined
+    handleMessage msg @ (Port     _)
+      = checkExtension msg ExtDHT $ do
+      undefined
+
+    handleMessage msg @ HaveAll
+      = checkExtension msg ExtFast $ do
+          pc <- liftIO $ getPieceCount se
+          haveMessage (haveAll pc)
+
+    handleMessage msg @ HaveNone
+      = checkExtension msg ExtFast $ do
+        pc <- liftIO $ getPieceCount se
+        haveMessage (haveNone pc)
+
+    handleMessage msg @ (SuggestPiece ix)
+          = checkExtension msg ExtFast $ do
+            undefined
+
+    handleMessage msg @ (RejectRequest ix)
+          = checkExtension msg ExtFast $ do
+            undefined
+
+    handleMessage msg @ (AllowedFast pix)
+          = checkExtension msg ExtFast $ do
+            undefined
+
+    haveMessage bf = do
+      cbf <- liftIO $ readIORef $ clientBitfield swarmSession
+      if undefined -- ix `member` bf
+        then nextEvent se
+        else undefined  -- return $ Available diff
+
+    checkExtension msg requredExtension action
+      | requredExtension `elem` enabledExtensions = action
+      | otherwise = liftIO $ throwIO $ userError errorMsg
+      where
+        errorMsg = show (ppExtension requredExtension)
+                   ++  "not enabled, but peer sent"
+                   ++ show (ppMessage msg)
+
+{-----------------------------------------------------------------------
+    P2P monad
+-----------------------------------------------------------------------}
 
 newtype P2P a = P2P {
     runP2P :: ReaderT PeerSession PeerWire a
@@ -72,86 +163,9 @@ withPeer se addr p2p =
   withPeerSession se addr $ \(sock, pses) -> do
     runConduit sock (runReaderT (runP2P p2p) pses)
 
-data Event = Available Bitfield
-           | Want
-           | Block
 
-
-
-waitForEvent :: P2P Event
-waitForEvent = P2P (ReaderT nextEvent)
-  where
-    nextEvent se @ PeerSession {..} = waitMessage >>= diff
-      where
-        -- diff finds difference between
-        diff KeepAlive = do
-          signalMessage KeepAlive
-          nextEvent se
-
-        handleMessage Choke     = do
-          SessionStatus {..} <- liftIO $ readIORef peerSessionStatus
-          if psChoking  sePeerStatus
-            then nextEvent se
-            else undefined
-
-        handleMessage Unchoke   = return $ Available BF.difference
-
-        handleMessage Interested = return undefined
-        handleMessage NotInterested = return undefined
-
-        handleMessage (Have ix) = do
-          pc <- liftIO $ getPieceCount se
-          haveMessage $ have ix (haveNone pc) -- TODO singleton
-
-        handleMessage (Bitfield bf) = undefined
-        handleMessage (Request  bix) = do
-          undefined
-
-        handleMessage (Piece    blk) = undefined
-        handleMessage (Port     _)
-          = checkExtension msg ExtDHT $ do
-              undefined
-
-        handleMessage msg @ HaveAll
-          = checkExtension msg ExtFast $ do
-              pc <- liftIO $ getPieceCount se
-              haveMessage (haveAll pc)
-
-        handleMessage msg @ HaveNone
-          = checkExtension msg ExtFast $ do
-              pc <- liftIO $ getPieceCount se
-              haveMessage (haveNone pc)
-
-        handleMessage msg @ (SuggestPiece ix)
-          = checkExtension msg ExtFast $ do
-            undefined
-
-        handleMessage msg @ (RejectRequest ix)
-          = checkExtension msg ExtFast $ do
-            undefined
-
-        handleMessage msg @ (AllowedFast pix)
-          = checkExtension msg ExtFast $ do
-            undefined
-
-        haveMessage bf = do
-          cbf <- liftIO $ readIORef $ clientBitfield swarmSession
-          if undefined -- ix `member` bf
-            then nextEvent se
-            else return $ Available diff
-
-        checkExtension msg requredExtension action
-            | requredExtension `elem` enabledExtensions = action
-            | otherwise = liftIO $ throwIO $ userError errorMsg
-          where
-            errorMsg = show (ppExtension requredExtension)
-                    ++  "not enabled, but peer sent"
-                    ++ show (ppMessage msg)
-
-
-
-getPieceCount :: PeerSession -> IO PieceCount
-getPieceCount = undefined
+awaitEvent :: P2P Event
+awaitEvent = P2P (ReaderT nextEvent)
 
 signalEvent  :: Event -> P2P ()
 signalEvent = undefined

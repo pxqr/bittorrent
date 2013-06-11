@@ -7,6 +7,7 @@
 --
 module Network.BitTorrent
        ( module BT
+       , module Data.Torrent
 
          -- * Tracker
 
@@ -16,12 +17,12 @@ module Network.BitTorrent
        , PeerSession
        ) where
 
+import Data.Torrent
 import Network.BitTorrent.Internal
-
 import Network.BitTorrent.Extension as BT
 import Network.BitTorrent.Peer as BT
 import Network.BitTorrent.Exchange as BT
 import Network.BitTorrent.Tracker as BT
 
---discover :: SwarmSession -> (Chan PeerAddr -> IO a) -> IO a
---discover = undefined
+--discover :: SwarmSession -> ([PeerAddr] -> IO a) -> IO a
+--discover = withTracker
