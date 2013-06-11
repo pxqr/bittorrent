@@ -35,14 +35,10 @@ flag testing
 library
   exposed-modules:     Data.Torrent
                      , Data.Bitfield
-
                      , Network.BitTorrent
                      , Network.BitTorrent.Extension
                      , Network.BitTorrent.Peer
-
                      , Network.BitTorrent.Tracker
-                     , Network.BitTorrent.Tracker.Scrape
-
                      , Network.BitTorrent.Exchange
 
   other-modules:       Network.BitTorrent.Internal

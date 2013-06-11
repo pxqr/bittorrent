@@ -21,9 +21,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- TODO: add "compact" field to TRequest
 module Network.BitTorrent.Tracker.Protocol
-       ( module Network.BitTorrent.Tracker.Scrape
-
-       , Event(..), TRequest(..), TResponse(..)
+       ( Event(..), TRequest(..), TResponse(..)
        , askTracker
 
          -- * Defaults
@@ -50,7 +48,6 @@ import Network.HTTP
 import Network.URI
 
 import Network.BitTorrent.Peer
-import Network.BitTorrent.Tracker.Scrape
 
 
 

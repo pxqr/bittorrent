@@ -226,12 +226,12 @@ updateOutcoming PeerSession {..}  =
   updateTimeout (eventManager (clientSession swarmSession))
     outcomingTimeout maxOutcomingTime
 
-sendKA :: Socket -> SwarmSession -> IO ()
-sendKA sock SwarmSession {..} = do
+sendKA :: Socket -> IO ()
+sendKA sock {- SwarmSession {..} -} = do
   print "I'm sending keep alive."
   sendAll sock (encode BT.KeepAlive)
-  let mgr = eventManager clientSession
-  updateTimeout mgr
+--  let mgr = eventManager clientSession
+--  updateTimeout mgr
   print "Done.."
 
 abortSession :: IO ()
