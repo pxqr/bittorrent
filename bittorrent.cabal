@@ -88,6 +88,7 @@ library
                      , cereal-conduit       >= 0.5
 
                        -- Misc
+                     , lens
                      , data-default
                      , cryptohash
                      , filepath    >= 1

@@ -5,12 +5,19 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
-{-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE DoAndIfThenElse            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE RecordWildCards            #-}
 module Network.BitTorrent.Exchange
-       ( P2P, withPeer
+       ( -- * Block
+         Block(..), BlockIx(..)
+
+         -- * Event
+       , Event(..)
+
+       , P2P, withPeer
        , awaitEvent, signalEvent
        ) where
 
@@ -18,6 +25,7 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Exception
+import Control.Lens
 import Control.Monad.Reader
 import Control.Monad.State
 
@@ -30,6 +38,7 @@ import Data.Conduit as C
 import Data.Conduit.Cereal
 import Data.Conduit.Network
 import Data.Serialize as S
+import Text.PrettyPrint as PP hiding (($$))
 
 import Network
 
@@ -43,8 +52,8 @@ import Data.Torrent
 
 
 data Event = Available Bitfield
-           | Want
-           | Block
+           | Want      BlockIx
+           | Fragment  Block
              deriving Show
 
 {-----------------------------------------------------------------------
@@ -53,88 +62,132 @@ data Event = Available Bitfield
 
 type PeerWire = ConduitM Message Message IO
 
-waitMessage :: PeerSession -> PeerWire Message
-waitMessage se = do
-  mmsg <- await
-  case mmsg of
-    Nothing -> waitMessage se
-    Just msg -> do
-      liftIO $ updateIncoming se
-      liftIO $ print msg
-      return msg
+runConduit :: Socket -> PeerWire () -> IO ()
+runConduit sock p2p =
+  sourceSocket sock   $=
+    conduitGet S.get  $=
+      forever p2p     $=
+    conduitPut S.put  $$
+  sinkSocket sock
 
-signalMessage :: PeerSession -> Message -> PeerWire ()
-signalMessage se msg = do
+waitMessage :: P2P Message
+waitMessage = P2P (ReaderT go)
+  where
+    go se = do
+      mmsg <- await
+      case mmsg of
+        Nothing -> go se
+        Just msg -> do
+          liftIO $ updateIncoming se
+          liftIO $ print msg
+          return msg
+
+signalMessage :: Message -> P2P ()
+signalMessage msg = P2P $ ReaderT $ \se -> do
   C.yield msg
   liftIO $ updateOutcoming se
 
 
-getPieceCount :: PeerSession -> IO PieceCount
-getPieceCount = undefined
+peerWant :: P2P Bitfield
+peerWant   = BF.difference <$> getPeerBF    <*> use bitfield
 
-canOffer :: PeerSession -> PeerWire Bitfield
-canOffer PeerSession {..} = liftIO $ do
-  pbf <- readIORef $ peerBitfield
-  cbf <- readIORef $ clientBitfield $ swarmSession
-  return $ BF.difference pbf cbf
+clientWant :: P2P Bitfield
+clientWant = BF.difference <$> use bitfield <*> getPeerBF
 
-revise :: PeerSession -> PeerWire ()
-revise se @ PeerSession {..} = do
-  isInteresting <- (not . BF.null) <$> canOffer se
-  SessionStatus {..} <- liftIO $ readIORef peerSessionStatus
+peerOffer :: P2P Bitfield
+peerOffer = do
+  sessionStatus <- use status
+  if canDownload sessionStatus then clientWant else emptyBF
 
-  when (isInteresting /= _interested seClientStatus) $
-    signalMessage se $ if isInteresting then Interested else NotInterested
+clientOffer :: P2P Bitfield
+clientOffer = do
+  sessionStatus <- use status
+  if canUpload sessionStatus then peerWant else emptyBF
+
+revise :: P2P ()
+revise = do
+  peerInteresting  <- (not . BF.null) <$> clientWant
+  clientInterested <- use (status.clientStatus.interested)
+
+  when (clientInterested /= peerInteresting) $
+    signalMessage $ if peerInteresting then Interested else NotInterested
+
+requireExtension :: Extension -> P2P ()
+requireExtension required = do
+  enabled <- asks enabledExtensions
+  unless (required `elem` enabled) $
+    sessionError $ ppExtension required <+> "not enabled"
+
+peerHave :: P2P Event
+peerHave = undefined
+
+--    haveMessage bf = do
+--      cbf <- undefined -- liftIO $ readIORef $ clientBitfield swarmSession
+--      if undefined -- ix `member` bf
+--        then nextEvent se
+--        else undefined  -- return $ Available diff
 
 
-nextEvent :: PeerSession -> PeerWire Event
-nextEvent se @ PeerSession {..} = waitMessage se >>= go
+-- |
+--   properties:
+--
+--   forall (Fragment block). isPiece block == True
+--
+awaitEvent :: P2P Event
+awaitEvent = waitMessage >>= go
   where
-    go KeepAlive = nextEvent se
+    go KeepAlive = awaitEvent
     go Choke     = do
-      SessionStatus {..} <- liftIO $ readIORef peerSessionStatus
-      if _choking  sePeerStatus
-        then nextEvent se
-        else undefined
+      status.peerStatus.choking .= True
+      awaitEvent
 
     go Unchoke   = do
-      SessionStatus {..} <- liftIO $ readIORef peerSessionStatus
-      if not (_choking sePeerStatus)
-        then nextEvent se
-        else if undefined
-             then undefined
-             else undefined
-    --return $ Available BF.difference
+      status.clientStatus.choking .= False
+      awaitEvent
 
-    go Interested = return undefined
-    go NotInterested = return undefined
+    go Interested    = do
+      status.peerStatus.interested .= True
+      awaitEvent
 
-    go (Have ix) = do
-      pc <- liftIO $ getPieceCount se
-      haveMessage $ have ix (haveNone pc) -- TODO singleton
+    go NotInterested = do
+      status.peerStatus.interested .= False
+      awaitEvent
 
-    go (Bitfield bf) = undefined
+--    go (Have ix)      = peerHave =<< singletonBF ix
+--    go (Bitfield bf)  = peerHave =<< adjustBF bf
     go (Request  bix) = do
-      undefined
+      bf <- use bitfield
+      if ixPiece bix `BF.member` bf
+         then return (Want bix)
+         else do
+           signalMessage (RejectRequest bix)
+           awaitEvent
 
-    go msg @ (Piece    blk) = undefined
+    go (Piece    blk) = undefined
+
+{-
     go msg @ (Port     _)
       = checkExtension msg ExtDHT $ do
       undefined
 
-    go msg @ HaveAll
-      = checkExtension msg ExtFast $ do
-          pc <- liftIO $ getPieceCount se
-          haveMessage (haveAll pc)
+    go HaveAll = do
+      requireExtension ExtFast
+      bitfield <~ fullBF
+      revise
+      awaitEvent
 
-    go msg @ HaveNone
-      = checkExtension msg ExtFast $ do
-        pc <- liftIO $ getPieceCount se
-        haveMessage (haveNone pc)
+    go HaveNone = do
+      requireExtension ExtFast
+      bitfield <~ emptyBF
+      revise
+      awaitEvent
 
-    go msg @ (SuggestPiece ix)
-          = checkExtension msg ExtFast $ do
-            undefined
+    go (SuggestPiece ix) = do
+      requireExtension ExtFast
+      bf <- use bitfield
+      if ix `BF.notMember` bf
+        then Available <$> singletonBF ix
+        else awaitEvent
 
     go msg @ (RejectRequest ix)
           = checkExtension msg ExtFast $ do
@@ -143,20 +196,16 @@ nextEvent se @ PeerSession {..} = waitMessage se >>= go
     go msg @ (AllowedFast pix)
           = checkExtension msg ExtFast $ do
             undefined
+-}
 
-    haveMessage bf = do
-      cbf <- liftIO $ readIORef $ clientBitfield swarmSession
-      if undefined -- ix `member` bf
-        then nextEvent se
-        else undefined  -- return $ Available diff
+signalEvent  :: Event -> P2P ()
+signalEvent (Available bf) = undefined
+signalEvent _ = undefined
 
-    checkExtension msg requredExtension action
-      | requredExtension `elem` enabledExtensions = action
-      | otherwise = liftIO $ throwIO $ userError errorMsg
-      where
-        errorMsg = show (ppExtension requredExtension)
-                   ++  "not enabled, but peer sent"
-                   ++ show (ppMessage msg)
+--flushBroadcast :: P2P ()
+--flushBroadcast = nextBroadcast >>= maybe (return ()) go
+--  where
+--    go = undefined
 
 {-----------------------------------------------------------------------
     P2P monad
@@ -164,29 +213,9 @@ nextEvent se @ PeerSession {..} = waitMessage se >>= go
 
 newtype P2P a = P2P {
     runP2P :: ReaderT PeerSession PeerWire a
-  } deriving (Monad, MonadReader PeerSession, MonadIO)
-
-instance MonadState SessionStatus P2P where
-  get   = asks peerSessionStatus >>= liftIO . readIORef
-  put x = asks peerSessionStatus >>= liftIO . (`writeIORef` x)
-
-
-runConduit :: Socket -> Conduit Message IO Message -> IO ()
-runConduit sock p2p =
-  sourceSocket sock   $=
-    conduitGet S.get  $=
-      forever p2p     $=
-    conduitPut S.put  $$
-  sinkSocket sock
+  } deriving (Functor, Applicative, Monad, MonadReader PeerSession, MonadIO)
 
 withPeer :: SwarmSession -> PeerAddr -> P2P () -> IO ()
 withPeer se addr p2p =
   withPeerSession se addr $ \(sock, pses) -> do
     runConduit sock (runReaderT (runP2P p2p) pses)
-
-
-awaitEvent :: P2P Event
-awaitEvent = P2P (ReaderT nextEvent)
-
-signalEvent  :: Event -> P2P ()
-signalEvent = undefined

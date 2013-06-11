@@ -26,7 +26,8 @@
 --   <https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29>
 --
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Network.BitTorrent.Exchange.Protocol
        ( -- * Inital handshake
          Handshake(..), ppHandshake
@@ -50,18 +51,22 @@ module Network.BitTorrent.Exchange.Protocol
        , Message(..)
        , ppMessage
 
-         -- * Exchange control
+         -- * control
        , PeerStatus(..)
-       , SessionStatus(..)
---       , canUpload, canDownload
+       , choking, interested
 
-       -- ** Defaults
+       , SessionStatus(..)
+       , clientStatus, peerStatus
+       , canUpload, canDownload
+
+         -- ** Defaults
        , defaultUnchokeSlots
        ) where
 
 import Control.Applicative
-import Control.Monad
 import Control.Exception
+import Control.Monad
+import Control.Lens
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -427,29 +432,31 @@ data PeerStatus = PeerStatus {
   , _interested :: Bool
   }
 
+$(makeLenses ''PeerStatus)
+
 instance Default PeerStatus where
   def = PeerStatus True False
 
 -- |
 data SessionStatus = SessionStatus {
-    seClientStatus :: PeerStatus
-  , sePeerStatus   :: PeerStatus
+    _clientStatus :: PeerStatus
+  , _peerStatus   :: PeerStatus
   }
+
+$(makeLenses ''SessionStatus)
 
 instance Default SessionStatus where
   def = SessionStatus def def
 
-{-
--- | Can the /client/ to upload to the /peer/?
+-- | Can the /client/ transfer to the /peer/?
 canUpload :: SessionStatus -> Bool
 canUpload SessionStatus {..}
-  = psInterested sePeerStatus && not (psChoking seClientStatus)
+  = _interested _peerStatus && not (_choking _clientStatus)
 
--- | Can the /client/ download from the /peer/?
+-- | Can the /client/ transfer from the /peer/?
 canDownload :: SessionStatus -> Bool
 canDownload SessionStatus {..}
-  = psInterested seClientStatus && not (psChoking sePeerStatus)
--}
+  = _interested _clientStatus && not (_choking _peerStatus)
 
 -- | Indicates how many peers are allowed to download from the client
 -- by default.

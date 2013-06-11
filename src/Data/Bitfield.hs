@@ -31,12 +31,14 @@ module Data.Bitfield
        ( PieceIx, PieceCount, Bitfield
 
          -- * Construction
-       , haveAll, haveNone, have
+       , haveAll, haveNone, have, singleton
        , adjustSize
 
          -- * Query
        , Data.Bitfield.null
        , haveCount, totalCount, completeness
+
+       , member, notMember
        , findMin, findMax
 
        , Frequency, frequencies, rarest
@@ -124,6 +126,9 @@ have ix Bitfield {..}
   | 0 <= ix && ix < bfSize = Bitfield bfSize (S.insert ix bfSet)
   |      otherwise         = Bitfield bfSize bfSet
 
+singleton :: PieceIx -> PieceCount -> Bitfield
+singleton ix pc = have ix (haveNone pc)
+
 -- | Assign new size to bitfield. FIXME Normally, size should be only
 -- decreased, otherwise exception raised.
 adjustSize :: PieceCount -> Bitfield -> Bitfield
@@ -151,6 +156,19 @@ totalCount = bfSize
 --
 completeness :: Bitfield -> Ratio PieceCount
 completeness b = haveCount b % totalCount b
+
+inRange :: PieceIx -> Bitfield -> Bool
+inRange ix bf @ Bitfield {..} = 0 <= ix && ix < bfSize
+
+member :: PieceIx -> Bitfield -> Bool
+member ix bf @ Bitfield {..}
+  | ix `inRange` bf = ix `S.member` bfSet
+  |     otherwise   = False
+
+notMember :: PieceIx -> Bitfield -> Bool
+notMember ix bf @ Bitfield {..}
+  | ix `inRange` bf = ix `S.notMember` bfSet
+  |     otherwise   = True
 
 -- | Find first available piece index.
 findMin :: Bitfield -> Maybe PieceIx

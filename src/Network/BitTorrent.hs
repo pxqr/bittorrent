@@ -21,10 +21,9 @@ module Network.BitTorrent
        , discover
 
          -- * Peer to Peer
-       , P2P, PeerSession
-            ( connectedPeerAddr, enabledExtensions
-            , peerBitfield, peerSessionStatus
-            )
+       , P2P
+       , PeerSession ( connectedPeerAddr, enabledExtensions )
+       , Block(..), BlockIx(..)
 
        , awaitEvent, signalEvent
        ) where
@@ -43,10 +42,13 @@ import Network.BitTorrent.Tracker
 -- thus we can obtain unified interface
 
 discover :: SwarmSession -> P2P () -> IO ()
-discover swarm @ SwarmSession {..} action = do
-  let conn = TConnection (tAnnounce torrentMeta) (tInfoHash torrentMeta)
-                         (clientPeerID clientSession) port
-  progress <- readIORef (currentProgress clientSession)
+discover swarm action = do
+  let conn = TConnection (tAnnounce (torrentMeta swarm))
+                         (tInfoHash (torrentMeta swarm))
+                         (clientPeerID (clientSession swarm))
+                          port
+
+  progress <- getCurrentProgress (clientSession swarm)
   withTracker progress conn $ \tses -> do
     forever $ do
       addr <- getPeerAddr tses

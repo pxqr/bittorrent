@@ -10,12 +10,33 @@
 --   Network.BitTorrent.Exchange and modules. To hide some internals
 --   of this module we detach it from Exchange.
 --
-{-# LANGUAGE RecordWildCards #-}
+--   Note: expose only static data in data field lists, all dynamic
+--   data should be modified through standalone functions.
+--
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances  #-}
 module Network.BitTorrent.Internal
        ( Progress(..), startProgress
-       , ClientSession(..), newClient
-       , SwarmSession(..), newLeacher, newSeeder
-       , PeerSession(..), withPeerSession
+
+       , ClientSession (clientPeerID, allowedExtensions)
+       , newClient, getCurrentProgress
+
+       , SwarmSession(SwarmSession, torrentMeta, clientSession)
+       , newLeacher, newSeeder
+
+       , PeerSession(PeerSession, connectedPeerAddr
+                    , swarmSession, enabledExtensions
+                    )
+       , SessionState
+       , bitfield, status
+       , emptyBF, fullBF, singletonBF
+       , getPieceCount, getPeerBF
+       , sessionError, withPeerSession
 
          -- * Timeouts
        , updateIncoming, updateOutcoming
@@ -24,6 +45,9 @@ module Network.BitTorrent.Internal
 import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Lens
+import Control.Monad.State
+import Control.Monad.Reader
 import Control.Exception
 
 import Data.IORef
@@ -32,10 +56,8 @@ import Data.Function
 import Data.Ord
 import Data.Set as S
 
-import Data.Conduit
-import Data.Conduit.Cereal
-import Data.Conduit.Network
-import Data.Serialize
+import Data.Serialize hiding (get)
+import Text.PrettyPrint
 
 import Network
 import Network.Socket
@@ -70,13 +92,20 @@ startProgress = Progress 0 0
     Client session
 -----------------------------------------------------------------------}
 
--- | In one application you could have many clients.
+-- | In one application we could have many clients with difference
+-- ID's and enabled extensions.
 data ClientSession = ClientSession {
-    clientPeerID      :: PeerID      -- ^
-  , allowedExtensions :: [Extension] -- ^
+    -- | Our peer ID used in handshaked and discovery mechanism.
+    clientPeerID      :: PeerID
+
+    -- | Extensions we should try to use. Hovewer some particular peer
+    -- might not support some extension, so we keep enableExtension in
+    -- 'PeerSession'.
+  , allowedExtensions :: [Extension]
+
   , swarmSessions     :: TVar (Set SwarmSession)
   , eventManager      :: EventManager
-  , currentProgress   :: IORef Progress
+  , currentProgress   :: TVar  Progress
   }
 
 instance Eq ClientSession where
@@ -84,6 +113,9 @@ instance Eq ClientSession where
 
 instance Ord ClientSession where
   compare = comparing clientPeerID
+
+getCurrentProgress :: MonadIO m => ClientSession -> m Progress
+getCurrentProgress = liftIO . readTVarIO . currentProgress
 
 newClient :: [Extension] -> IO ClientSession
 newClient exts = do
@@ -95,7 +127,7 @@ newClient exts = do
     <*> pure exts
     <*> newTVarIO S.empty
     <*> pure mgr
-    <*> newIORef (startProgress 0)
+    <*> newTVarIO (startProgress 0)
 
 {-----------------------------------------------------------------------
     Swarm session
@@ -106,7 +138,9 @@ newClient exts = do
 data SwarmSession = SwarmSession {
     torrentMeta       :: Torrent
   , clientSession     :: ClientSession
-  , clientBitfield    :: IORef Bitfield
+
+    -- | Modify this carefully updating global progress.
+  , clientBitfield    :: TVar  Bitfield
   , connectedPeers    :: TVar (Set PeerSession)
   }
 
@@ -120,7 +154,7 @@ newSwarmSession :: Bitfield -> ClientSession -> Torrent -> IO SwarmSession
 newSwarmSession bf cs @ ClientSession {..} t @ Torrent {..}
   = SwarmSession <$> pure t
                  <*> pure cs
-                 <*> newIORef bf
+                 <*> newTVarIO bf
                  <*> newTVarIO S.empty
 
 newSeeder :: ClientSession -> Torrent -> IO SwarmSession
@@ -134,13 +168,29 @@ newLeacher cs t @ Torrent {..}
 isLeacher :: SwarmSession -> IO Bool
 isLeacher = undefined
 
+getClientBitfield :: MonadIO m => SwarmSession -> m Bitfield
+getClientBitfield = liftIO . readTVarIO .  clientBitfield
+
+{-
+haveDone :: MonadIO m => PieceIx -> SwarmSession -> m ()
+haveDone ix =
+  liftIO $ atomically $ do
+    bf <- readTVar clientBitfield
+    writeTVar (have ix bf)
+    currentProgress
+-}
 {-----------------------------------------------------------------------
     Peer session
 -----------------------------------------------------------------------}
 
 data PeerSession = PeerSession {
+    -- | Used as unique 'PeerSession' identifier within one
+    -- 'SwarmSession'.
     connectedPeerAddr :: PeerAddr
+
   , swarmSession      :: SwarmSession
+
+    -- | Extensions such that both peer and client support.
   , enabledExtensions :: [Extension]
 
     -- | To dissconnect from died peers appropriately we should check
@@ -163,15 +213,30 @@ data PeerSession = PeerSession {
   , outcomingTimeout   :: TimeoutKey
 
   , broadcastMessages :: Chan   [Message]
-  , peerBitfield      :: IORef  Bitfield
-  , peerSessionStatus :: IORef  SessionStatus
+  , sessionState      :: IORef   SessionState
   }
+
+data SessionState = SessionState {
+    _bitfield :: Bitfield
+  , _status   :: SessionStatus
+  }
+
+$(makeLenses ''SessionState)
 
 instance Eq PeerSession where
   (==) = (==) `on` connectedPeerAddr
 
 instance Ord PeerSession where
   compare = comparing connectedPeerAddr
+
+instance (MonadIO m, MonadReader PeerSession m)
+      => MonadState SessionState m where
+  get   = asks sessionState >>= liftIO . readIORef
+  put s = asks sessionState >>= \ref -> liftIO $ writeIORef ref s
+
+sessionError :: MonadIO m => Doc -> m ()
+sessionError msg
+  = liftIO $ throwIO $ userError $ render $ msg <+> "in session"
 
 -- TODO check if it connected yet peer
 withPeerSession :: SwarmSession -> PeerAddr
@@ -196,11 +261,33 @@ withPeerSession ss @ SwarmSession {..} addr
          <*> registerTimeout (eventManager clientSession)
                 maxOutcomingTime (sendKA sock)
          <*> newChan
-         <*> pure clientBitfield
-         <*> newIORef def
+         <*> do {
+           ; tc <- totalCount <$> readTVarIO clientBitfield
+           ; newIORef (SessionState (haveNone tc) def)
+           }
       return (sock, ps)
 
     closeSession = close . fst
+
+getPieceCount :: (MonadReader PeerSession m) => m PieceCount
+getPieceCount = asks (pieceCount . tInfo . torrentMeta . swarmSession)
+
+emptyBF :: (MonadReader PeerSession m) => m Bitfield
+emptyBF = liftM haveNone getPieceCount
+
+fullBF ::  (MonadReader PeerSession m) => m Bitfield
+fullBF = liftM haveAll getPieceCount
+
+singletonBF :: (MonadReader PeerSession m) => PieceIx -> m Bitfield
+singletonBF ix = liftM (BF.singleton ix) getPieceCount
+
+getPeerBF :: (MonadIO m, MonadReader PeerSession m) => m Bitfield
+getPeerBF = asks swarmSession >>= liftIO . readTVarIO . clientBitfield
+
+--data Signal =
+--nextBroadcast :: P2P (Maybe Signal)
+--nextBroadcast =
+
 
 {-----------------------------------------------------------------------
     Timeouts
