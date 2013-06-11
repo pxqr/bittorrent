@@ -44,7 +44,6 @@ library
                      , Network.BitTorrent.Tracker.Scrape
 
                      , Network.BitTorrent.Exchange
-                     , Network.BitTorrent.Exchange.Selection
 
   other-modules:       Network.BitTorrent.Internal
 

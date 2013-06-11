@@ -33,12 +33,11 @@ import Data.Serialize as S
 
 import Network
 
-import Network.BitTorrent.Exchange.Selection
-import Network.BitTorrent.Exchange.Protocol
 
 import Network.BitTorrent.Internal
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
+import Network.BitTorrent.Exchange.Protocol
 import Data.Bitfield as BF
 import Data.Torrent
 
