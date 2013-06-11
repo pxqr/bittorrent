@@ -21,7 +21,9 @@ module Network.BitTorrent.Tracker
        , TConnection(..), tconnection
 
          -- * Session
-       , TSession, getPeerList, getProgress, waitInterval
+       , TSession
+       , getPeerAddr, getPeerList
+       , getProgress, waitInterval
 
          -- * Re-export
        , defaultPorts
@@ -125,16 +127,24 @@ completedReq ses pr = (genericReq ses pr) {
 data TSession = TSession {
     seProgress   :: TVar Progress
   , seInterval   :: IORef Int
-  , sePeers      :: TVar [PeerAddr]
+  , sePeers      :: Chan PeerAddr
+    -- TODO use something like 'TVar (Set PeerAddr)'
+    -- otherwise we might get space leak
   }
 
 newSession :: Progress -> Int -> [PeerAddr] -> IO TSession
-newSession pr i ps = TSession <$> newTVarIO pr
-                              <*> newIORef i
-                              <*> newTVarIO ps
+newSession pr i ps = do
+  chan <- newChan
+  writeList2Chan chan ps
+  TSession <$> newTVarIO pr
+           <*> newIORef i
+           <*> pure chan
+
+getPeerAddr :: TSession -> IO PeerAddr
+getPeerAddr = readChan . sePeers
 
 getPeerList :: TSession -> IO [PeerAddr]
-getPeerList = readTVarIO . sePeers
+getPeerList = getChanContents . sePeers
 
 getProgress :: TSession -> IO Progress
 getProgress = readTVarIO . seProgress
@@ -159,7 +169,7 @@ withTracker initProgress conn action = bracket start end (action . fst)
         case resp of
           Right (OK {..}) -> do
             writeIORef seInterval respInterval
-            atomically $ writeTVar sePeers respPeers
+            writeList2Chan sePeers respPeers
           _ -> return ()
       where
         isIOException :: IOException -> Maybe IOException
