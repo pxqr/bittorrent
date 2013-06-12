@@ -16,6 +16,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -23,20 +24,31 @@
 module Network.BitTorrent.Internal
        ( Progress(..), startProgress
 
+         -- * Client
        , ClientSession (clientPeerID, allowedExtensions)
        , newClient, getCurrentProgress
 
+         -- * Swarm
        , SwarmSession(SwarmSession, torrentMeta, clientSession)
        , newLeacher, newSeeder
 
+         -- * Peer
        , PeerSession(PeerSession, connectedPeerAddr
                     , swarmSession, enabledExtensions
                     )
        , SessionState
+       , withPeerSession
+
+         -- ** Exceptions
+       , SessionException(..)
+       , isSessionException
+       , putSessionException
+       , sessionError
+
+         -- ** Properties
        , bitfield, status
        , emptyBF, fullBF, singletonBF, adjustBF
        , getPieceCount, getClientBF
-       , sessionError, withPeerSession
 
          -- * Timeouts
        , updateIncoming, updateOutcoming
@@ -55,6 +67,7 @@ import Data.Default
 import Data.Function
 import Data.Ord
 import Data.Set as S
+import Data.Typeable
 
 import Data.Serialize hiding (get)
 import Text.PrettyPrint
@@ -212,6 +225,7 @@ data PeerSession = PeerSession {
     -- to avoid reduntant KA messages.
   , outcomingTimeout   :: TimeoutKey
 
+    -- TODO use dupChan for broadcasting
   , broadcastMessages :: Chan   [Message]
   , sessionState      :: IORef   SessionState
   }
@@ -233,6 +247,17 @@ instance (MonadIO m, MonadReader PeerSession m)
       => MonadState SessionState m where
   get   = asks sessionState >>= liftIO . readIORef
   put s = asks sessionState >>= \ref -> liftIO $ writeIORef ref s
+
+data SessionException = SessionException
+                        deriving (Show, Typeable)
+
+instance Exception SessionException
+
+isSessionException :: Monad m => SessionException -> m ()
+isSessionException _ = return ()
+
+putSessionException :: SessionException -> IO ()
+putSessionException = print
 
 sessionError :: MonadIO m => Doc -> m ()
 sessionError msg

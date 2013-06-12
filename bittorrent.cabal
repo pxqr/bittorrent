@@ -86,6 +86,7 @@ library
                      , conduit              == 1.*
                      , network-conduit      == 1.*
                      , cereal-conduit       >= 0.5
+                     , resourcet
 
                        -- Misc
                      , lens

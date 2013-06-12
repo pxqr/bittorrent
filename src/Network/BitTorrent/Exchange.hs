@@ -28,6 +28,7 @@ import Control.Exception
 import Control.Lens
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Trans.Resource
 
 import Data.IORef
 import Data.Function
@@ -77,7 +78,7 @@ awaitMessage = P2P (ReaderT go)
       liftIO $ putStrLn "trying recv:"
       mmsg <- await
       case mmsg of
-        Nothing -> go se
+        Nothing  -> monadThrow SessionException
         Just msg -> do
 --          liftIO $ updateIncoming se
           liftIO $ print ("recv:" <+> ppMessage msg)
@@ -250,8 +251,18 @@ awaitEvent = awaitMessage >>= go
 --   @
 --
 yieldEvent  :: Event -> P2P ()
-yieldEvent (Available bf) = undefined
-yieldEvent _ = undefined
+yieldEvent (Available bf)  = undefined
+yieldEvent (Want      bix) = do
+  offer <- peerOffer
+  if ixPiece bix `BF.member` offer
+     then yieldMessage (Request bix)
+     else return ()
+
+yieldEvent (Fragment  blk) = do
+  offer <- clientOffer
+  if blkPiece blk `BF.member` offer
+    then yieldMessage (Piece blk)
+    else return ()
 
 --flushBroadcast :: P2P ()
 --flushBroadcast = nextBroadcast >>= maybe (return ()) go
@@ -265,11 +276,21 @@ checkPiece = undefined
     P2P monad
 -----------------------------------------------------------------------}
 
+-- |
+--   Exceptions:
+--
+--     * SessionException: is visible with one peer session. Use this
+--     exception to terminate P2P session, but not the swarm session.
+--
 newtype P2P a = P2P {
     runP2P :: ReaderT PeerSession PeerWire a
-  } deriving (Functor, Applicative, Monad, MonadReader PeerSession, MonadIO)
+  } deriving ( Functor, Applicative, Monad
+             , MonadIO, MonadThrow, MonadActive
+             , MonadReader PeerSession
+             )
 
 withPeer :: SwarmSession -> PeerAddr -> P2P () -> IO ()
 withPeer se addr p2p =
   withPeerSession se addr $ \(sock, pses) -> do
-    runConduit sock (runReaderT (runP2P p2p) pses)
+    handle putSessionException $
+      runConduit sock (runReaderT (runP2P p2p) pses)

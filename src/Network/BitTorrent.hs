@@ -29,8 +29,13 @@ module Network.BitTorrent
        , awaitEvent, yieldEvent
        ) where
 
+import Control.Concurrent
+import Control.Exception
 import Control.Monad
+
 import Data.IORef
+
+import Network
 
 import Data.Torrent
 import Network.BitTorrent.Internal
@@ -45,6 +50,8 @@ import Network.BitTorrent.Tracker
 
 discover :: SwarmSession -> P2P () -> IO ()
 discover swarm action = do
+  port <- listener swarm action
+
   let conn = TConnection (tAnnounce (torrentMeta swarm))
                          (tInfoHash (torrentMeta swarm))
                          (clientPeerID (clientSession swarm))
@@ -57,8 +64,14 @@ discover swarm action = do
     forever $ do
       addr <- getPeerAddr tses
       putStrLn "connecting to peer"
-      withPeer swarm addr action
+      handle handler (withPeer swarm addr action)
 
+  where
+    handler :: IOException -> IO ()
+    handler _ = return ()
 
-
-port = 10000
+listener :: SwarmSession -> P2P () -> IO PortNumber
+listener _ _ = do
+  -- TODO:
+--  forkIO loop
+  return 10000

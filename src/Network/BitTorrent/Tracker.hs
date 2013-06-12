@@ -145,6 +145,7 @@ data TSession = TSession {
   , sePeers      :: Chan PeerAddr
     -- TODO use something like 'TVar (Set PeerAddr)'
     -- otherwise we might get space leak
+    -- TODO or maybe BoundedChan?
   }
 
 newSession :: Progress -> Int -> [PeerAddr] -> IO TSession
