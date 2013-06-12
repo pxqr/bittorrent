@@ -34,8 +34,8 @@ module Network.BitTorrent.Internal
                     )
        , SessionState
        , bitfield, status
-       , emptyBF, fullBF, singletonBF
-       , getPieceCount, getPeerBF
+       , emptyBF, fullBF, singletonBF, adjustBF
+       , getPieceCount, getClientBF
        , sessionError, withPeerSession
 
          -- * Timeouts
@@ -250,9 +250,14 @@ withPeerSession ss @ SwarmSession {..} addr
       let caps = encodeExts $ allowedExtensions $ clientSession
       let pid  = clientPeerID $ clientSession
       let chs  = Handshake defaultBTProtocol caps (tInfoHash torrentMeta) pid
-
+      putStrLn "trying to connect"
       sock <- connectToPeer addr
+
+      putStrLn "trying to handshake"
       phs  <- handshake sock chs `onException` close sock
+
+      cbf <- readTVarIO clientBitfield
+      sendAll sock (encode (Bitfield cbf))
 
       let enabled = decodeExts (enabledCaps caps (handshakeCaps phs))
       ps <- PeerSession addr ss enabled
@@ -281,8 +286,11 @@ fullBF = liftM haveAll getPieceCount
 singletonBF :: (MonadReader PeerSession m) => PieceIx -> m Bitfield
 singletonBF ix = liftM (BF.singleton ix) getPieceCount
 
-getPeerBF :: (MonadIO m, MonadReader PeerSession m) => m Bitfield
-getPeerBF = asks swarmSession >>= liftIO . readTVarIO . clientBitfield
+adjustBF :: (MonadReader PeerSession m) => Bitfield -> m Bitfield
+adjustBF bf = (`adjustSize` bf) `liftM` getPieceCount
+
+getClientBF :: (MonadIO m, MonadReader PeerSession m) => m Bitfield
+getClientBF = asks swarmSession >>= liftIO . readTVarIO . clientBitfield
 
 --data Signal =
 --nextBroadcast :: P2P (Maybe Signal)
@@ -317,7 +325,7 @@ updateOutcoming PeerSession {..}  =
 sendKA :: Socket -> IO ()
 sendKA sock {- SwarmSession {..} -} = do
   print "I'm sending keep alive."
-  sendAll sock (encode BT.KeepAlive)
+--  sendAll sock (encode BT.KeepAlive)
 --  let mgr = eventManager clientSession
 --  updateTimeout mgr
   print "Done.."

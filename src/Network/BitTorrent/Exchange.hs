@@ -18,7 +18,7 @@ module Network.BitTorrent.Exchange
        , Event(..)
 
        , P2P, withPeer
-       , awaitEvent, signalEvent
+       , awaitEvent, yieldEvent
        ) where
 
 import Control.Applicative
@@ -70,29 +70,31 @@ runConduit sock p2p =
     conduitPut S.put  $$
   sinkSocket sock
 
-waitMessage :: P2P Message
-waitMessage = P2P (ReaderT go)
+awaitMessage :: P2P Message
+awaitMessage = P2P (ReaderT go)
   where
     go se = do
+      liftIO $ putStrLn "trying recv:"
       mmsg <- await
       case mmsg of
         Nothing -> go se
         Just msg -> do
-          liftIO $ updateIncoming se
-          liftIO $ print msg
+--          liftIO $ updateIncoming se
+          liftIO $ print ("recv:" <+> ppMessage msg)
           return msg
 
-signalMessage :: Message -> P2P ()
-signalMessage msg = P2P $ ReaderT $ \se -> do
+yieldMessage :: Message -> P2P ()
+yieldMessage msg = P2P $ ReaderT $ \se -> do
   C.yield msg
+  liftIO $ print $ "sent:" <+> ppMessage msg
   liftIO $ updateOutcoming se
 
 
 peerWant :: P2P Bitfield
-peerWant   = BF.difference <$> getPeerBF    <*> use bitfield
+peerWant   = BF.difference <$> getClientBF  <*> use bitfield
 
 clientWant :: P2P Bitfield
-clientWant = BF.difference <$> use bitfield <*> getPeerBF
+clientWant = BF.difference <$> use bitfield <*> getClientBF
 
 peerOffer :: P2P Bitfield
 peerOffer = do
@@ -104,22 +106,23 @@ clientOffer = do
   sessionStatus <- use status
   if canUpload sessionStatus then peerWant else emptyBF
 
-revise :: P2P ()
+revise :: P2P Bitfield
 revise = do
-  peerInteresting  <- (not . BF.null) <$> clientWant
+  want <- clientWant
+  let peerInteresting = not (BF.null want)
   clientInterested <- use (status.clientStatus.interested)
 
-  when (clientInterested /= peerInteresting) $
-    signalMessage $ if peerInteresting then Interested else NotInterested
+  when (clientInterested /= peerInteresting) $ do
+    yieldMessage $ if peerInteresting then Interested else NotInterested
+    status.clientStatus.interested .= peerInteresting
+
+  return want
 
 requireExtension :: Extension -> P2P ()
 requireExtension required = do
   enabled <- asks enabledExtensions
   unless (required `elem` enabled) $
     sessionError $ ppExtension required <+> "not enabled"
-
-peerHave :: P2P Event
-peerHave = undefined
 
 --    haveMessage bf = do
 --      cbf <- undefined -- liftIO $ readIORef $ clientBitfield swarmSession
@@ -129,12 +132,21 @@ peerHave = undefined
 
 
 -- |
+--   +----------+---------+
+--   | Leacher  |  Seeder |
+--   |----------+---------+
+--   | Available|         |
+--   | Want     |   Want  |
+--   | Fragment |         |
+--   +----------+---------+
+--
+--
 --   properties:
 --
 --   forall (Fragment block). isPiece block == True
 --
 awaitEvent :: P2P Event
-awaitEvent = waitMessage >>= go
+awaitEvent = awaitMessage >>= go
   where
     go KeepAlive = awaitEvent
     go Choke     = do
@@ -142,8 +154,11 @@ awaitEvent = waitMessage >>= go
       awaitEvent
 
     go Unchoke   = do
-      status.clientStatus.choking .= False
-      awaitEvent
+      status.peerStatus.choking .= False
+      offer <- peerOffer
+      if BF.null offer
+        then awaitEvent
+        else return (Available offer)
 
     go Interested    = do
       status.peerStatus.interested .= True
@@ -153,21 +168,45 @@ awaitEvent = waitMessage >>= go
       status.peerStatus.interested .= False
       awaitEvent
 
---    go (Have ix)      = peerHave =<< singletonBF ix
---    go (Bitfield bf)  = peerHave =<< adjustBF bf
+    go (Have ix)      = do
+      new <- singletonBF ix
+      bitfield %= BF.union new
+      revise
+
+      offer <- peerOffer
+      if not (BF.null offer)
+        then return (Available offer)
+        else awaitEvent
+
+    go (Bitfield bf)  = do
+      new <- adjustBF bf
+      bitfield .= new
+      revise
+
+      offer <- peerOffer
+      if not (BF.null offer)
+        then return (Available offer)
+        else awaitEvent
+
     go (Request  bix) = do
-      bf <- use bitfield
+      bf <- clientOffer
       if ixPiece bix `BF.member` bf
          then return (Want bix)
          else do
-           signalMessage (RejectRequest bix)
+-- check if extension is enabled
+--           yieldMessage (RejectRequest bix)
            awaitEvent
 
-    go (Piece    blk) = undefined
+    go (Piece    blk) = do
+      -- this protect us from malicious peers and duplication
+      wanted <- clientWant
+      if blkPiece blk `BF.member` wanted
+        then return (Fragment blk)
+        else awaitEvent
 
 {-
-    go msg @ (Port     _)
-      = checkExtension msg ExtDHT $ do
+    go (Port     _) = do
+      requireExtension ExtDHT
       undefined
 
     go HaveAll = do
@@ -189,23 +228,38 @@ awaitEvent = waitMessage >>= go
         then Available <$> singletonBF ix
         else awaitEvent
 
-    go msg @ (RejectRequest ix)
-          = checkExtension msg ExtFast $ do
-            undefined
+    go (RejectRequest ix) = do
+       requireExtension ExtFast
+       awaitMessage
 
-    go msg @ (AllowedFast pix)
-          = checkExtension msg ExtFast $ do
-            undefined
+    go (AllowedFast pix) =
+       requireExtension ExtFast
+       awaitMessage
 -}
 
-signalEvent  :: Event -> P2P ()
-signalEvent (Available bf) = undefined
-signalEvent _ = undefined
+
+-- |
+--   @
+--   +----------+---------+
+--   | Leacher  |  Seeder |
+--   |----------+---------+
+--   | Available|         |
+--   | Want     |Fragment |
+--   | Fragment |         |
+--   +----------+---------+
+--   @
+--
+yieldEvent  :: Event -> P2P ()
+yieldEvent (Available bf) = undefined
+yieldEvent _ = undefined
 
 --flushBroadcast :: P2P ()
 --flushBroadcast = nextBroadcast >>= maybe (return ()) go
 --  where
 --    go = undefined
+
+checkPiece :: PieceLIx -> {-ByteString -> -} P2P Bool
+checkPiece = undefined
 
 {-----------------------------------------------------------------------
     P2P monad

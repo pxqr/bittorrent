@@ -41,6 +41,8 @@ module Data.Bitfield
        , member, notMember
        , findMin, findMax
 
+       , isSubsetOf
+
        , Frequency, frequencies, rarest
 
          -- * Combine
@@ -182,6 +184,9 @@ findMax Bitfield {..}
   | S.null bfSet = Nothing
   |   otherwise  = Just (S.findMax bfSet)
 
+isSubsetOf :: Bitfield -> Bitfield -> Bool
+isSubsetOf a b = bfSet a `S.isSubsetOf` bfSet b
+
 -- | Frequencies are needed in piece selection startegies which use
 -- availability quantity to find out the optimal next piece index to
 -- download.
@@ -208,7 +213,8 @@ frequencies xs = runST $ do
 rarest :: [Bitfield] -> Maybe PieceIx
 rarest xs
     | V.null freqMap = Nothing
-    |     otherwise  = Just $ fst $ V.ifoldr' minIx (0, freqMap V.! 0) freqMap
+    |     otherwise
+    = Just $ fst $ V.ifoldr' minIx (0, freqMap V.! 0) freqMap
   where
     freqMap = frequencies xs
 

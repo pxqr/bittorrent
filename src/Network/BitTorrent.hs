@@ -22,10 +22,11 @@ module Network.BitTorrent
 
          -- * Peer to Peer
        , P2P
+       , Event(..)
        , PeerSession ( connectedPeerAddr, enabledExtensions )
-       , Block(..), BlockIx(..)
+       , Block(..), BlockIx(..), ppBlock, ppBlockIx
 
-       , awaitEvent, signalEvent
+       , awaitEvent, yieldEvent
        ) where
 
 import Control.Monad
@@ -34,6 +35,7 @@ import Data.IORef
 import Data.Torrent
 import Network.BitTorrent.Internal
 import Network.BitTorrent.Exchange
+import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker
 
 
@@ -49,10 +51,14 @@ discover swarm action = do
                           port
 
   progress <- getCurrentProgress (clientSession swarm)
+
+  putStrLn "lookup peers"
   withTracker progress conn $ \tses -> do
     forever $ do
       addr <- getPeerAddr tses
+      putStrLn "connecting to peer"
       withPeer swarm addr action
+
 
 
 port = 10000

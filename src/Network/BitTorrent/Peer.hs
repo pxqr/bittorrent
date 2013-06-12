@@ -531,8 +531,12 @@ peerSockAddr = SockAddrInet <$> (g . peerPort) <*> (htonl . peerIP)
 -- | Tries to connect to peer using reasonable default parameters.
 connectToPeer :: PeerAddr -> IO Socket
 connectToPeer p = do
+  putStrLn "socket"
   sock <- socket AF_INET Stream Network.Socket.defaultProtocol
+
+  putStrLn "connect"
   connect sock (peerSockAddr p)
+  putStrLn "connected"
   return sock
 
 -- | Pretty print peer address in human readable form.

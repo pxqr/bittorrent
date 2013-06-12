@@ -94,8 +94,8 @@ genericReq ses pr =   TRequest {
   }
 
 
--- | The first request to the tracker that should be created is 'startedReq'.
---   It includes necessary 'Started' event field.
+-- | The first request to the tracker that should be created is
+--   'startedReq'. It includes necessary 'Started' event field.
 --
 startedReq :: TConnection -> Progress -> TRequest
 startedReq ses pr = (genericReq ses pr) {

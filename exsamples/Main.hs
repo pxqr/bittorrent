@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Main (main) where
 
 import Control.Concurrent
@@ -18,8 +19,15 @@ main = do
   discover swarm $ do
     addr <- asks connectedPeerAddr
     liftIO $ print $ "connected to" ++ show addr
-    e <- awaitEvent
-    liftIO $ print e
-    liftIO $ threadDelay (100 * 1000000)
+
+    forever $ do
+      e <- awaitEvent
+      case e of
+        Available bf
+          | Just m <- findMin bf -> yieldEvent (Want (BlockIx m 0 10))
+          |     otherwise        -> return ()
+        Want     bix -> liftIO $ print bix
+        Fragment blk -> liftIO $ print (ppBlock blk)
+
 
   print "Bye-bye! =_="

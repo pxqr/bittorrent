@@ -164,14 +164,18 @@ defaultHandshake = Handshake defaultBTProtocol defaultReserved
 -- | Handshaking with a peer specified by the second argument.
 handshake :: Socket -> Handshake -> IO Handshake
 handshake sock hs = do
+    putStrLn "send handshake"
     sendAll sock (S.encode hs)
 
+    putStrLn "recv handshake size"
     header <- recv sock 1
     when (B.length header == 0) $
       throw $ userError "Unable to receive handshake."
 
     let protocolLen = B.head header
     let restLen     = handshakeSize protocolLen - 1
+
+    putStrLn "recv handshake body"
     body <- recv sock restLen
     let resp = B.cons protocolLen body
 
