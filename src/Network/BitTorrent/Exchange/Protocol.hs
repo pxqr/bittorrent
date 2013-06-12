@@ -181,7 +181,7 @@ handshake sock hs = do
 
     case checkIH (S.decode resp) of
       Right hs' -> return hs'
-      Left msg  -> throw $ userError msg
+      Left msg  -> throwIO $ userError $ msg ++ " in handshake body."
   where
     checkIH (Right hs')
       | hsInfoHash hs /= hsInfoHash hs'
@@ -234,10 +234,10 @@ ppBlockIx BlockIx {..} =
 
 data Block = Block {
     -- | Zero-based piece index.
-    blkPiece  :: !PieceLIx
+    blkPiece  :: {-# UNPACK #-} !PieceLIx
 
     -- | Zero-based byte offset within the piece.
-  , blkOffset :: !Int
+  , blkOffset :: {-# UNPACK #-} !Int
 
     -- | Payload.
   , blkData   :: !ByteString

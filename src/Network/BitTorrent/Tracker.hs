@@ -172,6 +172,7 @@ withTracker initProgress conn action = bracket start end (action . fst)
   where
     start = do
       resp <- askTracker (startedReq conn initProgress)
+      print resp
       se   <- newSession initProgress (respInterval resp) (respPeers resp)
       tid  <- forkIO (syncSession se)
       return (se, tid)
@@ -179,10 +180,13 @@ withTracker initProgress conn action = bracket start end (action . fst)
     syncSession se @ TSession {..} = forever $ do
         waitInterval se
         pr   <- getProgress se
+        print "tracker req"
         resp <- tryJust isIOException $ do
                     askTracker (regularReq defaultNumWant conn pr)
+        print "tracker resp"
         case resp of
-          Right (OK {..}) -> do
+          Right (ok @ OK {..}) -> do
+            print ok
             writeIORef seInterval respInterval
             writeList2Chan sePeers respPeers
           _ -> return ()

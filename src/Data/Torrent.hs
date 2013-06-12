@@ -21,6 +21,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE BangPatterns      #-}
 -- TODO refine interface
 module Data.Torrent
        ( -- * Torrent
@@ -83,14 +84,14 @@ type Time = Text
 -- TODO more convenient form of torrent info.
 -- | Metainfo about particular torrent.
 data Torrent = Torrent {
-      tInfoHash     :: InfoHash
+      tInfoHash     :: !InfoHash
       -- ^ SHA1 hash of the 'TorrentInfo' of the 'Torrent'.
 
-    , tAnnounce     ::       URI
+    , tAnnounce     :: !URI
       -- ^ The URL of the tracker.
 
       -- NOTE: out of lexicographic order!
-    , tInfo         :: ContentInfo
+    , tInfo         :: !ContentInfo
       -- ^ Info about each content file.
 
     , tAnnounceList :: Maybe [[URI]]
@@ -112,9 +113,9 @@ data Torrent = Torrent {
       --   the info dictionary in the .torrent metafile.
 
     , tPublisher    :: Maybe URI
-      -- ^ Containing the RSA public key of the publisher of the torrent.
-      --   Private counterpart of this key that has the authority to allow
-      --   new peers onto the swarm.
+      -- ^ Containing the RSA public key of the publisher of the
+      -- torrent.  Private counterpart of this key that has the
+      -- authority to allow new peers onto the swarm.
 
     , tPublisherURL :: Maybe URI
     , tSignature    :: Maybe ByteString
@@ -144,22 +145,22 @@ simpleTorrent announce info = torrent announce info
 -- | Info part of the .torrent file contain info about each content file.
 data ContentInfo =
     SingleFile {
-      ciLength       :: Integer
+      ciLength       :: !Integer
       -- ^ Length of the file in bytes.
 
     , ciMD5sum       :: Maybe ByteString
       -- ^ 32 character long MD5 sum of the file.
       --   Used by third-party tools, not by bittorrent protocol itself.
 
-    , ciName         :: ByteString
+    , ciName         :: !ByteString
       -- ^ Suggested name of the file single file.
 
 
 
-    , ciPieceLength  :: Int
+    , ciPieceLength  :: !Int
       -- ^ Number of bytes in each piece.
 
-    , ciPieces       :: ByteString
+    , ciPieces       :: !ByteString
       -- ^ Concatenation of all 20-byte SHA1 hash values.
 
     , ciPrivate      :: Maybe Bool
@@ -171,28 +172,28 @@ data ContentInfo =
     }
 
   | MultiFile {
-      ciFiles        :: [FileInfo]
+      ciFiles        :: ![FileInfo]
       -- ^ List of the all files that torrent contains.
 
-    , ciName         :: ByteString
+    , ciName         :: !ByteString
       -- | The file path of the directory in which to store all the files.
 
-    , ciPieceLength  :: Int
-    , ciPieces       :: ByteString
+    , ciPieceLength  :: !Int
+    , ciPieces       :: !ByteString
     , ciPrivate      :: Maybe Bool
     } deriving (Show, Read, Eq)
 
 
 -- | Contain info about one single file.
 data FileInfo = FileInfo {
-      fiLength      :: Integer
+      fiLength      :: !Integer
       -- ^ Length of the file in bytes.
 
-    , fiMD5sum      :: Maybe ByteString
+    , fiMD5sum      ::  Maybe ByteString
       -- ^ 32 character long MD5 sum of the file.
       --   Used by third-party tools, not by bittorrent protocol itself.
 
-    , fiPath        :: [ByteString]
+    , fiPath        :: ![ByteString]
       -- ^ One or more string elements that together represent the
       --   path and filename. Each element in the list corresponds to
       --   either a directory name or (in the case of the last
@@ -323,16 +324,18 @@ blockCount :: Int         -- ^ Block size.
            -> Int         -- ^ Number of blocks.
 blockCount blkSize ci = contentLength ci `sizeInBase` blkSize
 
--- | File layout specifies the order and the size of each file in the storage.
---   Note that order of files is highly important since we coalesce all
---   the files in the given order to get the linear block address space.
+-- | File layout specifies the order and the size of each file in the
+--   storage. Note that order of files is highly important since we
+--   coalesce all the files in the given order to get the linear block
+--   address space.
 --
 type Layout = [(FilePath, Int)]
 
 -- | Extract files layout from torrent info with the given root path.
 contentLayout :: FilePath    -- ^ Root path for the all torrent files.
               -> ContentInfo -- ^ Torrent content information.
-              -> Layout      -- ^ The all file paths prefixed with the given root.
+              -> Layout      -- ^ The all file paths prefixed with the
+                             -- given root.
 contentLayout rootPath = filesLayout
   where
     filesLayout   (SingleFile { ciName = name, ciLength = len })
@@ -356,7 +359,11 @@ isMultiFile _            = False
 
 -- | Read and decode a .torrent file.
 fromFile :: FilePath -> IO Torrent
-fromFile = B.readFile >=> either (throwIO . userError) return . decoded
+fromFile path = do
+  contents <- B.readFile path
+  case decoded contents of
+    Right !t -> return t
+    Left msg -> throwIO $ userError  $ msg ++ " while reading torrent"
 
 {-----------------------------------------------------------------------
     Info hash

@@ -67,28 +67,28 @@ data Event = Started
 --   to keep track lists of active peer for a particular torrent.
 --
 data TRequest = TRequest { -- TODO peer here -- TODO detach announce
-     reqAnnounce   :: URI
+     reqAnnounce   :: !URI
      -- ^ Announce url of the torrent usually obtained from 'Torrent'.
 
-   , reqInfoHash   :: InfoHash
+   , reqInfoHash   :: !InfoHash
      -- ^ Hash of info part of the torrent usually obtained from
      -- 'Torrent'.
 
-   , reqPeerID     :: PeerID
+   , reqPeerID     :: !PeerID
      -- ^ ID of the peer doing request.
 
-   , reqPort       :: PortNumber
+   , reqPort       :: !PortNumber
      -- ^ Port to listen to for connections from other
      -- peers. Normally, tracker should respond with this port when
      -- some peer request the tracker with the same info hash.
 
-   , reqUploaded   :: Integer
+   , reqUploaded   :: !Integer
      -- ^ Number of bytes that the peer has uploaded in the swarm.
 
-   , reqDownloaded :: Integer
+   , reqDownloaded :: !Integer
      -- ^ Number of bytes downloaded in the swarm by the peer.
 
-   , reqLeft       :: Integer
+   , reqLeft       :: !Integer
      -- ^ Number of bytes needed in order to complete download.
 
    , reqIP         :: Maybe HostAddress
@@ -111,25 +111,25 @@ data TRequest = TRequest { -- TODO peer here -- TODO detach announce
 data TResponse =
      Failure Text -- ^ Failure reason in human readable form.
    | OK {
-       respWarning     :: Maybe Text
+       respWarning     ::  Maybe Text
        -- ^ Human readable warning.
 
-     , respInterval    :: Int
+     , respInterval    :: !Int
        -- ^ Recommended interval to wait between requests.
 
-     , respMinInterval :: Maybe Int
+     , respMinInterval ::  Maybe Int
        -- ^ Minimal amount of time between requests. A peer /should/
        -- make timeout with at least 'respMinInterval' value,
        -- otherwise tracker might not respond. If not specified the
        -- same applies to 'respInterval'.
 
-     , respComplete    :: Maybe Int
+     , respComplete    ::  Maybe Int
        -- ^ Number of peers completed the torrent. (seeders)
 
-     , respIncomplete  :: Maybe Int
+     , respIncomplete  ::  Maybe Int
        -- ^ Number of peers downloading the torrent. (leechers)
 
-     , respPeers       :: [PeerAddr]
+     , respPeers       :: ![PeerAddr]
        -- ^ Peers that must be contacted.
      } deriving Show
 
@@ -227,11 +227,14 @@ askTracker req = do
 
     rawResp  <- simpleHTTP r
     respBody <- getResponseBody rawResp
+    print $ respBody
     checkResult $ decoded respBody
   where
     mkHTTPRequest :: URI -> Request ByteString
     mkHTTPRequest uri = Request uri GET [] ""
 
-    checkResult (Left err)            = ioError (userError err)
-    checkResult (Right (Failure err)) = ioError (userError (show err))
+    checkResult (Left err)
+      = ioError $ userError $ err ++ " in tracker response"
+    checkResult (Right (Failure err))
+      = ioError $ userError $ show err ++ " in tracker response"
     checkResult (Right resp)          = return resp
