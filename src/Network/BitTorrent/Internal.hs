@@ -250,10 +250,7 @@ withPeerSession ss @ SwarmSession {..} addr
       let caps = encodeExts $ allowedExtensions $ clientSession
       let pid  = clientPeerID $ clientSession
       let chs  = Handshake defaultBTProtocol caps (tInfoHash torrentMeta) pid
-      putStrLn "trying to connect"
       sock <- connectToPeer addr
-
-      putStrLn "trying to handshake"
       phs  <- handshake sock chs `onException` close sock
 
       cbf <- readTVarIO clientBitfield
@@ -324,11 +321,12 @@ updateOutcoming PeerSession {..}  =
 
 sendKA :: Socket -> IO ()
 sendKA sock {- SwarmSession {..} -} = do
-  print "I'm sending keep alive."
+  return ()
+--  print "I'm sending keep alive."
 --  sendAll sock (encode BT.KeepAlive)
 --  let mgr = eventManager clientSession
 --  updateTimeout mgr
-  print "Done.."
+--  print "Done.."
 
 abortSession :: IO ()
 abortSession = error "abortSession: not implemented"

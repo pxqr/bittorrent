@@ -230,7 +230,6 @@ askTracker req = do
 
     rawResp  <- simpleHTTP r
     respBody <- getResponseBody rawResp
-    print $ respBody
     checkResult $ decoded respBody
   where
 
@@ -247,5 +246,5 @@ leaveTracker req = do
   let r = mkHTTPRequest (encodeRequest req)
 
   rawResp  <- simpleHTTP r
-  respBody <- getResponseBody rawResp
+  _ <- getResponseBody rawResp
   return ()

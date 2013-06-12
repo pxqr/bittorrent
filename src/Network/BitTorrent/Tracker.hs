@@ -170,7 +170,6 @@ sec = 1000 * 1000
 waitInterval :: TSession -> IO ()
 waitInterval se @ TSession {..} = do
   delay <- readIORef seInterval
-  print delay
   threadDelay (delay * sec)
 
 withTracker :: Progress -> TConnection -> (TSession -> IO a) -> IO a
@@ -178,21 +177,17 @@ withTracker initProgress conn action = bracket start end (action . fst)
   where
     start = do
       resp <- askTracker (startedReq conn initProgress)
-      print resp
       se   <- newSession initProgress (respInterval resp) (respPeers resp)
-      tid  <- forkIO (return ()) -- (syncSession se)
+      tid  <- forkIO (syncSession se)
       return (se, tid)
 
     syncSession se @ TSession {..} = forever $ do
         waitInterval se
         pr   <- getProgress se
-        print "tracker req"
         resp <- tryJust isIOException $ do
                     askTracker (regularReq defaultNumWant conn pr)
-        print "tracker resp"
         case resp of
           Right (ok @ OK {..}) -> do
-            print ok
             writeIORef seInterval respInterval
             writeList2Chan sePeers respPeers
           _ -> return ()
@@ -203,7 +198,6 @@ withTracker initProgress conn action = bracket start end (action . fst)
     end (se, tid) = do
       killThread tid
       pr <- getProgress se
-      print  "stopping"
       leaveTracker $ stoppedReq conn pr
 
 
