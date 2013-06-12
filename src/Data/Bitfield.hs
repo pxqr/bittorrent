@@ -160,7 +160,7 @@ completeness :: Bitfield -> Ratio PieceCount
 completeness b = haveCount b % totalCount b
 
 inRange :: PieceIx -> Bitfield -> Bool
-inRange ix bf @ Bitfield {..} = 0 <= ix && ix < bfSize
+inRange ix Bitfield {..} = 0 <= ix && ix < bfSize
 
 member :: PieceIx -> Bitfield -> Bool
 member ix bf @ Bitfield {..}
@@ -319,11 +319,11 @@ data StartegyClass
 strategyClass :: Ratio PieceCount -> Bitfield -> StartegyClass
 strategyClass threshold = classify . completeness
   where
-    classify have
-      |          have < threshold     = SCBeginning
-      | have + 1 % numerator have < 1 = SCReady
+    classify c
+      |        c < threshold       = SCBeginning
+      | c + 1 % numerator c < 1    = SCReady
     -- FIXME numerator have is not total count
-      |           otherwise           = SCEnd
+      |          otherwise         = SCEnd
 
 
 -- | Select the first available piece.

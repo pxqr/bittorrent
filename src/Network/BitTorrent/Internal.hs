@@ -133,7 +133,8 @@ getCurrentProgress = liftIO . readTVarIO . currentProgress
 newClient :: [Extension] -> IO ClientSession
 newClient exts = do
   mgr <- Ev.new
-  forkIO $ loop mgr
+  -- TODO kill this thread when leave client
+  _   <- forkIO $ loop mgr
 
   ClientSession
     <$> newPeerID
@@ -178,11 +179,8 @@ newLeacher :: ClientSession -> Torrent -> IO SwarmSession
 newLeacher cs t @ Torrent {..}
   = newSwarmSession (haveNone (pieceCount tInfo)) cs t
 
-isLeacher :: SwarmSession -> IO Bool
-isLeacher = undefined
-
-getClientBitfield :: MonadIO m => SwarmSession -> m Bitfield
-getClientBitfield = liftIO . readTVarIO .  clientBitfield
+--isLeacher :: SwarmSession -> IO Bool
+--isLeacher = undefined
 
 {-
 haveDone :: MonadIO m => PieceIx -> SwarmSession -> m ()
@@ -306,7 +304,7 @@ fullBF ::  (MonadReader PeerSession m) => m Bitfield
 fullBF = liftM haveAll getPieceCount
 
 singletonBF :: (MonadReader PeerSession m) => PieceIx -> m Bitfield
-singletonBF ix = liftM (BF.singleton ix) getPieceCount
+singletonBF i = liftM (BF.singleton i) getPieceCount
 
 adjustBF :: (MonadReader PeerSession m) => Bitfield -> m Bitfield
 adjustBF bf = (`adjustSize` bf) `liftM` getPieceCount

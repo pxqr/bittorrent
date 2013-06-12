@@ -1,4 +1,5 @@
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns  #-}
+{-# LANGUAGE PatternGuards #-}
 module Main (main) where
 
 import Control.Concurrent
@@ -7,6 +8,7 @@ import Network.BitTorrent
 import System.Environment
 import Control.Monad.Reader
 import Data.IORef
+
 
 main :: IO ()
 main = do

@@ -1,17 +1,12 @@
 {-# OPTIONS -fno-warn-orphans #-}
 module Main (main) where
 
-import Control.Applicative
 import Control.DeepSeq
 import Criterion.Main
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import Data.Serialize
 import Network
 
 import Network.BitTorrent as BT
 import Network.BitTorrent.Exchange.Protocol as BT
-import Network.BitTorrent.Tracker.Protocol as BT
 import Data.Bitfield as BT
 
 
@@ -34,12 +29,12 @@ instance NFData Message where
   rnf (Cancel   b) = rnf b
   rnf (Port     i) = rnf i
   rnf _ = ()  -- other fields are forced by pattern matching
-
+{-
 encodeMessages :: [Message] -> ByteString
 encodeMessages xs = runPut (mapM_ put xs)
 
 decodeMessages :: ByteString -> Either String [Message]
 decodeMessages = runGet (many get)
-
+-}
 main :: IO ()
 main = defaultMain []

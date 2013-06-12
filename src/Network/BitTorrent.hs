@@ -29,11 +29,8 @@ module Network.BitTorrent
        , awaitEvent, yieldEvent
        ) where
 
-import Control.Concurrent
 import Control.Exception
 import Control.Monad
-
-import Data.IORef
 
 import Network
 

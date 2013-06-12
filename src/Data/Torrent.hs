@@ -57,7 +57,6 @@ import Prelude hiding (sum)
 import Control.Applicative
 import Control.Arrow
 import Control.Exception
-import Control.Monad
 import Data.BEncode as BE
 import Data.Char
 import Data.Foldable
@@ -359,8 +358,8 @@ isMultiFile _            = False
 
 -- | Read and decode a .torrent file.
 fromFile :: FilePath -> IO Torrent
-fromFile path = do
-  contents <- B.readFile path
+fromFile filepath = do
+  contents <- B.readFile filepath
   case decoded contents of
     Right !t -> return t
     Left msg -> throwIO $ userError  $ msg ++ " while reading torrent"

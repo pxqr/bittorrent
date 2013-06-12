@@ -220,9 +220,9 @@ instance Serialize BlockIx where
   get = BlockIx <$> getInt <*> getInt <*> getInt
   {-# INLINE get #-}
 
-  put ix = do putInt (ixPiece ix)
-              putInt (ixOffset ix)
-              putInt (ixLength ix)
+  put i = do putInt (ixPiece i)
+             putInt (ixOffset i)
+             putInt (ixLength i)
   {-# INLINE put #-}
 
 -- | Format block index in human readable form.
@@ -277,11 +277,11 @@ blockRange pieceSize blk = (offset, offset + len)
 {-# SPECIALIZE blockRange :: Int -> Block -> (Int64, Int64) #-}
 
 ixRange :: (Num a, Integral a) => Int -> BlockIx -> (a, a)
-ixRange pieceSize ix = (offset, offset + len)
+ixRange pieceSize i = (offset, offset + len)
   where
-    offset = fromIntegral  pieceSize * fromIntegral (ixPiece ix)
-           + fromIntegral (ixOffset ix)
-    len    = fromIntegral (ixLength ix)
+    offset = fromIntegral  pieceSize * fromIntegral (ixPiece i)
+           + fromIntegral (ixOffset i)
+    len    = fromIntegral (ixLength i)
 {-# INLINE ixRange #-}
 {-# SPECIALIZE ixRange :: Int -> BlockIx -> (Int64, Int64) #-}
 
@@ -410,8 +410,8 @@ instance Serialize Message where
   put  HaveAll           = putInt 1  >> putWord8 0x0E
   put  HaveNone          = putInt 1  >> putWord8 0x0F
   put (SuggestPiece pix) = putInt 5  >> putWord8 0x0D >> putInt pix
-  put (RejectRequest ix) = putInt 13 >> putWord8 0x10 >> put ix
-  put (AllowedFast   ix) = putInt 5  >> putWord8 0x11 >> putInt ix
+  put (RejectRequest i ) = putInt 13 >> putWord8 0x10 >> put i
+  put (AllowedFast   i ) = putInt 5  >> putWord8 0x11 >> putInt i
 
 
 -- | Format messages in human readable form. Note that output is
@@ -421,9 +421,9 @@ instance Serialize Message where
 ppMessage :: Message -> Doc
 ppMessage (Bitfield _)       = "Bitfield"
 ppMessage (Piece blk)        = "Piece"    <+> ppBlock blk
-ppMessage (Cancel ix)        = "Cancel"   <+> ppBlockIx ix
+ppMessage (Cancel i )        = "Cancel"   <+> ppBlockIx i
 ppMessage (SuggestPiece pix) = "Suggest"  <+> int pix
-ppMessage (RejectRequest ix) = "Reject"   <+> ppBlockIx ix
+ppMessage (RejectRequest i ) = "Reject"   <+> ppBlockIx i
 ppMessage msg = text (show msg)
 
 {-----------------------------------------------------------------------

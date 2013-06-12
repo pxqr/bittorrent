@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BC
 import Data.Torrent
 

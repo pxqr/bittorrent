@@ -26,9 +26,6 @@ import Data.Bitfield as BF
 import Data.Torrent
 import Network.BitTorrent as BT
 import Network.BitTorrent.Exchange.Protocol
-import Network.BitTorrent.Tracker.Protocol
-import Network.BitTorrent.Extension
-import Network.BitTorrent.Exchange
 import Network.BitTorrent.Tracker
 import Network.BitTorrent.Peer
 
@@ -197,7 +194,7 @@ prop_messageEncoding :: Message -> Bool
 prop_messageEncoding msg @ (Bitfield bf)
   = case S.decode (S.encode msg) of
       Right (Bitfield bf') -> bf == adjustSize (totalCount bf) bf'
-      Left  _   -> False
+      _   -> False
 prop_messageEncoding msg
   = S.decode (S.encode msg) == Right msg
 

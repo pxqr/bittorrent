@@ -22,18 +22,10 @@ module Network.BitTorrent.Exchange
        ) where
 
 import Control.Applicative
-import Control.Concurrent
-import Control.Concurrent.STM
 import Control.Exception
 import Control.Lens
 import Control.Monad.Reader
-import Control.Monad.State
 import Control.Monad.Trans.Resource
-
-import Data.IORef
-import Data.Function
-import Data.Ord
-import Data.Set as S
 
 import Data.Conduit as C
 import Data.Conduit.Cereal
@@ -49,7 +41,6 @@ import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Exchange.Protocol
 import Data.Bitfield as BF
-import Data.Torrent
 
 
 data Event = Available Bitfield
@@ -74,7 +65,7 @@ runConduit sock p2p =
 awaitMessage :: P2P Message
 awaitMessage = P2P (ReaderT go)
   where
-    go se = do
+    go _ = do
       liftIO $ putStrLn "trying recv:"
       mmsg <- await
       case mmsg of
@@ -169,10 +160,10 @@ awaitEvent = awaitMessage >>= go
       status.peerStatus.interested .= False
       awaitEvent
 
-    go (Have ix)      = do
-      new <- singletonBF ix
+    go (Have idx)      = do
+      new <- singletonBF idx
       bitfield %= BF.union new
-      revise
+      _ <- revise
 
       offer <- peerOffer
       if not (BF.null offer)
@@ -182,7 +173,7 @@ awaitEvent = awaitMessage >>= go
     go (Bitfield bf)  = do
       new <- adjustBF bf
       bitfield .= new
-      revise
+      _ <- revise
 
       offer <- peerOffer
       if not (BF.null offer)
@@ -205,38 +196,40 @@ awaitEvent = awaitMessage >>= go
         then return (Fragment blk)
         else awaitEvent
 
-{-
+    go (Cancel _) = do
+      error "cancel message not implemented"
+
     go (Port     _) = do
       requireExtension ExtDHT
-      undefined
+      error "port message not implemented"
 
     go HaveAll = do
       requireExtension ExtFast
       bitfield <~ fullBF
-      revise
+      _ <- revise
       awaitEvent
 
     go HaveNone = do
       requireExtension ExtFast
       bitfield <~ emptyBF
-      revise
+      _ <- revise
       awaitEvent
 
-    go (SuggestPiece ix) = do
+    go (SuggestPiece idx) = do
       requireExtension ExtFast
       bf <- use bitfield
-      if ix `BF.notMember` bf
-        then Available <$> singletonBF ix
+      if idx `BF.notMember` bf
+        then Available <$> singletonBF idx
         else awaitEvent
 
-    go (RejectRequest ix) = do
+    go (RejectRequest _) = do
        requireExtension ExtFast
-       awaitMessage
+       awaitEvent
 
-    go (AllowedFast pix) =
+    go (AllowedFast _) = do
        requireExtension ExtFast
-       awaitMessage
--}
+       awaitEvent
+
 
 
 -- |
@@ -251,7 +244,7 @@ awaitEvent = awaitMessage >>= go
 --   @
 --
 yieldEvent  :: Event -> P2P ()
-yieldEvent (Available bf)  = undefined
+yieldEvent (Available _  ) = undefined
 yieldEvent (Want      bix) = do
   offer <- peerOffer
   if ixPiece bix `BF.member` offer

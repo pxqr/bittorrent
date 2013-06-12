@@ -188,7 +188,7 @@ withTracker initProgress conn action = bracket start end (action . fst)
         resp <- tryJust isIOException $ do
                     askTracker (regularReq defaultNumWant conn pr)
         case resp of
-          Right (ok @ OK {..}) -> do
+          Right (OK {..}) -> do
             writeIORef seInterval respInterval
             writeList2Chan sePeers respPeers
           _ -> return ()
