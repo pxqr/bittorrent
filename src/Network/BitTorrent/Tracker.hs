@@ -164,8 +164,14 @@ getPeerList = getChanContents . sePeers
 getProgress :: TSession -> IO Progress
 getProgress = readTVarIO . seProgress
 
+sec :: Int
+sec = 1000 * 1000
+
 waitInterval :: TSession -> IO ()
-waitInterval = readIORef . seInterval >=> threadDelay
+waitInterval se @ TSession {..} = do
+  delay <- readIORef seInterval
+  print delay
+  threadDelay (delay * sec)
 
 withTracker :: Progress -> TConnection -> (TSession -> IO a) -> IO a
 withTracker initProgress conn action = bracket start end (action . fst)
@@ -174,7 +180,7 @@ withTracker initProgress conn action = bracket start end (action . fst)
       resp <- askTracker (startedReq conn initProgress)
       print resp
       se   <- newSession initProgress (respInterval resp) (respPeers resp)
-      tid  <- forkIO (syncSession se)
+      tid  <- forkIO (return ()) -- (syncSession se)
       return (se, tid)
 
     syncSession se @ TSession {..} = forever $ do
@@ -197,7 +203,8 @@ withTracker initProgress conn action = bracket start end (action . fst)
     end (se, tid) = do
       killThread tid
       pr <- getProgress se
-      askTracker $ stoppedReq conn pr
+      print  "stopping"
+      leaveTracker $ stoppedReq conn pr
 
 
 

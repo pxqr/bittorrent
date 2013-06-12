@@ -22,7 +22,7 @@
 -- TODO: add "compact" field to TRequest
 module Network.BitTorrent.Tracker.Protocol
        ( Event(..), TRequest(..), TResponse(..)
-       , askTracker
+       , askTracker, leaveTracker
 
          -- * Defaults
        , defaultPorts, defaultNumWant
@@ -217,6 +217,9 @@ defaultPorts = [6881..6889]
 defaultNumWant :: Int
 defaultNumWant = 25
 
+mkHTTPRequest :: URI -> Request ByteString
+mkHTTPRequest uri = Request uri GET [] ""
+
 -- | Send request and receive response from the tracker specified in
 -- announce list. This function throws 'IOException' if it couldn't
 -- send request or receive response or decode response.
@@ -230,11 +233,19 @@ askTracker req = do
     print $ respBody
     checkResult $ decoded respBody
   where
-    mkHTTPRequest :: URI -> Request ByteString
-    mkHTTPRequest uri = Request uri GET [] ""
 
     checkResult (Left err)
       = ioError $ userError $ err ++ " in tracker response"
     checkResult (Right (Failure err))
       = ioError $ userError $ show err ++ " in tracker response"
     checkResult (Right resp)          = return resp
+
+-- | The same as the 'askTracker' but ignore response. Used in
+-- conjunction with 'Stopped'.
+leaveTracker :: TRequest -> IO ()
+leaveTracker req = do
+  let r = mkHTTPRequest (encodeRequest req)
+
+  rawResp  <- simpleHTTP r
+  respBody <- getResponseBody rawResp
+  return ()
