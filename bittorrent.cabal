@@ -58,11 +58,19 @@ library
 
                        -- Control packages
                      , mtl
+                     , resourcet
                      , lens
 
                        -- Concurrency packages
+                     , monad-fork
                      , SafeSemaphore
-                     , stm        >= 2.4
+                     , BoundedChan >= 1.0.1.0
+                     , stm         >= 2.4
+
+                       -- Conduits
+                     , conduit          == 1.*
+                     , network-conduit  == 1.*
+                     , cereal-conduit   >= 0.5
 
                        -- Data packages
                      , array      >= 0.4
@@ -86,12 +94,6 @@ library
                      , network    >= 2.4
                      , HTTP       >= 4000.2
                      , krpc
-
-                       -- Conduits
-                     , conduit              == 1.*
-                     , network-conduit      == 1.*
-                     , cereal-conduit       >= 0.5
-                     , resourcet
 
                        -- Misc
                      , data-default

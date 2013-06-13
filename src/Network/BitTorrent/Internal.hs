@@ -89,6 +89,9 @@ import Network.BitTorrent.Peer
 import Network.BitTorrent.Exchange.Protocol as BT
 import Network.BitTorrent.Tracker.Protocol as BT
 
+{-----------------------------------------------------------------------
+    Progress
+-----------------------------------------------------------------------}
 
 -- | 'Progress' contains upload/download/left stats about
 --   current client state.
@@ -109,6 +112,7 @@ startProgress = Progress 0 0
     Client session
 -----------------------------------------------------------------------}
 
+-- TODO comment thread count bounding
 type ThreadCount = Int
 
 defaultThreadCount :: ThreadCount
@@ -169,6 +173,7 @@ newClient n exts = do
     Swarm session
 -----------------------------------------------------------------------}
 
+-- TODO document P2P sessions bounding
 type SessionCount = Int
 
 defSeederConns :: SessionCount

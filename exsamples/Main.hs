@@ -15,7 +15,7 @@ main = do
   [path]  <- getArgs
   torrent <- fromFile path
 
-  client  <- defaultClient
+  client  <- newClient 2 []
   swarm   <- newLeacher  client torrent
 
   discover swarm $ do

@@ -24,7 +24,7 @@ module Network.BitTorrent.Tracker
 
          -- * Session
        , TSession
-       , getPeerAddr, getPeerList
+       , getPeerAddr
        , getProgress, waitInterval
 
          -- * Re-export
@@ -38,6 +38,7 @@ module Network.BitTorrent.Tracker
 
 import Control.Applicative
 import Control.Concurrent
+import Control.Concurrent.BoundedChan as BC
 import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
@@ -45,6 +46,7 @@ import Data.BEncode
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import Data.List as L
 import           Data.Map (Map)
 import qualified Data.Map as M
 import Data.Monoid
@@ -59,9 +61,13 @@ import Network.BitTorrent.Internal
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Tracker.Protocol
 
+{-----------------------------------------------------------------------
+    Tracker connection
+-----------------------------------------------------------------------}
 
--- | 'TConnection' (shorthand for Tracker session) combines tracker request
---   fields neccessary for tracker, torrent and client identification.
+-- | 'TConnection' (shorthand for Tracker session) combines tracker
+-- request fields neccessary for tracker, torrent and client
+-- identification.
 --
 --   This data is considered as static within one session.
 --
@@ -136,49 +142,84 @@ completedReq ses pr = (genericReq ses pr) {
   , reqEvent      = Just Completed
   }
 
+{-----------------------------------------------------------------------
+    Tracker session
+-----------------------------------------------------------------------}
 
+{-  Why use BoundedChan?
 
+Because most times we need just a list of peer at the start and all
+the rest time we will take little by little. On the other hand tracker
+will give us some constant count of peers and channel will grow with
+time. To avoid space leaks and long lists of peers (which we don't
+need) we use bounded chaan.
+
+   Chan size.
+
+Should be at least (count_of_workers * 2) to accumulate long enough
+peer list.
+
+  Order of peers in chan.
+
+Old peers in head, new ones in tail. Old peers should be used in the
+first place because by statistics they are most likely will present in
+network a long time than a new.
+
+-}
+
+type TimeInterval = Int
 
 data TSession = TSession {
+  -- TODO synchonize progress with client session
     seProgress   :: TVar Progress
-  , seInterval   :: IORef Int
-  , sePeers      :: Chan PeerAddr
-    -- TODO use something like 'TVar (Set PeerAddr)'
-    -- otherwise we might get space leak
-    -- TODO or maybe BoundedChan?
+  , seInterval   :: IORef TimeInterval
+  , sePeers      :: BoundedChan PeerAddr
   }
 
-newSession :: Progress -> Int -> [PeerAddr] -> IO TSession
-newSession pr i ps = do
-  chan <- newChan
-  writeList2Chan chan ps
-  TSession <$> newTVarIO pr
-           <*> newIORef i
-           <*> pure chan
+type PeerCount = Int
+
+defaultChanSize :: PeerCount
+defaultChanSize = defaultNumWant * 2
 
 getPeerAddr :: TSession -> IO PeerAddr
-getPeerAddr = readChan . sePeers
-
-getPeerList :: TSession -> IO [PeerAddr]
-getPeerList = getChanContents . sePeers
+getPeerAddr = BC.readChan . sePeers
 
 getProgress :: TSession -> IO Progress
 getProgress = readTVarIO . seProgress
 
-sec :: Int
-sec = 1000 * 1000
+newSession :: PeerCount -> Progress -> TimeInterval -> [PeerAddr]
+           -> IO TSession
+newSession chanSize pr i ps
+  | chanSize < 1
+  = throwIO $ userError "size of chan should be more that 1"
+
+  | otherwise = do
+    chan <- newBoundedChan chanSize
+
+    -- if length of the "ps" is more than the "chanSize" we will block
+    -- forever; to avoid this we remove excessive peers
+    let ps' = take chanSize ps
+    BC.writeList2Chan chan ps'
+
+    TSession <$> newTVarIO pr
+             <*> newIORef i
+             <*> pure chan
 
 waitInterval :: TSession -> IO ()
 waitInterval se @ TSession {..} = do
-  delay <- readIORef seInterval
-  threadDelay (delay * sec)
+    delay <- readIORef seInterval
+    threadDelay (delay * sec)
+  where
+    sec = 1000 * 1000 :: Int
 
 withTracker :: Progress -> TConnection -> (TSession -> IO a) -> IO a
 withTracker initProgress conn action = bracket start end (action . fst)
   where
     start = do
       resp <- askTracker (startedReq conn initProgress)
-      se   <- newSession initProgress (respInterval resp) (respPeers resp)
+      se   <- newSession defaultChanSize initProgress
+                         (respInterval resp) (respPeers resp)
+
       tid  <- forkIO (syncSession se)
       return (se, tid)
 
@@ -190,7 +231,16 @@ withTracker initProgress conn action = bracket start end (action . fst)
         case resp of
           Right (OK {..}) -> do
             writeIORef seInterval respInterval
-            writeList2Chan sePeers respPeers
+
+            -- we rely on the fact that union on lists is not
+            -- commutative: this implements the heuristic "old peers
+            -- in head"
+            old <- BC.getChanContents sePeers
+            let new = respPeers
+            let combined = L.union old new
+
+            BC.writeList2Chan sePeers combined
+
           _ -> return ()
       where
         isIOException :: IOException -> Maybe IOException
@@ -201,6 +251,9 @@ withTracker initProgress conn action = bracket start end (action . fst)
       pr <- getProgress se
       leaveTracker $ stoppedReq conn pr
 
+{-----------------------------------------------------------------------
+    Scrape
+-----------------------------------------------------------------------}
 
 
 -- | Information about particular torrent.

@@ -26,6 +26,7 @@ import Control.Applicative
 import Control.Exception
 import Control.Concurrent
 import Control.Lens
+import Control.Monad.Fork.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 
@@ -283,6 +284,7 @@ newtype P2P a = P2P {
              , MonadIO, MonadThrow, MonadActive
              , MonadReader PeerSession
              )
+-- TODO instance for MonadFork
 
 runSession :: SwarmSession -> PeerAddr -> P2P () -> IO ()
 runSession  se addr p2p =
