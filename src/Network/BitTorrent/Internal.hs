@@ -119,7 +119,7 @@ data ClientSession = ClientSession {
   , allowedExtensions :: [Extension]
 
     -- | Semaphor used to bound number of active P2P sessions.
-  , activeThreads     :: QSemN
+  , activeThreads     :: QSem
 
     -- | Max number of active connections.
   , maxActive         :: Int
@@ -151,7 +151,7 @@ newClient n exts = do
   ClientSession
     <$> newPeerID
     <*> pure exts
-    <*> newQSemN n
+    <*> newQSem n
     <*> pure n
     <*> newTVarIO S.empty
     <*> pure mgr
@@ -169,7 +169,7 @@ data SwarmSession = SwarmSession {
 
     -- | Represent count of peers we _currently_ can connect to in the
     -- swarm. Used to bound number of concurrent threads.
-  , vacantPeers       :: QSemN
+  , vacantPeers       :: QSem
 
     -- | Modify this carefully updating global progress.
   , clientBitfield    :: TVar  Bitfield
@@ -187,7 +187,7 @@ newSwarmSession :: Int -> Bitfield -> ClientSession -> Torrent
 newSwarmSession n bf cs @ ClientSession {..} t @ Torrent {..}
   = SwarmSession <$> pure t
                  <*> pure cs
-                 <*> newQSemN n
+                 <*> newQSem n
                  <*> newTVarIO bf
                  <*> newTVarIO S.empty
 
@@ -219,13 +219,13 @@ haveDone ix =
 
 enterSwarm :: SwarmSession -> IO ()
 enterSwarm SwarmSession {..} = do
-  waitQSemN (activeThreads clientSession) 1
-  waitQSemN vacantPeers 1
+  waitQSem (activeThreads clientSession)
+  waitQSem vacantPeers
 
 leaveSwarm :: SwarmSession -> IO ()
 leaveSwarm SwarmSession {..} = do
-  signalQSemN vacantPeers 1
-  signalQSemN (activeThreads clientSession) 1
+  signalQSem vacantPeers
+  signalQSem (activeThreads clientSession)
 
 waitVacancy :: SwarmSession -> IO () -> IO ()
 waitVacancy se =
