@@ -29,8 +29,10 @@ module Network.BitTorrent
        , awaitEvent, yieldEvent
        ) where
 
+import Control.Concurrent
 import Control.Exception
 import Control.Monad
+import Control.Monad.Reader
 
 import Network
 
@@ -41,9 +43,8 @@ import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker
 
 
-
 -- discover should hide tracker and DHT communication under the hood
--- thus we can obtain unified interface
+-- thus we can obtain an unified interface
 
 discover :: SwarmSession -> P2P () -> IO ()
 discover swarm action = do
@@ -58,14 +59,14 @@ discover swarm action = do
 
   putStrLn "lookup peers"
   withTracker progress conn $ \tses -> do
+    putStrLn "get peer list "
     forever $ do
       addr <- getPeerAddr tses
-      putStrLn "connecting to peer"
-      handle handler (withPeer swarm addr action)
-
-  where
-    handler :: IOException -> IO ()
-    handler _ = return ()
+      putStrLn "connect to peer"
+      spawnP2P swarm addr $ do
+        liftIO $ putStrLn "run p2p session"
+        action
+      putStrLn "connected"
 
 listener :: SwarmSession -> P2P () -> IO PortNumber
 listener _ _ = do

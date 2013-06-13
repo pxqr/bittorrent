@@ -31,6 +31,7 @@ module Network.BitTorrent.Internal
          -- * Swarm
        , SwarmSession(SwarmSession, torrentMeta, clientSession)
        , newLeacher, newSeeder
+       , enterSwarm, leaveSwarm , waitVacancy
 
          -- * Peer
        , PeerSession(PeerSession, connectedPeerAddr
@@ -83,7 +84,7 @@ import Data.Torrent
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Exchange.Protocol as BT
-
+import Network.BitTorrent.Tracker.Protocol as BT
 
 
 -- | 'Progress' contains upload/download/left stats about
@@ -106,9 +107,10 @@ startProgress = Progress 0 0
 -----------------------------------------------------------------------}
 
 -- | In one application we could have many clients with difference
--- ID's and enabled extensions.
+-- ID's and different enabled extensions.
 data ClientSession = ClientSession {
-    -- | Our peer ID used in handshaked and discovery mechanism.
+    -- | Our peer ID used in handshaked and discovery mechanism. The
+    -- clientPeerID is unique 'ClientSession' identifier.
     clientPeerID      :: PeerID
 
     -- | Extensions we should try to use. Hovewer some particular peer
@@ -116,7 +118,14 @@ data ClientSession = ClientSession {
     -- 'PeerSession'.
   , allowedExtensions :: [Extension]
 
+    -- | Semaphor used to bound number of active P2P sessions.
+  , activeThreads     :: QSemN
+
+    -- | Max number of active connections.
+  , maxActive         :: Int
+
   , swarmSessions     :: TVar (Set SwarmSession)
+
   , eventManager      :: EventManager
   , currentProgress   :: TVar  Progress
   }
@@ -130,8 +139,11 @@ instance Ord ClientSession where
 getCurrentProgress :: MonadIO m => ClientSession -> m Progress
 getCurrentProgress = liftIO . readTVarIO . currentProgress
 
-newClient :: [Extension] -> IO ClientSession
-newClient exts = do
+newClient :: Int              -- ^ Maximum count of active P2P Sessions.
+          -> [Extension]      -- ^ Extensions allowed to use.
+          -> IO ClientSession
+
+newClient n exts = do
   mgr <- Ev.new
   -- TODO kill this thread when leave client
   _   <- forkIO $ loop mgr
@@ -139,6 +151,8 @@ newClient exts = do
   ClientSession
     <$> newPeerID
     <*> pure exts
+    <*> newQSemN n
+    <*> pure n
     <*> newTVarIO S.empty
     <*> pure mgr
     <*> newTVarIO (startProgress 0)
@@ -153,6 +167,10 @@ data SwarmSession = SwarmSession {
     torrentMeta       :: Torrent
   , clientSession     :: ClientSession
 
+    -- | Represent count of peers we _currently_ can connect to in the
+    -- swarm. Used to bound number of concurrent threads.
+  , vacantPeers       :: QSemN
+
     -- | Modify this carefully updating global progress.
   , clientBitfield    :: TVar  Bitfield
   , connectedPeers    :: TVar (Set PeerSession)
@@ -164,20 +182,28 @@ instance Eq SwarmSession where
 instance Ord SwarmSession where
   compare = comparing (tInfoHash . torrentMeta)
 
-newSwarmSession :: Bitfield -> ClientSession -> Torrent -> IO SwarmSession
-newSwarmSession bf cs @ ClientSession {..} t @ Torrent {..}
+newSwarmSession :: Int -> Bitfield -> ClientSession -> Torrent
+                -> IO SwarmSession
+newSwarmSession n bf cs @ ClientSession {..} t @ Torrent {..}
   = SwarmSession <$> pure t
                  <*> pure cs
+                 <*> newQSemN n
                  <*> newTVarIO bf
                  <*> newTVarIO S.empty
 
 newSeeder :: ClientSession -> Torrent -> IO SwarmSession
 newSeeder cs t @ Torrent {..}
-  = newSwarmSession (haveAll (pieceCount tInfo)) cs t
+  = newSwarmSession defSeederConns (haveAll (pieceCount tInfo)) cs t
 
 newLeacher :: ClientSession -> Torrent -> IO SwarmSession
 newLeacher cs t @ Torrent {..}
-  = newSwarmSession (haveNone (pieceCount tInfo)) cs t
+  = newSwarmSession defLeacherConns (haveNone (pieceCount tInfo)) cs t
+
+defSeederConns :: Int
+defSeederConns = defaultUnchokeSlots
+
+defLeacherConns :: Int
+defLeacherConns = defaultNumWant
 
 --isLeacher :: SwarmSession -> IO Bool
 --isLeacher = undefined
@@ -190,6 +216,22 @@ haveDone ix =
     writeTVar (have ix bf)
     currentProgress
 -}
+
+enterSwarm :: SwarmSession -> IO ()
+enterSwarm SwarmSession {..} = do
+  waitQSemN (activeThreads clientSession) 1
+  waitQSemN vacantPeers 1
+
+leaveSwarm :: SwarmSession -> IO ()
+leaveSwarm SwarmSession {..} = do
+  signalQSemN vacantPeers 1
+  signalQSemN (activeThreads clientSession) 1
+
+waitVacancy :: SwarmSession -> IO () -> IO ()
+waitVacancy se =
+  bracket (enterSwarm se) (const (leaveSwarm se))
+                  . const
+
 {-----------------------------------------------------------------------
     Peer session
 -----------------------------------------------------------------------}
@@ -263,16 +305,18 @@ sessionError msg
 
 -- TODO check if it connected yet peer
 withPeerSession :: SwarmSession -> PeerAddr
-                -> ((Socket, PeerSession) -> IO a)
-                -> IO a
+                -> ((Socket, PeerSession) -> IO ())
+                -> IO ()
 
 withPeerSession ss @ SwarmSession {..} addr
-    = bracket openSession closeSession
+    = handle isSessionException . bracket openSession closeSession
   where
     openSession = do
-      let caps = encodeExts $ allowedExtensions $ clientSession
-      let pid  = clientPeerID $ clientSession
-      let chs  = Handshake defaultBTProtocol caps (tInfoHash torrentMeta) pid
+      let caps  = encodeExts $ allowedExtensions $ clientSession
+      let ihash = tInfoHash torrentMeta
+      let pid   = clientPeerID $ clientSession
+      let chs   = Handshake defaultBTProtocol caps ihash pid
+
       sock <- connectToPeer addr
       phs  <- handshake sock chs `onException` close sock
 
@@ -292,7 +336,8 @@ withPeerSession ss @ SwarmSession {..} addr
            }
       return (sock, ps)
 
-    closeSession = close . fst
+    closeSession (sock, _) = do
+      close sock
 
 getPieceCount :: (MonadReader PeerSession m) => m PieceCount
 getPieceCount = asks (pieceCount . tInfo . torrentMeta . swarmSession)

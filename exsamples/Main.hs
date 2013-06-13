@@ -15,12 +15,12 @@ main = do
   [path] <- getArgs
   torrent <- fromFile path
 
-  client  <- newClient []
+  client  <- newClient 1 []
   swarm   <- newLeacher  client torrent
 
-  ref <- newIORef 0
-
   discover swarm $ do
+    ref <- liftIO $ newIORef 0
+
     addr <- asks connectedPeerAddr
     liftIO $ print $ "connected to" ++ show addr
 
@@ -36,7 +36,6 @@ main = do
           liftIO $ do
             readIORef ref >>= print
             modifyIORef ref succ
-            print (ppBlock blk)
 
           yieldEvent (Want (BlockIx 0 0 (16 * 1024)))
 
