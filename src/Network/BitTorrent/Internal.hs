@@ -58,6 +58,7 @@ module Network.BitTorrent.Internal
 import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Concurrent.MSem as MSem
 import Control.Lens
 import Control.Monad.State
 import Control.Monad.Reader
@@ -106,6 +107,8 @@ startProgress = Progress 0 0
     Client session
 -----------------------------------------------------------------------}
 
+type ThreadCount = Int
+
 -- | In one application we could have many clients with difference
 -- ID's and different enabled extensions.
 data ClientSession = ClientSession {
@@ -119,10 +122,10 @@ data ClientSession = ClientSession {
   , allowedExtensions :: [Extension]
 
     -- | Semaphor used to bound number of active P2P sessions.
-  , activeThreads     :: QSem
+  , activeThreads     :: MSem ThreadCount
 
     -- | Max number of active connections.
-  , maxActive         :: Int
+  , maxActive         :: ThreadCount
 
   , swarmSessions     :: TVar (Set SwarmSession)
 
@@ -139,7 +142,7 @@ instance Ord ClientSession where
 getCurrentProgress :: MonadIO m => ClientSession -> m Progress
 getCurrentProgress = liftIO . readTVarIO . currentProgress
 
-newClient :: Int              -- ^ Maximum count of active P2P Sessions.
+newClient :: ThreadCount      -- ^ Maximum count of active P2P Sessions.
           -> [Extension]      -- ^ Extensions allowed to use.
           -> IO ClientSession
 
@@ -151,7 +154,7 @@ newClient n exts = do
   ClientSession
     <$> newPeerID
     <*> pure exts
-    <*> newQSem n
+    <*> MSem.new n
     <*> pure n
     <*> newTVarIO S.empty
     <*> pure mgr
@@ -161,6 +164,8 @@ newClient n exts = do
     Swarm session
 -----------------------------------------------------------------------}
 
+type SessionCount = Int
+
 -- | Extensions are set globally by
 --   Swarm session are un
 data SwarmSession = SwarmSession {
@@ -169,7 +174,7 @@ data SwarmSession = SwarmSession {
 
     -- | Represent count of peers we _currently_ can connect to in the
     -- swarm. Used to bound number of concurrent threads.
-  , vacantPeers       :: QSem
+  , vacantPeers       :: MSem SessionCount
 
     -- | Modify this carefully updating global progress.
   , clientBitfield    :: TVar  Bitfield
@@ -187,7 +192,7 @@ newSwarmSession :: Int -> Bitfield -> ClientSession -> Torrent
 newSwarmSession n bf cs @ ClientSession {..} t @ Torrent {..}
   = SwarmSession <$> pure t
                  <*> pure cs
-                 <*> newQSem n
+                 <*> MSem.new n
                  <*> newTVarIO bf
                  <*> newTVarIO S.empty
 
@@ -199,10 +204,10 @@ newLeacher :: ClientSession -> Torrent -> IO SwarmSession
 newLeacher cs t @ Torrent {..}
   = newSwarmSession defLeacherConns (haveNone (pieceCount tInfo)) cs t
 
-defSeederConns :: Int
+defSeederConns :: SessionCount
 defSeederConns = defaultUnchokeSlots
 
-defLeacherConns :: Int
+defLeacherConns :: SessionCount
 defLeacherConns = defaultNumWant
 
 --isLeacher :: SwarmSession -> IO Bool
@@ -219,13 +224,13 @@ haveDone ix =
 
 enterSwarm :: SwarmSession -> IO ()
 enterSwarm SwarmSession {..} = do
-  waitQSem (activeThreads clientSession)
-  waitQSem vacantPeers
+  MSem.wait (activeThreads clientSession)
+  MSem.wait vacantPeers
 
 leaveSwarm :: SwarmSession -> IO ()
 leaveSwarm SwarmSession {..} = do
-  signalQSem vacantPeers
-  signalQSem (activeThreads clientSession)
+  MSem.signal vacantPeers
+  MSem.signal (activeThreads clientSession)
 
 waitVacancy :: SwarmSession -> IO () -> IO ()
 waitVacancy se =
