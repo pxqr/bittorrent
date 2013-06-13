@@ -12,7 +12,7 @@ module Network.BitTorrent
 
          -- * Session
        , ClientSession
-       , newClient
+       , newClient, defaultClient
 
        , SwarmSession
        , newLeacher, newSeeder
@@ -27,6 +27,8 @@ module Network.BitTorrent
        , Block(..), BlockIx(..), ppBlock, ppBlockIx
 
        , awaitEvent, yieldEvent
+
+       , Extension, defaultExtensions, ppExtension
        ) where
 
 import Control.Concurrent
@@ -41,7 +43,11 @@ import Network.BitTorrent.Internal
 import Network.BitTorrent.Exchange
 import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker
+import Network.BitTorrent.Extension
 
+
+defaultClient :: IO ClientSession
+defaultClient = newClient defaultThreadCount defaultExtensions
 
 -- discover should hide tracker and DHT communication under the hood
 -- thus we can obtain an unified interface

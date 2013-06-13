@@ -28,6 +28,8 @@ module Network.BitTorrent.Internal
        , ClientSession (clientPeerID, allowedExtensions)
        , newClient, getCurrentProgress
 
+       , ThreadCount, defaultThreadCount
+
          -- * Swarm
        , SwarmSession(SwarmSession, torrentMeta, clientSession)
        , newLeacher, newSeeder
@@ -109,6 +111,9 @@ startProgress = Progress 0 0
 
 type ThreadCount = Int
 
+defaultThreadCount :: ThreadCount
+defaultThreadCount = 1000
+
 -- | In one application we could have many clients with difference
 -- ID's and different enabled extensions.
 data ClientSession = ClientSession {
@@ -166,6 +171,13 @@ newClient n exts = do
 
 type SessionCount = Int
 
+defSeederConns :: SessionCount
+defSeederConns = defaultUnchokeSlots
+
+defLeacherConns :: SessionCount
+defLeacherConns = defaultNumWant
+
+
 -- | Extensions are set globally by
 --   Swarm session are un
 data SwarmSession = SwarmSession {
@@ -203,12 +215,6 @@ newSeeder cs t @ Torrent {..}
 newLeacher :: ClientSession -> Torrent -> IO SwarmSession
 newLeacher cs t @ Torrent {..}
   = newSwarmSession defLeacherConns (haveNone (pieceCount tInfo)) cs t
-
-defSeederConns :: SessionCount
-defSeederConns = defaultUnchokeSlots
-
-defLeacherConns :: SessionCount
-defLeacherConns = defaultNumWant
 
 --isLeacher :: SwarmSession -> IO Bool
 --isLeacher = undefined

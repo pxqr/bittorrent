@@ -12,10 +12,10 @@ import Data.IORef
 
 main :: IO ()
 main = do
-  [path] <- getArgs
+  [path]  <- getArgs
   torrent <- fromFile path
 
-  client  <- newClient 1 []
+  client  <- defaultClient
   swarm   <- newLeacher  client torrent
 
   discover swarm $ do

@@ -12,8 +12,15 @@
 --
 {-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.Extension
-       ( Capabilities,  ppCaps, defaultCaps, enabledCaps
-       , Extension(..), ppExtension, encodeExts, decodeExts
+       ( -- * Capabilities
+         Capabilities
+       , ppCaps, defaultCaps
+       , enabledCaps
+
+         -- * Extensions
+       , Extension(..)
+       , defaultExtensions, ppExtension
+       , encodeExts, decodeExts
        ) where
 
 import Data.Bits
@@ -35,7 +42,6 @@ enabledCaps :: Capabilities -- ^ of the client.
 enabledCaps = (.&.)
 
 
-
 data Extension = ExtDHT  -- ^ BEP 5
                | ExtFast -- ^ BEP 6
                  deriving (Show, Eq, Ord, Enum, Bounded)
@@ -48,6 +54,8 @@ extensionMask :: Extension -> Word64
 extensionMask ExtDHT  = 0x01
 extensionMask ExtFast = 0x04
 
+defaultExtensions :: [Extension]
+defaultExtensions = []
 
 encodeExts :: [Extension] -> Capabilities
 encodeExts = foldr (.&.) 0 . map extensionMask
