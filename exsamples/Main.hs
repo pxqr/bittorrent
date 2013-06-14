@@ -18,7 +18,7 @@ main = do
   print (contentLayout "./" (tInfo torrent))
 
   client  <- newClient 100 []
-  swarm   <- newLeacher  client torrent
+  swarm   <- newLeecher  client torrent
 
   ref <- liftIO $ newIORef 0
   discover swarm $ do

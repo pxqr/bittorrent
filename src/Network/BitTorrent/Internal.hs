@@ -22,6 +22,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ConstraintKinds       #-}
 module Network.BitTorrent.Internal
        ( Progress(..), startProgress
 
@@ -39,13 +40,21 @@ module Network.BitTorrent.Internal
 
 
          -- * Swarm
-       , SwarmSession(SwarmSession, torrentMeta, clientSession)
+       , SwarmSession( SwarmSession, torrentMeta, clientSession )
+
+       , SessionCount
        , getSessionCount
-       , newLeacher, newSeeder
-       , enterSwarm, leaveSwarm , waitVacancy
+
+       , newLeecher
+       , newSeeder
+       , getClientBitfield
+
+       , enterSwarm
+       , leaveSwarm
+       , waitVacancy
 
          -- * Peer
-       , PeerSession(PeerSession, connectedPeerAddr
+       , PeerSession( PeerSession, connectedPeerAddr
                     , swarmSession, enabledExtensions
                     )
        , SessionState
@@ -58,8 +67,7 @@ module Network.BitTorrent.Internal
 
          -- ** Properties
        , bitfield, status
-       , emptyBF, fullBF, singletonBF, adjustBF
-       , getPieceCount, getClientBF
+       , findPieceCount
 
          -- * Timeouts
        , updateIncoming, updateOutcoming
@@ -237,7 +245,20 @@ newClient n exts = do
     Swarm session
 -----------------------------------------------------------------------}
 
--- TODO document P2P sessions bounding
+{- NOTE: If client is a leecher then there is NO particular reason to
+set max sessions count more than the_number_of_unchoke_slots * k:
+
+  * thread slot(activeThread semaphore)
+  * will take but no
+
+So if client is a leecher then max sessions count depends on the
+number of unchoke slots.
+
+However if client is a seeder then the value depends on .
+-}
+
+-- | Used to bound the number of simultaneous connections and, which
+-- is the same, P2P sessions within the swarm session.
 type SessionCount = Int
 
 defSeederConns :: SessionCount
@@ -271,10 +292,6 @@ instance Eq SwarmSession where
 instance Ord SwarmSession where
   compare = comparing (tInfoHash . torrentMeta)
 
-getSessionCount :: SwarmSession -> IO SessionCount
-getSessionCount SwarmSession {..} = do
-  S.size <$> readTVarIO connectedPeers
-
 newSwarmSession :: Int -> Bitfield -> ClientSession -> Torrent
                 -> IO SwarmSession
 newSwarmSession n bf cs @ ClientSession {..} t @ Torrent {..}
@@ -284,16 +301,26 @@ newSwarmSession n bf cs @ ClientSession {..} t @ Torrent {..}
                  <*> newTVarIO bf
                  <*> newTVarIO S.empty
 
+-- | New swarm session in which the client allowed to upload only.
 newSeeder :: ClientSession -> Torrent -> IO SwarmSession
 newSeeder cs t @ Torrent {..}
   = newSwarmSession defSeederConns (haveAll (pieceCount tInfo)) cs t
 
-newLeacher :: ClientSession -> Torrent -> IO SwarmSession
-newLeacher cs t @ Torrent {..}
+-- | New swarm in which the client allowed both download and upload.
+newLeecher :: ClientSession -> Torrent -> IO SwarmSession
+newLeecher cs t @ Torrent {..}
   = newSwarmSession defLeacherConns (haveNone (pieceCount tInfo)) cs t
 
 --isLeacher :: SwarmSession -> IO Bool
 --isLeacher = undefined
+
+-- | Get the number of connected peers in the given swarm.
+getSessionCount :: SwarmSession -> IO SessionCount
+getSessionCount SwarmSession {..} = do
+  S.size <$> readTVarIO connectedPeers
+
+getClientBitfield :: SwarmSession -> IO Bitfield
+getClientBitfield = readTVarIO . clientBitfield
 
 {-
 haveDone :: MonadIO m => PieceIx -> SwarmSession -> m ()
@@ -303,6 +330,8 @@ haveDone ix =
     writeTVar (have ix bf)
     currentProgress
 -}
+
+-- acquire/release mechanism: for internal use only
 
 enterSwarm :: SwarmSession -> IO ()
 enterSwarm SwarmSession {..} = do
@@ -323,11 +352,13 @@ waitVacancy se =
     Peer session
 -----------------------------------------------------------------------}
 
+-- | Peer session contain all data necessary for peer to peer communication.
 data PeerSession = PeerSession {
     -- | Used as unique 'PeerSession' identifier within one
     -- 'SwarmSession'.
     connectedPeerAddr :: !PeerAddr
 
+    -- | The swarm to which both end points belong to.
   , swarmSession      :: !SwarmSession
 
     -- | Extensions such that both peer and client support.
@@ -350,16 +381,24 @@ data PeerSession = PeerSession {
     --
     -- We should update timeout if we /send/ any message within timeout
     -- to avoid reduntant KA messages.
+    --
   , outcomingTimeout   :: !TimeoutKey
 
     -- TODO use dupChan for broadcasting
+
+    -- | Channel used for replicate messages across all peers in
+    -- swarm. For exsample if we get some piece we should sent to all
+    -- connected (and interested in) peers HAVE message.
+    --
   , broadcastMessages :: !(Chan   [Message])
+
+    -- | Dymanic P2P data.
   , sessionState      :: !(IORef  SessionState)
   }
 
 data SessionState = SessionState {
-    _bitfield :: !Bitfield
-  , _status   :: !SessionStatus
+    _bitfield :: !Bitfield        -- ^ Other peer Have bitfield.
+  , _status   :: !SessionStatus   -- ^ Status of both peers.
   } deriving (Show, Eq)
 
 $(makeLenses ''SessionState)
@@ -380,18 +419,28 @@ instance (MonadIO m, MonadReader PeerSession m)
 
   put !s = asks sessionState >>= \ref -> liftIO $ writeIORef ref s
 
+
+-- | Exceptions used to interrupt the current P2P session. This
+-- exceptions will NOT affect other P2P sessions, DHT, peer <->
+-- tracker, or any other session.
+--
 data SessionException = PeerDisconnected
                       | ProtocolError Doc
                         deriving (Show, Typeable)
 
 instance Exception SessionException
 
+
+-- | Do nothing with exception, used with 'handle' or 'try'.
 isSessionException :: Monad m => SessionException -> m ()
 isSessionException _ = return ()
 
+-- | The same as 'isSessionException' but output to stdout the catched
+-- exception, for debugging purposes only.
 putSessionException :: SessionException -> IO ()
 putSessionException = print
 
+-- TODO modify such that we can use this in listener loop
 -- TODO check if it connected yet peer
 withPeerSession :: SwarmSession -> PeerAddr
                 -> ((Socket, PeerSession) -> IO ())
@@ -432,32 +481,19 @@ withPeerSession ss @ SwarmSession {..} addr
       atomically $ modifyTVar' connectedPeers (S.delete ps)
       close sock
 
-getPieceCount :: (MonadReader PeerSession m) => m PieceCount
-getPieceCount = asks (pieceCount . tInfo . torrentMeta . swarmSession)
+findPieceCount :: PeerSession -> PieceCount
+findPieceCount = pieceCount . tInfo . torrentMeta . swarmSession
 
-emptyBF :: (MonadReader PeerSession m) => m Bitfield
-emptyBF = liftM haveNone getPieceCount
-
-fullBF ::  (MonadReader PeerSession m) => m Bitfield
-fullBF = liftM haveAll getPieceCount
-
-singletonBF :: (MonadReader PeerSession m) => PieceIx -> m Bitfield
-singletonBF i = liftM (BF.singleton i) getPieceCount
-
-adjustBF :: (MonadReader PeerSession m) => Bitfield -> m Bitfield
-adjustBF bf = (`adjustSize` bf) `liftM` getPieceCount
-
-getClientBF :: (MonadIO m, MonadReader PeerSession m) => m Bitfield
-getClientBF = asks swarmSession >>= liftIO . readTVarIO . clientBitfield
-
+-- TODO use this type for broadcast messages instead of 'Message'
 --data Signal =
 --nextBroadcast :: P2P (Maybe Signal)
 --nextBroadcast =
 
-
 {-----------------------------------------------------------------------
     Timeouts
 -----------------------------------------------------------------------}
+
+-- for internal use only
 
 sec :: Int
 sec = 1000 * 1000

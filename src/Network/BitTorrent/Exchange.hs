@@ -10,6 +10,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE FlexibleContexts           #-}
 module Network.BitTorrent.Exchange
        ( -- * Block
          Block(..), BlockIx(..)
@@ -22,6 +23,10 @@ module Network.BitTorrent.Exchange
        , awaitEvent, yieldEvent
 
        , disconnect, protocolError
+
+       , getHaveCount
+       , getWantCount
+       , getPieceCount
        ) where
 
 import Control.Applicative
@@ -128,9 +133,12 @@ chainP2P :: SwarmSession -> PeerConnection -> P2P () -> IO ()
     Exceptions
 -----------------------------------------------------------------------}
 
+-- | Terminate the current 'P2P' session.
 disconnect :: MonadThrow m => m a
 disconnect = monadThrow PeerDisconnected
 
+-- TODO handle all protocol details here so we can hide this from
+-- public interface |
 protocolError :: MonadThrow m => Doc -> m a
 protocolError = monadThrow . ProtocolError
 
@@ -138,7 +146,40 @@ protocolError = monadThrow . ProtocolError
     Helpers
 -----------------------------------------------------------------------}
 
-peerWant :: P2P Bitfield
+-- | Count of client have pieces.
+getHaveCount :: (MonadReader PeerSession m) => m PieceCount
+getHaveCount = undefined
+{-# INLINE getHaveCount #-}
+
+-- | Count of client do not have pieces.
+getWantCount :: (MonadReader PeerSession m) => m PieceCount
+getWantCount = undefined
+{-# INLINE getWantCount #-}
+
+-- | Count of both have and want pieces.
+getPieceCount :: (MonadReader PeerSession m) => m PieceCount
+getPieceCount = asks findPieceCount
+{-# INLINE getPieceCount #-}
+
+-- for internal use only
+emptyBF :: (MonadReader PeerSession m) => m Bitfield
+emptyBF = liftM haveNone getPieceCount
+
+fullBF ::  (MonadReader PeerSession m) => m Bitfield
+fullBF = liftM haveAll getPieceCount
+
+singletonBF :: (MonadReader PeerSession m) => PieceIx -> m Bitfield
+singletonBF i = liftM (BF.singleton i) getPieceCount
+
+adjustBF :: (MonadReader PeerSession m) => Bitfield -> m Bitfield
+adjustBF bf = (`adjustSize` bf) `liftM` getPieceCount
+
+getClientBF :: (MonadIO m, MonadReader PeerSession m) => m Bitfield
+getClientBF = asks swarmSession >>= liftIO . getClientBitfield
+
+
+
+peerWant   :: P2P Bitfield
 peerWant   = BF.difference <$> getClientBF  <*> use bitfield
 
 clientWant :: P2P Bitfield
@@ -153,6 +194,8 @@ clientOffer :: P2P Bitfield
 clientOffer = do
   sessionStatus <- use status
   if canUpload sessionStatus then peerWant else emptyBF
+
+
 
 revise :: P2P Bitfield
 revise = do

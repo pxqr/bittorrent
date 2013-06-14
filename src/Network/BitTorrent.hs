@@ -11,11 +11,11 @@ module Network.BitTorrent
          module Data.Torrent
 
          -- * Session
-         -- ** Client
-       , ClientSession( clientPeerID, allowedExtensions )
-
        , ThreadCount
        , defaultThreadCount
+
+         -- ** Client
+       , ClientSession( clientPeerID, allowedExtensions )
 
        , newClient
        , defaultClient
@@ -24,24 +24,37 @@ module Network.BitTorrent
        , getPeerCount
        , getSwarmCount
 
-
          -- ** Swarm
        , SwarmSession(torrentMeta)
-       , newLeacher, newSeeder
+
+       , newLeecher
+       , newSeeder
+
+       , SessionCount
        , getSessionCount
 
          -- * Discovery
        , discover
 
          -- * Peer to Peer
-       , PeerSession ( connectedPeerAddr, enabledExtensions )
        , P2P
+
+         -- ** Session
+       , PeerSession( PeerSession, connectedPeerAddr
+                    , swarmSession, enabledExtensions
+                    )
+
+       , getHaveCount
+       , getWantCount
+       , getPieceCount
+
 
          -- ** Transfer
        , Block(..), ppBlock
        , BlockIx(..), ppBlockIx
 
          -- ** Control
+       , SessionException
        , disconnect
        , protocolError
 
