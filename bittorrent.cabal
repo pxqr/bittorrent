@@ -62,7 +62,6 @@ library
                      , lens
 
                        -- Concurrency packages
-                     , monad-fork
                      , SafeSemaphore
                      , BoundedChan >= 1.0.1.0
                      , stm         >= 2.4

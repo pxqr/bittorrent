@@ -6,11 +6,9 @@
 --   Portability :  portable
 --
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE DoAndIfThenElse            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE BangPatterns               #-}
 module Network.BitTorrent.Exchange
        ( -- * Block
@@ -34,7 +32,6 @@ import Control.Applicative
 import Control.Exception
 import Control.Concurrent
 import Control.Lens
-import Control.Monad.Fork.Class
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans.Resource
@@ -110,8 +107,6 @@ instance MonadState SessionState P2P where
   {-# INLINE get #-}
   put !s = asks sessionState >>= \ref -> liftIO $ writeIORef ref s
   {-# INLINE put #-}
-
--- TODO instance for MonadFork
 
 runSession :: SwarmSession -> PeerAddr -> P2P () -> IO ()
 runSession  se addr p2p =

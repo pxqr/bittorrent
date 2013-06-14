@@ -14,15 +14,9 @@
 --   data should be modified through standalone functions.
 --
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE ConstraintKinds       #-}
 module Network.BitTorrent.Internal
        ( Progress(..), startProgress
 
@@ -79,9 +73,8 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.MSem as MSem
 import Control.Lens
-import Control.Monad.State
-import Control.Monad.Reader
 import Control.Exception
+import Control.Monad.Trans
 
 import Data.IORef
 import Data.Default
