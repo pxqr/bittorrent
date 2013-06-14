@@ -27,9 +27,16 @@ module Network.BitTorrent.Internal
 
          -- * Client
        , ClientSession (clientPeerID, allowedExtensions)
-       , newClient, getCurrentProgress
 
-       , ThreadCount, defaultThreadCount
+       , ThreadCount
+       , defaultThreadCount
+
+       , newClient
+
+       , getCurrentProgress
+       , getSwarmCount
+       , getPeerCount
+
 
          -- * Swarm
        , SwarmSession(SwarmSession, torrentMeta, clientSession)
@@ -95,52 +102,93 @@ import Network.BitTorrent.Tracker.Protocol as BT
 -----------------------------------------------------------------------}
 
 -- | 'Progress' contains upload/download/left stats about
---   current client state.
+--   current client state and used to notify the tracker
 --
---   This data is considered as dynamic within one session.
+--   This data is considered as dynamic within one client
+--   session. This data also should be shared across client
+--   application sessions (e.g. files), otherwise use 'startProgress'
+--   to get initial 'Progress'.
 --
 data Progress = Progress {
-    prUploaded   :: Integer -- ^ Total amount of bytes uploaded.
-  , prDownloaded :: Integer -- ^ Total amount of bytes downloaded.
-  , prLeft       :: Integer -- ^ Total amount of bytes left.
-  } deriving Show
+    prUploaded   :: !Integer -- ^ Total amount of bytes uploaded.
+  , prDownloaded :: !Integer -- ^ Total amount of bytes downloaded.
+  , prLeft       :: !Integer -- ^ Total amount of bytes left.
+  } deriving (Show, Read, Eq)
 
+-- TODO make lenses
+
+-- | Initial progress is used when there are no session before.
+--
+--   Please note that tracker might penalize client some way if the do
+--   not accumulate progress. If possible and save 'Progress' between
+--   client sessions to avoid that.
+--
 startProgress :: Integer -> Progress
 startProgress = Progress 0 0
-
 
 {-----------------------------------------------------------------------
     Client session
 -----------------------------------------------------------------------}
 
--- TODO comment thread count bounding
+{- NOTE: If we will not restrict number of threads we could end up
+with thousands of connected swarm and make no particular progress.
+
+Note also we do not bound number of swarms! This is not optimal
+strategy because each swarm might have say 1 thread and we could end
+up bounded by the meaningless limit. Bounding global number of p2p
+sessions should work better, and simpler.-}
+
+-- | Each client might have a limited number of threads.
 type ThreadCount = Int
 
+-- | The number of threads suitable for a typical BT client.
 defaultThreadCount :: ThreadCount
 defaultThreadCount = 1000
 
--- | In one application we could have many clients with difference
--- ID's and different enabled extensions.
+{- NOTE: basically, client session should contain options which user
+app store in configuration files. (related to the protocol) Moreover
+it should contain the all client identification info. (e.g. DHT)  -}
+
+-- | Client session is the basic unit of bittorrent network, it has:
+--
+--     * The /peer ID/ used as unique identifier of the client in
+--     network. Obviously, this value is not changed during client
+--     session.
+--
+--     * The number of /protocol extensions/ it might use. This value
+--     is static as well, but if you want to dynamically reconfigure
+--     the client you might kill the end the current session and
+--     create a new with the fresh required extensions.
+--
+--     * The number of /swarms/ to join, each swarm described by the
+--     'SwarmSession'.
+--
+--  Normally, you would have one client session, however, if we need,
+--  in one application we could have many clients with different peer
+--  ID's and different enabled extensions at the same time.
+--
 data ClientSession = ClientSession {
-    -- | Our peer ID used in handshaked and discovery mechanism. The
-    -- clientPeerID is unique 'ClientSession' identifier.
+    -- | Used in handshakes and discovery mechanism.
     clientPeerID      :: !PeerID
 
     -- | Extensions we should try to use. Hovewer some particular peer
-    -- might not support some extension, so we keep enableExtension in
+    -- might not support some extension, so we keep enabledExtension in
     -- 'PeerSession'.
   , allowedExtensions :: [Extension]
 
     -- | Semaphor used to bound number of active P2P sessions.
-  , activeThreads     :: MSem ThreadCount
+  , activeThreads     :: !(MSem ThreadCount)
 
     -- | Max number of active connections.
-  , maxActive         :: ThreadCount
+  , maxActive         :: !ThreadCount
 
-  , swarmSessions     :: TVar (Set SwarmSession)
+    -- | Used to traverse the swarm session.
+  , swarmSessions     :: !(TVar (Set SwarmSession))
 
-  , eventManager      :: EventManager
-  , currentProgress   :: TVar  Progress
+  , eventManager      :: !EventManager
+
+    -- | Used to keep track global client progress.
+  , currentProgress   :: !(TVar  Progress)
   }
 
 instance Eq ClientSession where
@@ -149,12 +197,27 @@ instance Eq ClientSession where
 instance Ord ClientSession where
   compare = comparing clientPeerID
 
+-- | Get current global progress of the client. This value is usually
+-- shown to a user.
 getCurrentProgress :: MonadIO m => ClientSession -> m Progress
 getCurrentProgress = liftIO . readTVarIO . currentProgress
 
-newClient :: ThreadCount      -- ^ Maximum count of active P2P Sessions.
+-- | Get number of swarms client aware of.
+getSwarmCount :: MonadIO m => ClientSession -> m SessionCount
+getSwarmCount ClientSession {..} = liftIO $
+  S.size <$> readTVarIO swarmSessions
+
+-- | Get number of peers the client currently connected to.
+getPeerCount :: MonadIO m => ClientSession -> m ThreadCount
+getPeerCount ClientSession {..} = liftIO $ do
+  unused  <- peekAvail activeThreads
+  return (maxActive - unused)
+
+-- | Create a new client session. The data passed to this function are
+-- usually loaded from configuration file.
+newClient :: SessionCount     -- ^ Maximum count of active P2P Sessions.
           -> [Extension]      -- ^ Extensions allowed to use.
-          -> IO ClientSession
+          -> IO ClientSession -- ^ Client with unique peer ID.
 
 newClient n exts = do
   mgr <- Ev.new
@@ -183,11 +246,11 @@ defSeederConns = defaultUnchokeSlots
 defLeacherConns :: SessionCount
 defLeacherConns = defaultNumWant
 
-
--- | Extensions are set globally by
---   Swarm session are un
+-- | Swarm session is
 data SwarmSession = SwarmSession {
     torrentMeta       :: !Torrent
+
+    -- |
   , clientSession     :: !ClientSession
 
     -- | Represent count of peers we _currently_ can connect to in the

@@ -20,6 +20,8 @@ module Network.BitTorrent.Exchange
        , P2P
        , runP2P, spawnP2P
        , awaitEvent, yieldEvent
+
+       , disconnect, protocolError
        ) where
 
 import Control.Applicative
@@ -181,13 +183,13 @@ requireExtension required = do
 -----------------------------------------------------------------------}
 
 -- |
---   +----------+---------+
---   | Leacher  |  Seeder |
---   |----------+---------+
---   | Available|         |
---   | Want     |   Want  |
---   | Fragment |         |
---   +----------+---------+
+--   > +----------+---------+
+--   > | Leacher  |  Seeder |
+--   > |----------+---------+
+--   > | Available|         |
+--   > | Want     |   Want  |
+--   > | Fragment |         |
+--   > +----------+---------+
 --
 --
 --   properties:

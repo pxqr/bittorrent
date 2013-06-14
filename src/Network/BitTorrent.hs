@@ -11,10 +11,22 @@ module Network.BitTorrent
          module Data.Torrent
 
          -- * Session
-       , ClientSession
-       , newClient, defaultClient
+         -- ** Client
+       , ClientSession( clientPeerID, allowedExtensions )
 
-       , SwarmSession
+       , ThreadCount
+       , defaultThreadCount
+
+       , newClient
+       , defaultClient
+
+       , getCurrentProgress
+       , getPeerCount
+       , getSwarmCount
+
+
+         -- ** Swarm
+       , SwarmSession(torrentMeta)
        , newLeacher, newSeeder
        , getSessionCount
 
@@ -22,13 +34,22 @@ module Network.BitTorrent
        , discover
 
          -- * Peer to Peer
-       , P2P
-       , Event(..)
        , PeerSession ( connectedPeerAddr, enabledExtensions )
-       , Block(..), BlockIx(..), ppBlock, ppBlockIx
+       , P2P
 
+         -- ** Transfer
+       , Block(..), ppBlock
+       , BlockIx(..), ppBlockIx
+
+         -- ** Control
+       , disconnect
+       , protocolError
+
+         -- ** Events
+       , Event(..)
        , awaitEvent, yieldEvent
 
+         -- * Extensions
        , Extension, defaultExtensions, ppExtension
        ) where
 
@@ -48,6 +69,7 @@ import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
 
 
+-- | Client session with default parameters. Use it for testing only.
 defaultClient :: IO ClientSession
 defaultClient = newClient defaultThreadCount defaultExtensions
 
