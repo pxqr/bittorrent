@@ -11,6 +11,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE BangPatterns               #-}
 module Network.BitTorrent.Exchange
        ( -- * Block
          Block(..), BlockIx(..)
@@ -35,13 +36,16 @@ import Control.Concurrent
 import Control.Lens
 import Control.Monad.Fork.Class
 import Control.Monad.Reader
+import Control.Monad.State
 import Control.Monad.Trans.Resource
 
+import Data.IORef
 import Data.Conduit as C
 import Data.Conduit.Cereal
 import Data.Conduit.Network
 import Data.Serialize as S
 import Text.PrettyPrint as PP hiding (($$))
+
 
 import Network
 
@@ -75,10 +79,12 @@ runPeerWire sock p2p =
 awaitMessage :: P2P Message
 awaitMessage = P2P (ReaderT (const go))
   where
-    go = await >>= maybe disconnect return
+    go = await >>= maybe (monadThrow PeerDisconnected) return
+{-# INLINE awaitMessage #-}
 
 yieldMessage :: Message -> P2P ()
 yieldMessage msg = P2P $ ReaderT $ \se -> C.yield msg
+{-# INLINE yieldMessage #-}
 
 {-----------------------------------------------------------------------
     P2P monad
@@ -97,6 +103,14 @@ newtype P2P a = P2P {
              , MonadIO, MonadThrow, MonadActive
              , MonadReader PeerSession
              )
+
+instance MonadState SessionState P2P where
+  {-# SPECIALIZE instance MonadState SessionState P2P #-}
+  get    = asks sessionState >>= liftIO . readIORef
+  {-# INLINE get #-}
+  put !s = asks sessionState >>= \ref -> liftIO $ writeIORef ref s
+  {-# INLINE put #-}
+
 -- TODO instance for MonadFork
 
 runSession :: SwarmSession -> PeerAddr -> P2P () -> IO ()
@@ -134,49 +148,49 @@ chainP2P :: SwarmSession -> PeerConnection -> P2P () -> IO ()
 -----------------------------------------------------------------------}
 
 -- | Terminate the current 'P2P' session.
-disconnect :: MonadThrow m => m a
+disconnect :: P2P a
 disconnect = monadThrow PeerDisconnected
 
 -- TODO handle all protocol details here so we can hide this from
 -- public interface |
-protocolError :: MonadThrow m => Doc -> m a
+protocolError ::  Doc -> P2P a
 protocolError = monadThrow . ProtocolError
 
 {-----------------------------------------------------------------------
     Helpers
 -----------------------------------------------------------------------}
 
--- | Count of client have pieces.
-getHaveCount :: (MonadReader PeerSession m) => m PieceCount
-getHaveCount = undefined
+getClientBF :: P2P Bitfield
+getClientBF = asks swarmSession >>= liftIO . getClientBitfield
+{-# INLINE getClientBF #-}
+
+-- | Count of client /have/ pieces.
+getHaveCount :: P2P PieceCount
+getHaveCount = haveCount <$> getClientBF
 {-# INLINE getHaveCount #-}
 
--- | Count of client do not have pieces.
-getWantCount :: (MonadReader PeerSession m) => m PieceCount
-getWantCount = undefined
+-- | Count of client do not /have/ pieces.
+getWantCount :: P2P PieceCount
+getWantCount = totalCount <$> getClientBF
 {-# INLINE getWantCount #-}
 
--- | Count of both have and want pieces.
-getPieceCount :: (MonadReader PeerSession m) => m PieceCount
+-- | Count of both /have/ and /want/ pieces.
+getPieceCount :: P2P PieceCount
 getPieceCount = asks findPieceCount
 {-# INLINE getPieceCount #-}
 
 -- for internal use only
-emptyBF :: (MonadReader PeerSession m) => m Bitfield
+emptyBF :: P2P Bitfield
 emptyBF = liftM haveNone getPieceCount
 
-fullBF ::  (MonadReader PeerSession m) => m Bitfield
+fullBF ::  P2P Bitfield
 fullBF = liftM haveAll getPieceCount
 
-singletonBF :: (MonadReader PeerSession m) => PieceIx -> m Bitfield
+singletonBF :: PieceIx -> P2P Bitfield
 singletonBF i = liftM (BF.singleton i) getPieceCount
 
-adjustBF :: (MonadReader PeerSession m) => Bitfield -> m Bitfield
+adjustBF :: Bitfield -> P2P Bitfield
 adjustBF bf = (`adjustSize` bf) `liftM` getPieceCount
-
-getClientBF :: (MonadIO m, MonadReader PeerSession m) => m Bitfield
-getClientBF = asks swarmSession >>= liftIO . getClientBitfield
-
 
 
 peerWant   :: P2P Bitfield
@@ -332,7 +346,7 @@ awaitEvent = awaitMessage >>= go
        requireExtension ExtFast
        awaitEvent
 
-
+-- TODO minimized number of peerOffer calls
 
 -- |
 --   @

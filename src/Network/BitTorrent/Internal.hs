@@ -56,6 +56,7 @@ module Network.BitTorrent.Internal
          -- * Peer
        , PeerSession( PeerSession, connectedPeerAddr
                     , swarmSession, enabledExtensions
+                    , sessionState
                     )
        , SessionState
        , withPeerSession
@@ -352,7 +353,8 @@ waitVacancy se =
     Peer session
 -----------------------------------------------------------------------}
 
--- | Peer session contain all data necessary for peer to peer communication.
+-- | Peer session contain all data necessary for peer to peer
+-- communication.
 data PeerSession = PeerSession {
     -- | Used as unique 'PeerSession' identifier within one
     -- 'SwarmSession'.
@@ -408,17 +410,6 @@ instance Eq PeerSession where
 
 instance Ord PeerSession where
   compare = comparing connectedPeerAddr
-
-instance (MonadIO m, MonadReader PeerSession m)
-      => MonadState SessionState m where
-  get    = do
-    ref <- asks sessionState
-    st <- liftIO (readIORef ref)
-    liftIO $ print (completeness (_bitfield st))
-    return st
-
-  put !s = asks sessionState >>= \ref -> liftIO $ writeIORef ref s
-
 
 -- | Exceptions used to interrupt the current P2P session. This
 -- exceptions will NOT affect other P2P sessions, DHT, peer <->
