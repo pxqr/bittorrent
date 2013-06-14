@@ -45,6 +45,7 @@ import Network.BitTorrent.Exchange
 import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker
 import Network.BitTorrent.Extension
+import Network.BitTorrent.Peer
 
 
 defaultClient :: IO ClientSession
@@ -55,7 +56,7 @@ defaultClient = newClient defaultThreadCount defaultExtensions
 
 discover :: SwarmSession -> P2P () -> IO ()
 discover swarm action = do
-  port <- listener swarm action
+  port <- forkListener (error "discover")
 
   let conn = TConnection (tAnnounce (torrentMeta swarm))
                          (tInfoHash (torrentMeta swarm))
@@ -69,9 +70,3 @@ discover swarm action = do
       addr <- getPeerAddr tses
       spawnP2P swarm addr $ do
         action
-
-listener :: SwarmSession -> P2P () -> IO PortNumber
-listener _ _ = do
-  -- TODO:
---  forkIO loop
-  return 10000

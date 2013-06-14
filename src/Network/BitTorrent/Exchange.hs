@@ -102,7 +102,7 @@ runSession  se addr p2p =
     isIOException _ = return ()
 
 -- | Run P2P session in the current thread. Normally you don't need this
--- function in client application.
+-- function in client application, except for debugging.
 runP2P :: SwarmSession -> PeerAddr -> P2P () -> IO ()
 runP2P se addr p2p = waitVacancy se $ runSession se addr p2p
 
@@ -115,6 +115,13 @@ spawnP2P se addr p2p = do
   forkIO $ do
     runSession se addr p2p `finally` leaveSwarm se
 
+-- TODO unify this all using PeerConnection
+{-
+listenP2P :: SwarmSession -> P2P () -> IO PortNumber
+listenP2P _ _ = undefined
+
+chainP2P :: SwarmSession -> PeerConnection -> P2P () -> IO ()
+-}
 {-----------------------------------------------------------------------
     Exceptions
 -----------------------------------------------------------------------}

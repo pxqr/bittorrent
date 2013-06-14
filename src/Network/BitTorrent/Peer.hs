@@ -44,12 +44,14 @@ module Network.BitTorrent.Peer
 
          -- ** Generation
        , newPeerID, timestampByteString
+
          -- ** Extra
        , byteStringPadded
 
          -- * Peer address
        , PeerAddr(..)
-       , peerSockAddr, connectToPeer
+       , peerSockAddr
+       , connectToPeer, forkListener
        , ppPeer
 
          -- * Client version detection
@@ -66,6 +68,8 @@ module Network.BitTorrent.Peer
 
 
 import Control.Applicative
+import Control.Concurrent
+import Control.Exception
 import Data.BEncode
 import Data.Bits
 import Data.Word
@@ -84,7 +88,7 @@ import Data.Time.Format (formatTime)
 import Text.PrettyPrint (text, Doc, (<+>))
 import System.Locale    (defaultTimeLocale)
 
-import Network
+import Network hiding (accept)
 import Network.Socket
 
 
@@ -489,7 +493,8 @@ data PeerAddr = PeerAddr {
     , peerIP   :: HostAddress
     , peerPort :: PortNumber
     } deriving (Show, Eq, Ord)
-               -- TODO verify semantic of ord and eq instances
+
+-- TODO check semantic of ord and eq instances
 
 instance BEncodable PortNumber where
   toBEncode = toBEncode . fromEnum
@@ -534,6 +539,28 @@ connectToPeer p = do
   sock <- socket AF_INET Stream Network.Socket.defaultProtocol
   connect sock (peerSockAddr p)
   return sock
+
+
+forkListener :: ((PeerAddr, Socket) -> IO ()) -> IO PortNumber
+forkListener action = do
+    sock <- socket AF_INET Stream defaultProtocol
+    bindSocket sock (SockAddrInet 0 0)
+    listen sock 1
+    addr <- getSocketName sock
+    case addr of
+      SockAddrInet port _ -> do
+        forkIO (loop sock)
+        return port
+      _                   -> do
+        throwIO $ userError "listener: impossible happened"
+  where
+    loop sock = do
+      (conn, addr) <- accept sock
+      case addr of
+        SockAddrInet port host ->
+          action (PeerAddr Nothing host port, conn)
+        _                      -> return ()
+      loop sock
 
 -- | Pretty print peer address in human readable form.
 ppPeer :: PeerAddr -> Doc
