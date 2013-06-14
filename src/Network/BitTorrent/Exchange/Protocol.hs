@@ -164,10 +164,8 @@ defaultHandshake = Handshake defaultBTProtocol defaultReserved
 -- | Handshaking with a peer specified by the second argument.
 handshake :: Socket -> Handshake -> IO Handshake
 handshake sock hs = do
-    putStrLn "send handshake"
     sendAll sock (S.encode hs)
 
-    putStrLn "recv handshake size"
     header <- recv sock 1
     when (B.length header == 0) $
       throw $ userError "Unable to receive handshake."
@@ -175,7 +173,6 @@ handshake sock hs = do
     let protocolLen = B.head header
     let restLen     = handshakeSize protocolLen - 1
 
-    putStrLn "recv handshake body"
     body <- recv sock restLen
     let resp = B.cons protocolLen body
 
@@ -432,9 +429,9 @@ ppMessage msg = text (show msg)
 
 -- |
 data PeerStatus = PeerStatus {
-    _choking    :: Bool
-  , _interested :: Bool
-  }
+    _choking    :: !Bool
+  , _interested :: !Bool
+  } deriving (Show, Eq)
 
 $(makeLenses ''PeerStatus)
 
@@ -443,9 +440,9 @@ instance Default PeerStatus where
 
 -- |
 data SessionStatus = SessionStatus {
-    _clientStatus :: PeerStatus
-  , _peerStatus   :: PeerStatus
-  }
+    _clientStatus :: !PeerStatus
+  , _peerStatus   :: !PeerStatus
+  } deriving (Show, Eq)
 
 $(makeLenses ''SessionStatus)
 

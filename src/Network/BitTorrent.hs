@@ -16,6 +16,7 @@ module Network.BitTorrent
 
        , SwarmSession
        , newLeacher, newSeeder
+       , getSessionCount
 
          -- * Discovery
        , discover
@@ -63,16 +64,11 @@ discover swarm action = do
 
   progress <- getCurrentProgress (clientSession swarm)
 
-  putStrLn "lookup peers"
   withTracker progress conn $ \tses -> do
-    putStrLn "get peer list "
     forever $ do
       addr <- getPeerAddr tses
-      putStrLn "connect to peer"
       spawnP2P swarm addr $ do
-        liftIO $ putStrLn "run p2p session"
         action
-      putStrLn "connected"
 
 listener :: SwarmSession -> P2P () -> IO PortNumber
 listener _ _ = do

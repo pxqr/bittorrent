@@ -14,6 +14,7 @@
 --   data should be modified through standalone functions.
 --
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
@@ -32,6 +33,7 @@ module Network.BitTorrent.Internal
 
          -- * Swarm
        , SwarmSession(SwarmSession, torrentMeta, clientSession)
+       , getSessionCount
        , newLeacher, newSeeder
        , enterSwarm, leaveSwarm , waitVacancy
 
@@ -46,7 +48,6 @@ module Network.BitTorrent.Internal
        , SessionException(..)
        , isSessionException
        , putSessionException
-       , sessionError
 
          -- ** Properties
        , bitfield, status
@@ -123,7 +124,7 @@ defaultThreadCount = 1000
 data ClientSession = ClientSession {
     -- | Our peer ID used in handshaked and discovery mechanism. The
     -- clientPeerID is unique 'ClientSession' identifier.
-    clientPeerID      :: PeerID
+    clientPeerID      :: !PeerID
 
     -- | Extensions we should try to use. Hovewer some particular peer
     -- might not support some extension, so we keep enableExtension in
@@ -186,23 +187,30 @@ defLeacherConns = defaultNumWant
 -- | Extensions are set globally by
 --   Swarm session are un
 data SwarmSession = SwarmSession {
-    torrentMeta       :: Torrent
-  , clientSession     :: ClientSession
+    torrentMeta       :: !Torrent
+  , clientSession     :: !ClientSession
 
     -- | Represent count of peers we _currently_ can connect to in the
     -- swarm. Used to bound number of concurrent threads.
-  , vacantPeers       :: MSem SessionCount
+  , vacantPeers       :: !(MSem SessionCount)
 
     -- | Modify this carefully updating global progress.
-  , clientBitfield    :: TVar  Bitfield
-  , connectedPeers    :: TVar (Set PeerSession)
+  , clientBitfield    :: !(TVar  Bitfield)
+  , connectedPeers    :: !(TVar (Set PeerSession))
   }
+
+-- INVARIANT:
+--   max_sessions_count - sizeof connectedPeers = value vacantPeers
 
 instance Eq SwarmSession where
   (==) = (==) `on` (tInfoHash . torrentMeta)
 
 instance Ord SwarmSession where
   compare = comparing (tInfoHash . torrentMeta)
+
+getSessionCount :: SwarmSession -> IO SessionCount
+getSessionCount SwarmSession {..} = do
+  S.size <$> readTVarIO connectedPeers
 
 newSwarmSession :: Int -> Bitfield -> ClientSession -> Torrent
                 -> IO SwarmSession
@@ -255,9 +263,9 @@ waitVacancy se =
 data PeerSession = PeerSession {
     -- | Used as unique 'PeerSession' identifier within one
     -- 'SwarmSession'.
-    connectedPeerAddr :: PeerAddr
+    connectedPeerAddr :: !PeerAddr
 
-  , swarmSession      :: SwarmSession
+  , swarmSession      :: !SwarmSession
 
     -- | Extensions such that both peer and client support.
   , enabledExtensions :: [Extension]
@@ -269,7 +277,7 @@ data PeerSession = PeerSession {
     --
     -- We should update timeout if we /receive/ any message within
     -- timeout interval to keep connection up.
-  , incomingTimeout     :: TimeoutKey
+  , incomingTimeout     :: !TimeoutKey
 
     -- | To send KA message appropriately we should know when was last
     -- time we sent a message to a peer. To do that we keep registered
@@ -279,17 +287,17 @@ data PeerSession = PeerSession {
     --
     -- We should update timeout if we /send/ any message within timeout
     -- to avoid reduntant KA messages.
-  , outcomingTimeout   :: TimeoutKey
+  , outcomingTimeout   :: !TimeoutKey
 
     -- TODO use dupChan for broadcasting
-  , broadcastMessages :: Chan   [Message]
-  , sessionState      :: IORef   SessionState
+  , broadcastMessages :: !(Chan   [Message])
+  , sessionState      :: !(IORef  SessionState)
   }
 
 data SessionState = SessionState {
-    _bitfield :: Bitfield
-  , _status   :: SessionStatus
-  }
+    _bitfield :: !Bitfield
+  , _status   :: !SessionStatus
+  } deriving (Show, Eq)
 
 $(makeLenses ''SessionState)
 
@@ -301,10 +309,16 @@ instance Ord PeerSession where
 
 instance (MonadIO m, MonadReader PeerSession m)
       => MonadState SessionState m where
-  get   = asks sessionState >>= liftIO . readIORef
-  put s = asks sessionState >>= \ref -> liftIO $ writeIORef ref s
+  get    = do
+    ref <- asks sessionState
+    st <- liftIO (readIORef ref)
+    liftIO $ print (completeness (_bitfield st))
+    return st
 
-data SessionException = SessionException
+  put !s = asks sessionState >>= \ref -> liftIO $ writeIORef ref s
+
+data SessionException = PeerDisconnected
+                      | ProtocolError Doc
                         deriving (Show, Typeable)
 
 instance Exception SessionException
@@ -314,10 +328,6 @@ isSessionException _ = return ()
 
 putSessionException :: SessionException -> IO ()
 putSessionException = print
-
-sessionError :: MonadIO m => Doc -> m ()
-sessionError msg
-  = liftIO $ throwIO $ userError $ render $ msg <+> "in session"
 
 -- TODO check if it connected yet peer
 withPeerSession :: SwarmSession -> PeerAddr
@@ -342,7 +352,7 @@ withPeerSession ss @ SwarmSession {..} addr
       let enabled = decodeExts (enabledCaps caps (handshakeCaps phs))
       ps <- PeerSession addr ss enabled
          <$> registerTimeout (eventManager clientSession)
-                maxIncomingTime abortSession
+                maxIncomingTime (return ())
          <*> registerTimeout (eventManager clientSession)
                 maxOutcomingTime (sendKA sock)
          <*> newChan
@@ -350,9 +360,13 @@ withPeerSession ss @ SwarmSession {..} addr
            ; tc <- totalCount <$> readTVarIO clientBitfield
            ; newIORef (SessionState (haveNone tc) def)
            }
+
+      atomically $ modifyTVar' connectedPeers (S.insert ps)
+
       return (sock, ps)
 
-    closeSession (sock, _) = do
+    closeSession (sock, ps) = do
+      atomically $ modifyTVar' connectedPeers (S.delete ps)
       close sock
 
 getPieceCount :: (MonadReader PeerSession m) => m PieceCount
@@ -411,6 +425,3 @@ sendKA sock {- SwarmSession {..} -} = do
 --  let mgr = eventManager clientSession
 --  updateTimeout mgr
 --  print "Done.."
-
-abortSession :: IO ()
-abortSession = error "abortSession: not implemented"

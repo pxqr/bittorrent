@@ -212,10 +212,11 @@ defaultPorts = [6881..6889]
 --   in fact only actively forms new connections if it has less than
 --   30 peers and will refuse connections if it has 55.
 --
---   So the default value is set to 25.
+--   So the default value is set to 50 because usually 30-50% of peers
+--   are not responding.
 --
 defaultNumWant :: Int
-defaultNumWant = 25
+defaultNumWant = 50
 
 mkHTTPRequest :: URI -> Request ByteString
 mkHTTPRequest uri = Request uri GET [] ""

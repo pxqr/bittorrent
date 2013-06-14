@@ -61,28 +61,73 @@ runPeerWire :: Socket -> PeerWire () -> IO ()
 runPeerWire sock p2p =
   sourceSocket sock   $=
     conduitGet S.get  $=
-      forever p2p     $=
+      p2p             $=
     conduitPut S.put  $$
   sinkSocket sock
 
 awaitMessage :: P2P Message
-awaitMessage = P2P (ReaderT go)
+awaitMessage = P2P (ReaderT (const go))
   where
-    go _ = do
-      liftIO $ putStrLn "trying recv:"
-      mmsg <- await
-      case mmsg of
-        Nothing  -> monadThrow SessionException
-        Just msg -> do
---          liftIO $ updateIncoming se
-          liftIO $ print ("recv:" <+> ppMessage msg)
-          return msg
+    go = await >>= maybe disconnect return
 
 yieldMessage :: Message -> P2P ()
-yieldMessage msg = P2P $ ReaderT $ \se -> do
-  C.yield msg
-  liftIO $ print $ "sent:" <+> ppMessage msg
-  liftIO $ updateOutcoming se
+yieldMessage msg = P2P $ ReaderT $ \se -> C.yield msg
+
+{-----------------------------------------------------------------------
+    P2P monad
+-----------------------------------------------------------------------}
+
+-- |
+--   Exceptions:
+--
+--     * SessionException: is visible only within one peer
+--     session. Use this exception to terminate P2P session, but not
+--     the swarm session.
+--
+newtype P2P a = P2P {
+    unP2P :: ReaderT PeerSession PeerWire a
+  } deriving ( Functor, Applicative, Monad
+             , MonadIO, MonadThrow, MonadActive
+             , MonadReader PeerSession
+             )
+-- TODO instance for MonadFork
+
+runSession :: SwarmSession -> PeerAddr -> P2P () -> IO ()
+runSession  se addr p2p =
+    handle isIOException $
+      withPeerSession se addr $ \(sock, pses) -> do
+        runPeerWire sock (runReaderT (unP2P p2p) pses)
+  where
+    isIOException :: IOException -> IO ()
+    isIOException _ = return ()
+
+-- | Run P2P session in the current thread. Normally you don't need this
+-- function in client application.
+runP2P :: SwarmSession -> PeerAddr -> P2P () -> IO ()
+runP2P se addr p2p = waitVacancy se $ runSession se addr p2p
+
+-- | Run P2P session in forked thread. Might be used in listener or
+-- some other loop. Note that this function may block while waiting
+-- for a vacant place: use forkIO and runP2P instead.
+spawnP2P :: SwarmSession -> PeerAddr -> P2P () -> IO ThreadId
+spawnP2P se addr p2p = do
+  enterSwarm se
+  forkIO $ do
+    runSession se addr p2p `finally` leaveSwarm se
+
+{-----------------------------------------------------------------------
+    Exceptions
+-----------------------------------------------------------------------}
+
+disconnect :: MonadThrow m => m a
+disconnect = monadThrow PeerDisconnected
+
+protocolError :: MonadThrow m => Doc -> m a
+protocolError = monadThrow . ProtocolError
+
+{-----------------------------------------------------------------------
+    Helpers
+-----------------------------------------------------------------------}
 
 peerWant :: P2P Bitfield
 peerWant   = BF.difference <$> getClientBF  <*> use bitfield
@@ -116,7 +161,7 @@ requireExtension :: Extension -> P2P ()
 requireExtension required = do
   enabled <- asks enabledExtensions
   unless (required `elem` enabled) $
-    sessionError $ ppExtension required <+> "not enabled"
+    protocolError $ ppExtension required <+> "not enabled"
 
 --    haveMessage bf = do
 --      cbf <- undefined -- liftIO $ readIORef $ clientBitfield swarmSession
@@ -124,6 +169,9 @@ requireExtension required = do
 --        then nextEvent se
 --        else undefined  -- return $ Available diff
 
+{-----------------------------------------------------------------------
+    Exchange
+-----------------------------------------------------------------------}
 
 -- |
 --   +----------+---------+
@@ -266,41 +314,3 @@ yieldEvent (Fragment  blk) = do
 
 checkPiece :: PieceLIx -> {-ByteString -> -} P2P Bool
 checkPiece = undefined
-
-{-----------------------------------------------------------------------
-    P2P monad
------------------------------------------------------------------------}
-
--- |
---   Exceptions:
---
---     * SessionException: is visible only within one peer
---     session. Use this exception to terminate P2P session, but not
---     the swarm session.
---
-newtype P2P a = P2P {
-    unP2P :: ReaderT PeerSession PeerWire a
-  } deriving ( Functor, Applicative, Monad
-             , MonadIO, MonadThrow, MonadActive
-             , MonadReader PeerSession
-             )
--- TODO instance for MonadFork
-
-runSession :: SwarmSession -> PeerAddr -> P2P () -> IO ()
-runSession  se addr p2p =
-  withPeerSession se addr $ \(sock, pses) -> do
-    runPeerWire sock (runReaderT (unP2P p2p) pses)
-
--- | Run P2P session in the current thread. Normally you don't need this
--- function in client application.
-runP2P :: SwarmSession -> PeerAddr -> P2P () -> IO ()
-runP2P se addr p2p = waitVacancy se $ runSession se addr p2p
-
--- | Run P2P session in forked thread. Might be used in listener or
--- some other loop. Note that this function may block while waiting
--- for a vacant place: use forkIO and runP2P instead.
-spawnP2P :: SwarmSession -> PeerAddr -> P2P () -> IO ThreadId
-spawnP2P se addr p2p = do
-  enterSwarm se
-  forkIO $ do
-    runSession se addr p2p `finally` leaveSwarm se

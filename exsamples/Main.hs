@@ -15,15 +15,13 @@ main = do
   [path]  <- getArgs
   torrent <- fromFile path
 
-  client  <- newClient 2 []
+  print (contentLayout "./" (tInfo torrent))
+
+  client  <- newClient 100 []
   swarm   <- newLeacher  client torrent
 
+  ref <- liftIO $ newIORef 0
   discover swarm $ do
-    ref <- liftIO $ newIORef 0
-
-    addr <- asks connectedPeerAddr
-    liftIO $ print $ "connected to" ++ show addr
-
     forever $ do
       e <- awaitEvent
       case e of
@@ -33,9 +31,14 @@ main = do
         Want     bix -> liftIO $ print bix
         Fragment blk -> do
 
+          sc <- liftIO $ getSessionCount swarm
+          addr <- asks connectedPeerAddr
+
           liftIO $ do
-            readIORef ref >>= print
-            modifyIORef ref succ
+            x <- atomicModifyIORef ref (\x -> (succ x, x))
+            if x `mod` 100 == 0
+              then print (x, sc, addr)
+              else return ()
 
           yieldEvent (Want (BlockIx 0 0 (16 * 1024)))
 
