@@ -1,0 +1,6 @@
+[submodule "sub/bencoding"]
+	path = sub/bencoding
+	url = git://github.com/pxqr/bencoding.git
+[submodule "sub/krpc"]
+	path = sub/krpc
+	url = git://github.com/pxqr/krpc.git
