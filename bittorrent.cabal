@@ -42,6 +42,7 @@ library
                      , Network.BitTorrent.Exchange
 
   other-modules:       Network.BitTorrent.Internal
+                     , System.IO.MMap.Fixed
 
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
@@ -56,12 +57,12 @@ library
   build-depends:
                        base       == 4.*
 
-                       -- Control packages
+                       -- Control
                      , mtl
                      , resourcet
                      , lens
 
-                       -- Concurrency packages
+                       -- Concurrency
                      , SafeSemaphore
                      , BoundedChan >= 1.0.1.0
                      , stm         >= 2.4
@@ -71,35 +72,41 @@ library
                      , network-conduit  == 1.*
                      , cereal-conduit   >= 0.5
 
-                       -- Data packages
+                       -- Data
                      , array      >= 0.4
-                     , bytestring
- -- >= 0.10.2
-                     , containers >= 0.4
-                     , intset     >= 0.1
+                     , bytestring >= 0.10
+
+                     , containers  >= 0.4
+                     , intset      >= 0.1
+                     , IntervalMap >= 0.3
+
                      , text       >= 0.11.0
                      , vector
 
-                       -- Encoding/Serialization packages
+                       -- Encoding/Serialization
                      , bencoding  >= 0.1
                      , cereal     >= 0.3
                      , urlencoded >= 0.4
 
-                       -- Time packages
+                       -- Time
                      , time       >= 0.1
                      , old-locale >= 1.0
 
-                       -- Network packages
+                       -- Network
                      , network    >= 2.4
                      , HTTP       >= 4000.2
                      , krpc
 
+                       -- System
+                     , filepath    >= 1
+                     , mmap         >= 0.5.2
+
                        -- Misc
                      , data-default
                      , cryptohash
-                     , filepath    >= 1
-                     , bits-atomic >= 0.1
                      , pretty
+
+                     , bits-atomic >= 0.1
 
   extensions:          PatternGuards
   hs-source-dirs:      src
@@ -107,20 +114,23 @@ library
     cpp-options:       -DTESTING
   ghc-options:         -Wall
 
-executable exsample
+
+
+executable example
   main-is:             Main.hs
-  hs-source-dirs:      exsamples
+  hs-source-dirs:      examples
   build-depends:       base == 4.*
                      , bittorrent
                      , mtl
 
-  ghc-options:         -O2 -rtsopts -threaded 
+  ghc-options:         -O2 -rtsopts -threaded
 -- -threaded -rtsopts
 -- -eventlog
 --  ghc-prof-options:    -prof -auto-all -caf-all
 
   if !flag(testing)
      buildable:        False
+
 
 
 test-suite info-hash
@@ -140,6 +150,23 @@ test-suite info-hash
 
   if !flag(testing)
      buildable:        False
+
+
+
+test-suite mmap
+  type:                exitcode-stdio-1.0
+  main-is:             MMap.hs
+  build-depends:       base        == 4.*
+                     , bytestring
+                     , directory
+
+                     , HUnit
+                     , test-framework
+                     , test-framework-hunit
+
+                     , mmap-fixed
+
+  hs-source-dirs:      tests
 
 
 
