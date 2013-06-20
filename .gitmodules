@@ -1,0 +1,3 @@
+[submodule "bencoding"]
+	path = bencoding
+	url = git://github.com/pxqr/bencoding.git
