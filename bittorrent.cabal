@@ -114,8 +114,10 @@ executable exsample
                      , bittorrent
                      , mtl
 
-  ghc-options:         -O2 -rtsopts -eventlog -threaded
-  ghc-prof-options:    -prof -auto-all -caf-all
+  ghc-options:         -O2 -rtsopts -threaded 
+-- -threaded -rtsopts
+-- -eventlog
+--  ghc-prof-options:    -prof -auto-all -caf-all
 
   if !flag(testing)
      buildable:        False

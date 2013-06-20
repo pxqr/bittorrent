@@ -1,2 +1,7 @@
 dist
 cabal-dev
+*.aux
+*.eventlog
+*.hp
+*.pdf
+*.ps
