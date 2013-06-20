@@ -1,4 +1,6 @@
 .PHONY: clean
 
 clean:
-	rm -r tmp
+	rm -rf tmp
+	rm *.aux *.eventlog *.ps *.hp *.pdf
+	cabal clean
