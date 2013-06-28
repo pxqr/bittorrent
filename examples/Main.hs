@@ -20,6 +20,9 @@ main = do
   client  <- newClient 100 []
   swarm   <- newLeecher  client torrent
 
+--  storage <- bindStorage swarm "/tmp/"
+--  discover swarm $ exchange storage
+
   ref <- liftIO $ newIORef 0
   discover swarm $ do
     forever $ do

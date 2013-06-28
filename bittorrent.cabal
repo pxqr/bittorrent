@@ -101,7 +101,8 @@ library
 
                        -- System
                      , filepath    >= 1
-                     , mmap         >= 0.5.2
+                     , directory   >= 1
+                     , mmap        >= 0.5.2
 
                        -- Misc
                      , data-default

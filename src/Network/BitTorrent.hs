@@ -73,6 +73,7 @@ import Control.Monad.Reader
 
 import Network
 
+import Data.Bitfield
 import Data.Torrent
 import Network.BitTorrent.Internal
 import Network.BitTorrent.Exchange
@@ -80,6 +81,8 @@ import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
+
+import System.Torrent.Storage
 
 
 -- | Client session with default parameters. Use it for testing only.
@@ -105,3 +108,33 @@ discover swarm action = do
       addr <- getPeerAddr tses
       spawnP2P swarm addr $ do
         action
+
+-- Event translation table looks like:
+--
+--   Available -> Want
+--   Want      -> Fragment
+--   Fragment  -> Available
+--
+-- If we join the chain we get the event loop:
+--
+--   Available -> Want -> Fragment --\
+--      /|\                           |
+--       \---------------------------/
+--
+
+-- | Default P2P action.
+exchange :: Storage -> P2P ()
+exchange storage = handleEvent handler
+  where
+    handler (Available bf)
+      | Just m <- findMin bf = return (Want (BlockIx m 0 10))
+      |     otherwise        = error "impossible"
+                               -- TODO findMin :: Bitfield -> PieceIx
+
+    handler (Want     bix) = do
+      blk <- liftIO $ getBlk bix storage
+      return (Fragment blk)
+
+    handler (Fragment blk) = do
+      liftIO $ putBlk blk storage
+      return (Available (singleton (blkPiece blk) (error "singleton") ))

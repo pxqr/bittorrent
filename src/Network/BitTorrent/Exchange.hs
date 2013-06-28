@@ -58,6 +58,7 @@ module Network.BitTorrent.Exchange
        , Event(..)
        , awaitEvent
        , yieldEvent
+       , handleEvent
 
          -- * Exceptions
        , disconnect
@@ -443,6 +444,10 @@ yieldEvent (Fragment  blk) = do
   if blkPiece blk `BF.member` offer
     then yieldMessage (Piece blk)
     else return ()
+
+
+handleEvent :: (Event -> P2P Event) -> P2P ()
+handleEvent action = awaitEvent >>= action >>= yieldEvent
 
 --flushBroadcast :: P2P ()
 --flushBroadcast = nextBroadcast >>= maybe (return ()) go
