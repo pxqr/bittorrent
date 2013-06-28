@@ -14,14 +14,15 @@
 --       data in the filesystem.
 --
 --
+--
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE NamedFieldPuns  #-}
 {-# LANGUAGE RecordWildCards #-}
-module Cobit.Storage
+module System.Torrent.Storage
        ( Storage
 
          -- * Construction
-       , mapStorage, unmapStorage, withStorage
+       , bindTo, unbind, withStorage
 
          -- * Modification
        , getBlk, putBlk
@@ -37,71 +38,52 @@ import System.FilePath
 import System.Directory
 
 import Data.Torrent
-import Network.BitTorrent
+import Network.BitTorrent.Exchange.Protocol
+import Network.BitTorrent.Internal
 import System.IO.MMap.Fixed
 
 
 data Storage = Storage {
-    session :: SwarmSession
+    -- |
+    session :: !SwarmSession
 
     -- | Used to map linear block addresses to disjoint mallocated/mmaped adresses.
-  , stPayload :: Fixed
-
-    -- | Used to find out block offsets.
-  , stPieceSize :: Int
-
-    -- | Used to verify pieces and set finally mark piece as verified.
-  , stHashes :: ByteString
+  , payload :: !Fixed
   }
 
--- TODO doc args
-mapStorage :: Int -> Maybe FilePath -> FilePath -> ContentInfo -> IO Storage
-mapStorage blkSize statusPath contentPath ci = do
-  let content_paths = contentLayout contentPath ci
-  mapM_ mkDir (L.map fst content_paths)
-  Storage <$> coalesceFiles content_paths
-          <*> getAllocator statusPath (pieceCount ci) (blockCount blkSize ci)
-          <*> pure (ciPieceLength ci)
-          <*> pure (ciPieces ci)
-  where
-    getAllocator (Just path) = error "getAllocator"
-    getAllocator Nothing     = error "getAllocator"
+pieceSize :: Storage -> Int
+pieceSize = ciPieceLength . tInfo . torrentMeta . session
 
+-- TODO doc args
+bindTo :: SwarmSession -> FilePath -> IO Storage
+bindTo se @ SwarmSession {..} contentPath = do
+    let content_paths = contentLayout contentPath (tInfo torrentMeta)
+    mapM_ mkDir (L.map fst content_paths)
+    Storage se <$> coalesceFiles content_paths
+  where
     mkDir path = do
       let dirPath = fst (splitFileName path)
       exist <- doesDirectoryExist dirPath
       unless exist $ do
         createDirectoryIfMissing True dirPath
 
-unmapStorage :: Storage -> IO ()
-unmapStorage st = error "unmapStorage"
+unbind :: Storage -> IO ()
+unbind st = error "unmapStorage"
 
 
-withStorage :: Int -> Maybe FilePath -> FilePath -> ContentInfo
-            -> (Storage -> IO a)
-            -> IO a
-withStorage blkSize statusPath contentPath t =
-  bracket (mapStorage blkSize statusPath contentPath t) unmapStorage
-
-isAvailable :: BlockIx -> Storage -> IO Bool
-isAvailable ix Storage {..} = error "isAvailable"
+withStorage :: SwarmSession -> FilePath -> (Storage -> IO a) -> IO a
+withStorage se path = bracket (se `bindTo` path) unbind
 
 
 putBlk :: Block -> Storage -> IO ()
 putBlk blk @ Block {..}  st @ Storage {..} = do
-  available <- isAvailable (blockIx blk) st
-  unless available $
-    writeBytes (blkInterval stPieceSize blk) (Lazy.fromChunks [blkData]) stPayload
+  writeBytes (blkInterval (pieceSize st) blk) (Lazy.fromChunks [blkData]) payload
 
 -- TODO
-getBlk :: BlockIx -> Storage -> IO (Maybe Block)
+getBlk :: BlockIx -> Storage -> IO Block
 getBlk ix @ BlockIx {..}  st @ Storage {..} = do
-    available <- isAvailable ix st
-    if available
-      then Just <$> do
-        bs <- readBytes (ixInterval stPieceSize ix) stPayload
-        return $ Block ixPiece ixOffset (Lazy.toStrict bs)
-      else return Nothing
+  bs <- readBytes (ixInterval (pieceSize st) ix) payload
+  return $ Block ixPiece ixOffset (Lazy.toStrict bs)
 
 ixInterval :: Int -> BlockIx -> FixedInterval
 ixInterval pieceSize BlockIx {..} =
