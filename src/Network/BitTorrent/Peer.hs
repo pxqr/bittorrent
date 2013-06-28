@@ -77,7 +77,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Builder as B
+import qualified Data.ByteString.Lazy.Builder as B
 import Data.Foldable    (foldMap)
 import Data.Monoid      ((<>))
 import Data.Serialize

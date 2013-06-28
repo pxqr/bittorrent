@@ -65,9 +65,9 @@ import qualified Data.Map as M
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
-import qualified Data.ByteString.Builder as B
-import qualified Data.ByteString.Builder.Prim as B
 import qualified Data.ByteString.Lazy as Lazy
+import qualified Data.ByteString.Lazy.Builder as B
+import qualified Data.ByteString.Lazy.Builder.ASCII as B
 import qualified Data.List as L
 import           Data.Text (Text)
 import           Data.Serialize as S hiding (Result)
@@ -401,10 +401,10 @@ hashlazy = InfoHash . C.hashlazy
 
 -- | Pretty print info hash in hexadecimal format.
 ppInfoHash :: InfoHash -> Doc
-ppInfoHash = text . BC.unpack . Lazy.toStrict . ppHex . getInfoHash
+ppInfoHash = text . BC.unpack . ppHex . getInfoHash
 
-ppHex :: ByteString -> Lazy.ByteString
-ppHex = B.toLazyByteString . foldMap (B.primFixed B.word8HexFixed) . B.unpack
+ppHex :: ByteString -> ByteString
+ppHex = Lazy.toStrict . B.toLazyByteString . B.byteStringHexFixed
 
 -- | Add query info hash parameter to uri.
 --

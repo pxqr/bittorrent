@@ -8,7 +8,8 @@ copyright:             (c) 2013, Sam T.
 category:              Network
 build-type:            Simple
 cabal-version:         >= 1.8
-tested-with:           GHC==7.4.1
+tested-with:           GHC == 7.4.1
+                     , GHC == 7.6.3
 homepage:              https://github.com/pxqr/bittorrent
 bug-reports:           https://github.com/pxqr/bittorrent/issues
 synopsis:              Bittorrent protocol implementation.
@@ -42,16 +43,16 @@ library
                      , Network.BitTorrent.Exchange
 
   other-modules:       Network.BitTorrent.Internal
-                     , System.IO.MMap.Fixed
 
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
+                     , System.IO.MMap.Fixed
 
   if !flag(testing)
-     other-modules:
-                       Network.BitTorrent.Exchange.Protocol
+     other-modules:    Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
+                     , System.IO.MMap.Fixed
 
 
   build-depends:
@@ -69,29 +70,29 @@ library
                      , stm         >= 2.4
 
                        -- Conduits
-                     , conduit          == 1.*
-                     , network-conduit  == 1.*
+                     , conduit          >= 1.0
+                     , network-conduit  >= 1.0
                      , cereal-conduit   >= 0.5
 
                        -- Data
-                     , array      >= 0.4
-                     , bytestring >= 0.10
+                     , array       >= 0.4
+                     , bytestring  >= 0.10.0.0
 
                      , containers  >= 0.4
                      , intset      >= 0.1
                      , IntervalMap >= 0.3
 
-                     , text       >= 0.11.0
+                     , text        >= 0.11.0
                      , vector
 
                        -- Encoding/Serialization
-                     , bencoding  >= 0.1
-                     , cereal     >= 0.3
-                     , urlencoded >= 0.4
+                     , bencoding   >= 0.1.0.1
+                     , cereal      >= 0.3
+                     , urlencoded  >= 0.4
 
                        -- Time
-                     , time       >= 0.1
-                     , old-locale >= 1.0
+                     , time        >= 0.1
+                     , old-locale  >= 1.0
 
                        -- Network
                      , network    >= 2.4
@@ -107,7 +108,7 @@ library
                      , cryptohash
                      , pretty
 
-                     , bits-atomic >= 0.1
+--                     , bits-atomic >= 0.1
 
   extensions:          PatternGuards
   hs-source-dirs:      src
@@ -139,11 +140,10 @@ test-suite info-hash
   main-is:             InfoHash.hs
   hs-source-dirs:      tests
 
-  build-depends:       base       == 4.*
+  build-depends:       base
                      , bytestring
- -- >= 0.10.2.0
-                     , containers >= 0.4.2.1
-                     , bencoding  >= 0.1.0.0
+                     , containers
+                     , bencoding
                      , bittorrent
                      , Diff
 
@@ -157,7 +157,8 @@ test-suite info-hash
 test-suite mmap
   type:                exitcode-stdio-1.0
   main-is:             MMap.hs
-  build-depends:       base        == 4.*
+  build-depends:       base
+                     , bittorrent
                      , bytestring
                      , directory
 
@@ -165,9 +166,10 @@ test-suite mmap
                      , test-framework
                      , test-framework-hunit
 
-                     , mmap-fixed
-
   hs-source-dirs:      tests
+
+  if !flag(testing)
+     buildable:        False
 
 
 
@@ -175,11 +177,11 @@ test-suite properties
   type:                exitcode-stdio-1.0
   main-is:             Main.hs
   hs-source-dirs:      tests
-  build-depends:       base       == 4.*
+  build-depends:       base == 4.*
                      , bytestring
--- >= 0.10.2
-                     , cereal     >= 0.3.5.2
-                     , network    >= 2.4.0.13
+
+                     , cereal
+                     , network
                      , text
 
                      , test-framework
@@ -201,7 +203,7 @@ benchmark benchmarks
   main-is:             Main.hs
   hs-source-dirs:      bench
 
-  build-depends:       base == 4.*
+  build-depends:       base
                      , bytestring
                      , cereal
                      , network
