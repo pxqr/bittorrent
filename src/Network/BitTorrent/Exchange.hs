@@ -1,3 +1,16 @@
+{- TODO turn awaitEvent and yieldEvent to sourcePeer and sinkPeer
+
+      sourceSocket sock   $=
+        conduitGet S.get  $=
+          sourcePeer      $=
+            p2p           $=
+          sinkPeer        $=
+        conduitPut S.put  $$
+      sinkSocket sock
+
+       measure performance
+ -}
+
 -- |
 --   Copyright   :  (c) Sam T. 2013
 --   License     :  MIT
@@ -5,27 +18,53 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
+--   This module provides P2P communication and aims to hide the
+--   following stuff under the hood:
+--
+--     * TODO;
+--
+--     * /keep alives/ -- ;
+--
+--     * /choking mechanism/ -- is used ;
+--
+--     * /message broadcasting/ -- ;
+--
+--     * /message filtering/ -- due to network latency and concurrency
+--     some arriving messages might not make sense in the current
+--     session context;
+--
+--     * /scatter\/gather pieces/ -- ;
+--
+--     * /various P2P protocol extensions/ -- .
+--
+--   Finally we get a simple event-based communication model.
+--
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE BangPatterns               #-}
 module Network.BitTorrent.Exchange
-       ( -- * Block
-         Block(..), BlockIx(..)
+       ( P2P
+       , runP2P
+       , spawnP2P
 
-         -- * Event
-       , Event(..)
-
-       , P2P
-       , runP2P, spawnP2P
-       , awaitEvent, yieldEvent
-
-       , disconnect, protocolError
-
+         -- * Query
        , getHaveCount
        , getWantCount
        , getPieceCount
+
+         -- * Events
+       , Event(..)
+       , awaitEvent
+       , yieldEvent
+
+         -- * Exceptions
+       , disconnect
+       , protocolError
+
+         -- * Block
+       , Block(..), BlockIx(..)
        ) where
 
 import Control.Applicative
@@ -53,11 +92,6 @@ import Network.BitTorrent.Peer
 import Network.BitTorrent.Exchange.Protocol
 import Data.Bitfield as BF
 
-
-data Event = Available Bitfield
-           | Want      BlockIx
-           | Fragment  Block
-             deriving Show
 
 {-----------------------------------------------------------------------
     Peer wire
@@ -234,7 +268,34 @@ requireExtension required = do
     Exchange
 -----------------------------------------------------------------------}
 
--- |
+
+-- | The 'Event' occur when either client or a peer change their
+-- state. 'Event' are similar to 'Message' but differ in. We could
+-- both wait for an event or raise an event using the 'awaitEvent' and
+-- 'yieldEvent' functions respectively.
+--
+--
+--   'awaitEvent'\/'yieldEvent' properties:
+--
+--     * between any await or yield state of the (another)peer could not change.
+--
+data Event
+    -- | Generalize 'Bitfield', 'Have', 'HaveAll', 'HaveNone',
+    -- 'SuggestPiece', 'AllowedFast' messages.
+  = Available Bitfield
+
+    -- | Generalize 'Request' and 'Interested' messages.
+  | Want      BlockIx
+
+    -- | Generalize 'Piece' and 'Unchoke' messages.
+  | Fragment  Block
+    deriving Show
+
+
+-- | You could think of 'awaitEvent' as wait until something interesting occur.
+--
+--   The following table shows which events may occur:
+--
 --   > +----------+---------+
 --   > | Leacher  |  Seeder |
 --   > |----------+---------+
@@ -243,10 +304,12 @@ requireExtension required = do
 --   > | Fragment |         |
 --   > +----------+---------+
 --
+--   The reason is that seeder is not interested in any piece, and
+--   both available or fragment events doesn't make sense in this context.
 --
---   properties:
+--   Some properties:
 --
---   forall (Fragment block). isPiece block == True
+--     forall (Fragment block). isPiece block == True
 --
 awaitEvent :: P2P Event
 awaitEvent = awaitMessage >>= go
@@ -341,9 +404,12 @@ awaitEvent = awaitMessage >>= go
        requireExtension ExtFast
        awaitEvent
 
--- TODO minimized number of peerOffer calls
+-- TODO minimize number of peerOffer calls
 
--- |
+-- | Raise an events which may occur
+--
+--   This table shows when a some specific events /makes sense/ to yield:
+--
 --   @
 --   +----------+---------+
 --   | Leacher  |  Seeder |
@@ -353,6 +419,16 @@ awaitEvent = awaitMessage >>= go
 --   | Fragment |         |
 --   +----------+---------+
 --   @
+--
+--   Seeder should not yield:
+--
+--     * Available -- seeder could not store anything new.
+--
+--     * Want -- seeder alread have everything, no reason to want.
+--
+--   Hovewer, it's okay to not obey the rules -- if we are yield some
+--   event which doesn't /makes sense/ in the current context then it
+--   most likely will be ignored without any network IO.
 --
 yieldEvent  :: Event -> P2P ()
 yieldEvent (Available _  ) = undefined
