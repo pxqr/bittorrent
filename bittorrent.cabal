@@ -41,6 +41,7 @@ library
                      , Network.BitTorrent.Peer
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Exchange
+                     , System.Torrent.Storage
 
   other-modules:       Network.BitTorrent.Internal
 

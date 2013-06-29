@@ -356,6 +356,22 @@ isMultiFile :: ContentInfo -> Bool
 isMultiFile MultiFile {} = True
 isMultiFile _            = False
 
+slice :: Int -> Int -> ByteString -> ByteString
+slice from to = B.take to . B.drop from
+
+-- | Extract validation hash by specified piece index.
+pieceHash :: ContentInfo -> Int -> ByteString
+pieceHash ci ix = slice offset size (ciPieces ci)
+  where
+    offset = ciPieceLength ci * ix
+    size   = ciPieceLength ci
+
+-- | Validate piece with metainfo hash.
+checkPiece :: ContentInfo -> Int -> ByteString -> Bool
+checkPiece ci ix piece
+  =  B.length piece == ciPieceLength ci
+  && hash piece     == InfoHash (pieceHash ci ix)
+
 -- | Read and decode a .torrent file.
 fromFile :: FilePath -> IO Torrent
 fromFile filepath = do

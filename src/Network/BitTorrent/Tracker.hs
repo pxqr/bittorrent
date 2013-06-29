@@ -90,9 +90,9 @@ genericReq ses pr =   TRequest {
   , reqPeerID     = tconnPeerID   ses
   , reqPort       = tconnPort     ses
 
-  , reqUploaded   = prUploaded   pr
-  , reqDownloaded = prDownloaded pr
-  , reqLeft       = prLeft       pr
+  , reqUploaded   = _uploaded   pr
+  , reqDownloaded = _downloaded pr
+  , reqLeft       = _left       pr
 
   , reqIP         = Nothing
   , reqNumWant    = Nothing

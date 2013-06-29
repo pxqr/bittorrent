@@ -33,8 +33,15 @@ module Network.BitTorrent
        , SessionCount
        , getSessionCount
 
+         -- * Storage
+       , Storage
+       , bindTo
+       , unbind
+
          -- * Discovery
        , discover
+       , exchange
+
 
          -- * Peer to Peer
        , P2P
@@ -122,12 +129,13 @@ discover swarm action = do
 --       \---------------------------/
 --
 
+
 -- | Default P2P action.
 exchange :: Storage -> P2P ()
-exchange storage = handleEvent handler
+exchange storage = handleEvent (\msg -> liftIO (print msg) >> handler msg)
   where
     handler (Available bf)
-      | Just m <- findMin bf = return (Want (BlockIx m 0 10))
+      | Just m <- findMin bf = return (Want (BlockIx m 0 262144))
       |     otherwise        = error "impossible"
                                -- TODO findMin :: Bitfield -> PieceIx
 

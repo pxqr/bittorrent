@@ -52,6 +52,7 @@ module Data.Bitfield
 
          -- * Serialization
        , fromBitmap, toBitmap
+       , toList
 
          -- * Selection
        , Selector
@@ -258,6 +259,10 @@ unions = foldl' union (haveNone 0)
 {-----------------------------------------------------------------------
     Serialization
 -----------------------------------------------------------------------}
+
+-- | List all have indexes.
+toList :: Bitfield -> [PieceIx]
+toList Bitfield {..} = S.toList bfSet
 
 -- | Unpack 'Bitfield' from tightly packed bit array. Note resulting
 -- size might be more than real bitfield size, use 'adjustSize'.

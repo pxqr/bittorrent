@@ -109,14 +109,17 @@ runPeerWire sock p2p =
   sinkSocket sock
 
 awaitMessage :: P2P Message
-awaitMessage = P2P (ReaderT (const go))
+awaitMessage = P2P $ ReaderT $ const go
   where
     go = await >>= maybe (monadThrow PeerDisconnected) return
 {-# INLINE awaitMessage #-}
 
 yieldMessage :: Message -> P2P ()
-yieldMessage msg = P2P $ ReaderT $ \se -> C.yield msg
+yieldMessage msg = P2P $ ReaderT $ const (C.yield msg)
 {-# INLINE yieldMessage #-}
+
+flushPending :: P2P ()
+flushPending = ask >>= liftIO . getPending >>= mapM_ yieldMessage
 
 {-----------------------------------------------------------------------
     P2P monad
@@ -313,7 +316,9 @@ data Event
 --     forall (Fragment block). isPiece block == True
 --
 awaitEvent :: P2P Event
-awaitEvent = awaitMessage >>= go
+awaitEvent = do
+
+    awaitMessage >>= go
   where
     go KeepAlive = awaitEvent
     go Choke     = do
@@ -432,7 +437,7 @@ awaitEvent = awaitMessage >>= go
 --   most likely will be ignored without any network IO.
 --
 yieldEvent  :: Event -> P2P ()
-yieldEvent (Available _  ) = undefined
+yieldEvent (Available ixs) = asks swarmSession >>= liftIO . available ixs
 yieldEvent (Want      bix) = do
   offer <- peerOffer
   if ixPiece bix `BF.member` offer
@@ -448,11 +453,6 @@ yieldEvent (Fragment  blk) = do
 
 handleEvent :: (Event -> P2P Event) -> P2P ()
 handleEvent action = awaitEvent >>= action >>= yieldEvent
-
---flushBroadcast :: P2P ()
---flushBroadcast = nextBroadcast >>= maybe (return ()) go
---  where
---    go = undefined
 
 checkPiece :: PieceLIx -> {-ByteString -> -} P2P Bool
 checkPiece = undefined
