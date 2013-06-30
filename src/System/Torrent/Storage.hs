@@ -172,8 +172,8 @@ getPiece :: PieceIx -> Storage -> IO ByteString
 getPiece pix st @ Storage {..} = {-# SCC getPiece #-} do
   let pieceLen = pieceLength session
   let bix      = BlockIx pix 0 (pieceLength session)
-  bs <- readBytes (ixInterval pieceLen bix) payload
-  return (Lazy.toStrict bs)
+  let bs       = viewBytes (ixInterval pieceLen bix) payload
+  return $! Lazy.toStrict bs
 
 resetPiece :: PieceIx -> Storage -> IO ()
 resetPiece pix st @ Storage {..}
