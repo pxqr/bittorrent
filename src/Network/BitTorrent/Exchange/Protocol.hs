@@ -237,7 +237,7 @@ data Block = Block {
   , blkOffset :: {-# UNPACK #-} !Int
 
     -- | Payload.
-  , blkData   :: !ByteString
+  , blkData   :: !ByteString -- TODO make lazy bytestring
   } deriving (Show, Eq)
 
 -- | Format block in human readable form. Payload is ommitted.

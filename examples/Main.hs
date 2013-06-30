@@ -18,6 +18,8 @@ main = do
 
   storage <- swarm `bindTo`  "/tmp/"
 
+  ppStorage storage >>= print
+
   discover swarm $ do
     liftIO $ print "connected to peer"
     forever $ exchange storage

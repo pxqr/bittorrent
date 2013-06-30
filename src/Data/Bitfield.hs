@@ -32,6 +32,7 @@ module Data.Bitfield
 
          -- * Construction
        , haveAll, haveNone, have, singleton
+       , interval
        , adjustSize
 
          -- * Query
@@ -137,6 +138,10 @@ singleton ix pc = have ix (haveNone pc)
 adjustSize :: PieceCount -> Bitfield -> Bitfield
 adjustSize s Bitfield {..} = Bitfield s bfSet
 
+-- | NOTE: for internal use only
+interval :: PieceCount -> PieceIx -> PieceIx -> Bitfield
+interval pc a b = Bitfield pc (S.interval a b)
+
 {-----------------------------------------------------------------------
     Query
 -----------------------------------------------------------------------}
@@ -174,16 +179,14 @@ notMember ix bf @ Bitfield {..}
   |     otherwise   = True
 
 -- | Find first available piece index.
-findMin :: Bitfield -> Maybe PieceIx
-findMin Bitfield {..}
-  | S.null bfSet = Nothing
-  |   otherwise  = Just (S.findMin bfSet)
+findMin :: Bitfield -> PieceIx
+findMin = S.findMin . bfSet
+{-# INLINE findMin #-}
 
 -- | Find last available piece index.
-findMax :: Bitfield -> Maybe PieceIx
-findMax Bitfield {..}
-  | S.null bfSet = Nothing
-  |   otherwise  = Just (S.findMax bfSet)
+findMax :: Bitfield -> PieceIx
+findMax = S.findMax . bfSet
+{-# INLINE findMax #-}
 
 isSubsetOf :: Bitfield -> Bitfield -> Bool
 isSubsetOf a b = bfSet a `S.isSubsetOf` bfSet b
@@ -333,11 +336,11 @@ strategyClass threshold = classify . completeness
 
 -- | Select the first available piece.
 strictFirst :: Selector
-strictFirst h a _ = findMin (difference a h)
+strictFirst h a _ = Just $ findMin (difference a h)
 
 -- | Select the last available piece.
 strictLast :: Selector
-strictLast h a _ = findMax (difference a h)
+strictLast h a _ = Just $ findMax (difference a h)
 
 -- |
 rarestFirst :: Selector

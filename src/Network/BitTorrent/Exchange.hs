@@ -53,6 +53,7 @@ module Network.BitTorrent.Exchange
        , getHaveCount
        , getWantCount
        , getPieceCount
+       , peerOffer
 
          -- * Events
        , Event(..)
@@ -295,6 +296,10 @@ data Event
   | Fragment  Block
     deriving Show
 
+-- INVARIANT:
+--
+--   * Available Bitfield is never empty
+--
 
 -- | You could think of 'awaitEvent' as wait until something interesting occur.
 --
@@ -316,9 +321,7 @@ data Event
 --     forall (Fragment block). isPiece block == True
 --
 awaitEvent :: P2P Event
-awaitEvent = do
-
-    awaitMessage >>= go
+awaitEvent = awaitMessage >>= go
   where
     go KeepAlive = awaitEvent
     go Choke     = do
@@ -341,8 +344,7 @@ awaitEvent = do
       awaitEvent
 
     go (Have idx)      = do
-      new <- singletonBF idx
-      bitfield %= BF.union new
+      bitfield %= have idx
       _ <- revise
 
       offer <- peerOffer

@@ -48,7 +48,7 @@ module Network.BitTorrent.Internal
        , leaveSwarm
        , waitVacancy
 
-       , available
+       , pieceLength
 
          -- * Peer
        , PeerSession( PeerSession, connectedPeerAddr
@@ -57,6 +57,9 @@ module Network.BitTorrent.Internal
                     )
        , SessionState
        , withPeerSession
+
+         -- ** Broadcasting
+       , available
        , getPending
 
          -- ** Exceptions
@@ -388,6 +391,7 @@ waitVacancy se =
 
 pieceLength :: SwarmSession -> Int
 pieceLength = ciPieceLength . tInfo . torrentMeta
+{-# INLINE pieceLength #-}
 
 {-----------------------------------------------------------------------
     Peer session
@@ -532,7 +536,8 @@ findPieceCount = pieceCount . tInfo . torrentMeta . swarmSession
 -- 3. Signal to the all other peer about this.
 
 available :: Bitfield -> SwarmSession -> IO ()
-available bf se @ SwarmSession {..} = mark >> atomically broadcast
+available bf se @ SwarmSession {..} = do
+    mark >> atomically broadcast
   where
     mark = do
       let bytes = pieceLength se * BF.haveCount bf

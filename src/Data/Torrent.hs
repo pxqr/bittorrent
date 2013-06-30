@@ -34,6 +34,8 @@ module Data.Torrent
        , contentLength, pieceCount, blockCount
        , isSingleFile, isMultiFile
 
+       , checkPiece
+
          -- * Info hash
 #if defined (TESTING)
        , InfoHash(..)
@@ -76,6 +78,9 @@ import qualified Crypto.Hash.SHA1 as C
 import Network.URI
 import System.FilePath
 import Numeric
+
+import Data.ByteString.Internal
+import Debug.Trace
 
 
 type Time = Text
@@ -140,6 +145,8 @@ simpleTorrent announce info = torrent announce info
                               Nothing Nothing Nothing
                               Nothing Nothing Nothing
                               Nothing Nothing
+
+-- TODO check if pieceLength is power of 2
 
 -- | Info part of the .torrent file contain info about each content file.
 data ContentInfo =
@@ -361,14 +368,14 @@ slice from to = B.take to . B.drop from
 
 -- | Extract validation hash by specified piece index.
 pieceHash :: ContentInfo -> Int -> ByteString
-pieceHash ci ix = slice offset size (ciPieces ci)
+pieceHash ci ix = slice (hashsize * ix) hashsize (ciPieces ci)
   where
-    offset = ciPieceLength ci * ix
-    size   = ciPieceLength ci
+    hashsize   = 20
 
 -- | Validate piece with metainfo hash.
 checkPiece :: ContentInfo -> Int -> ByteString -> Bool
-checkPiece ci ix piece
+checkPiece ci ix piece @ (PS _ off si)
+  | traceShow (ix, off, si) True
   =  B.length piece == ciPieceLength ci
   && hash piece     == InfoHash (pieceHash ci ix)
 

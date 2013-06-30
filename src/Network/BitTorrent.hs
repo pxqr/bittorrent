@@ -35,6 +35,8 @@ module Network.BitTorrent
 
          -- * Storage
        , Storage
+       , ppStorage
+
        , bindTo
        , unbind
 
@@ -80,7 +82,7 @@ import Control.Monad.Reader
 
 import Network
 
-import Data.Bitfield
+import Data.Bitfield as BF
 import Data.Torrent
 import Network.BitTorrent.Internal
 import Network.BitTorrent.Exchange
@@ -132,17 +134,24 @@ discover swarm action = do
 
 -- | Default P2P action.
 exchange :: Storage -> P2P ()
-exchange storage = handleEvent (\msg -> liftIO (print msg) >> handler msg)
+exchange storage = awaitEvent >>= handler
   where
-    handler (Available bf)
-      | Just m <- findMin bf = return (Want (BlockIx m 0 262144))
-      |     otherwise        = error "impossible"
-                               -- TODO findMin :: Bitfield -> PieceIx
+    handler (Available bf) = do
+      liftIO (print (completeness bf))
+      ixs <- selBlk (findMin bf) storage
+      mapM_ (yieldEvent . Want) ixs -- TODO yield vectored
 
     handler (Want     bix) = do
       blk <- liftIO $ getBlk bix storage
-      return (Fragment blk)
+      yieldEvent (Fragment blk)
 
-    handler (Fragment blk) = do
-      liftIO $ putBlk blk storage
-      return (Available (singleton (blkPiece blk) (error "singleton") ))
+    handler (Fragment blk @ Block {..}) = do
+      liftIO $ print (ppBlock blk)
+      done <- liftIO $ putBlk blk storage
+      when done $ do
+        yieldEvent $ Available $ singleton blkPiece (succ blkPiece)
+
+        offer <- peerOffer
+        if BF.null offer
+          then return ()
+          else handler (Available offer)
