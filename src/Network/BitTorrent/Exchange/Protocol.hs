@@ -72,9 +72,14 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as Lazy
 import Data.Default
-import Data.Serialize as S
 import Data.Int
 import Data.Word
+
+import Data.Binary as B
+import Data.Binary.Get as B
+import Data.Binary.Put as B
+import Data.Serialize as S
+
 import Text.PrettyPrint
 
 import Network
@@ -117,18 +122,18 @@ data Handshake = Handshake {
 
 instance Serialize Handshake where
   put hs = do
-    putWord8 (fromIntegral (B.length (hsProtocol hs)))
-    putByteString (hsProtocol hs)
-    putWord64be   (hsReserved hs)
-    put (hsInfoHash hs)
-    put (hsPeerID hs)
+    S.putWord8 (fromIntegral (B.length (hsProtocol hs)))
+    S.putByteString (hsProtocol hs)
+    S.putWord64be   (hsReserved hs)
+    S.put (hsInfoHash hs)
+    S.put (hsPeerID hs)
 
   get = do
-    len  <- getWord8
-    Handshake <$> getBytes (fromIntegral len)
-              <*> getWord64be
-              <*> get
-              <*> get
+    len  <- S.getWord8
+    Handshake <$> S.getBytes (fromIntegral len)
+              <*> S.getWord64be
+              <*> S.get
+              <*> S.get
 
 -- | Extract capabilities from a peer handshake message.
 handshakeCaps :: Handshake -> Capabilities
@@ -204,13 +209,21 @@ data BlockIx = BlockIx {
   , ixLength :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
 
-getInt :: Get Int
-getInt = fromIntegral <$> getWord32be
+getInt :: S.Get Int
+getInt = fromIntegral <$> S.getWord32be
 {-# INLINE getInt #-}
 
-putInt :: Putter Int
-putInt = putWord32be . fromIntegral
+putInt :: S.Putter Int
+putInt = S.putWord32be . fromIntegral
 {-# INLINE putInt #-}
+
+getIntB :: B.Get Int
+getIntB = fromIntegral <$> B.getWord32be
+{-# INLINE getIntB #-}
+
+putIntB :: Int -> B.Put
+putIntB = B.putWord32be . fromIntegral
+{-# INLINE putIntB #-}
 
 instance Serialize BlockIx where
   {-# SPECIALIZE instance Serialize BlockIx #-}
@@ -221,6 +234,16 @@ instance Serialize BlockIx where
              putInt (ixOffset i)
              putInt (ixLength i)
   {-# INLINE put #-}
+
+instance Binary BlockIx where
+  {-# SPECIALIZE instance Binary BlockIx #-}
+  get = BlockIx <$> getIntB <*> getIntB <*> getIntB
+  {-# INLINE get #-}
+
+  put BlockIx {..} = do
+    putIntB ixPiece
+    putIntB ixOffset
+    putIntB ixLength
 
 -- | Format block index in human readable form.
 ppBlockIx :: BlockIx -> Doc
@@ -355,61 +378,120 @@ instance Serialize Message where
 --    _   <- lookAhead $ ensure len
     if len == 0 then return KeepAlive
       else do
-        mid <- getWord8
+        mid <- S.getWord8
         case mid of
           0x00 -> return Choke
           0x01 -> return Unchoke
           0x02 -> return Interested
           0x03 -> return NotInterested
           0x04 -> Have     <$> getInt
-          0x05 -> (Bitfield . fromBitmap) <$> getByteString (pred len)
-          0x06 -> Request  <$> get
+          0x05 -> (Bitfield . fromBitmap) <$> S.getByteString (pred len)
+          0x06 -> Request  <$> S.get
           0x07 -> Piece    <$> getBlock (len - 9)
-          0x08 -> Cancel   <$> get
-          0x09 -> (Port . fromIntegral) <$> getWord16be
+          0x08 -> Cancel   <$> S.get
+          0x09 -> (Port . fromIntegral) <$> S.getWord16be
           0x0E -> return HaveAll
           0x0F -> return HaveNone
           0x0D -> SuggestPiece  <$> getInt
-          0x10 -> RejectRequest <$> get
+          0x10 -> RejectRequest <$> S.get
           0x11 -> AllowedFast   <$> getInt
           _    -> do
-            rm <- remaining >>= getBytes
+            rm <- S.remaining >>= S.getBytes
             fail $ "unknown message ID: " ++ show mid ++ "\n"
                 ++ "remaining available bytes: " ++ show rm
 
     where
-      getBlock :: Int -> Get Block
-      getBlock len = Block <$> getInt <*> getInt <*> getBytes len
+      getBlock :: Int -> S.Get Block
+      getBlock len = Block <$> getInt <*> getInt <*> S.getBytes len
       {-# INLINE getBlock #-}
 
 
   put KeepAlive     = putInt 0
-  put Choke         = putInt 1  >> putWord8 0x00
-  put Unchoke       = putInt 1  >> putWord8 0x01
-  put Interested    = putInt 1  >> putWord8 0x02
-  put NotInterested = putInt 1  >> putWord8 0x03
-  put (Have i)      = putInt 5  >> putWord8 0x04 >> putInt i
-  put (Bitfield bf) = putInt l  >> putWord8 0x05 >> putLazyByteString b
+  put Choke         = putInt 1  >> S.putWord8 0x00
+  put Unchoke       = putInt 1  >> S.putWord8 0x01
+  put Interested    = putInt 1  >> S.putWord8 0x02
+  put NotInterested = putInt 1  >> S.putWord8 0x03
+  put (Have i)      = putInt 5  >> S.putWord8 0x04 >> putInt i
+  put (Bitfield bf) = putInt l  >> S.putWord8 0x05 >> S.putLazyByteString b
     where b = toBitmap bf
           l = succ (fromIntegral (Lazy.length b))
           {-# INLINE l #-}
-  put (Request blk) = putInt 13 >> putWord8 0x06 >> put blk
-  put (Piece   blk) = putInt l  >> putWord8 0x07 >> putBlock
+  put (Request blk) = putInt 13 >> S.putWord8 0x06 >> S.put blk
+  put (Piece   blk) = putInt l  >> S.putWord8 0x07 >> putBlock
     where l = 9 + B.length (blkData blk)
           {-# INLINE l #-}
           putBlock = do putInt (blkPiece blk)
                         putInt (blkOffset  blk)
-                        putByteString (blkData blk)
+                        S.putByteString (blkData blk)
           {-# INLINE putBlock #-}
 
-  put (Cancel  blk)      = putInt 13 >> putWord8 0x08 >> put blk
-  put (Port    p  )      = putInt 3  >> putWord8 0x09 >> putWord16be (fromIntegral p)
-  put  HaveAll           = putInt 1  >> putWord8 0x0E
-  put  HaveNone          = putInt 1  >> putWord8 0x0F
-  put (SuggestPiece pix) = putInt 5  >> putWord8 0x0D >> putInt pix
-  put (RejectRequest i ) = putInt 13 >> putWord8 0x10 >> put i
-  put (AllowedFast   i ) = putInt 5  >> putWord8 0x11 >> putInt i
+  put (Cancel  blk)      = putInt 13 >> S.putWord8 0x08 >> S.put blk
+  put (Port    p  )      = putInt 3  >> S.putWord8 0x09 >> S.putWord16be (fromIntegral p)
+  put  HaveAll           = putInt 1  >> S.putWord8 0x0E
+  put  HaveNone          = putInt 1  >> S.putWord8 0x0F
+  put (SuggestPiece pix) = putInt 5  >> S.putWord8 0x0D >> putInt pix
+  put (RejectRequest i ) = putInt 13 >> S.putWord8 0x10 >> S.put i
+  put (AllowedFast   i ) = putInt 5  >> S.putWord8 0x11 >> putInt i
 
+instance Binary Message where
+  get = do
+    len <- undefined --getInt
+--    _   <- lookAhead $ ensure len
+    if len == 0 then return KeepAlive
+      else do
+        mid <- B.getWord8
+        case mid of
+          0x00 -> return Choke
+          0x01 -> return Unchoke
+          0x02 -> return Interested
+          0x03 -> return NotInterested
+          0x04 -> Have     <$> getIntB
+          0x05 -> (Bitfield . fromBitmap) <$> B.getByteString (pred len)
+          0x06 -> Request  <$> B.get
+          0x07 -> Piece    <$>   getBlock (len - 9)
+          0x08 -> Cancel   <$> B.get
+          0x09 -> (Port . fromIntegral) <$> B.getWord16be
+          0x0E -> return HaveAll
+          0x0F -> return HaveNone
+          0x0D -> SuggestPiece  <$> getIntB
+          0x10 -> RejectRequest <$> B.get
+          0x11 -> AllowedFast   <$> getIntB
+          _    -> do
+            rm <- B.remaining >>= B.getBytes . fromIntegral
+            fail $ "unknown message ID: " ++ show mid ++ "\n"
+                ++ "remaining available bytes: " ++ show rm
+
+    where
+      getBlock :: Int -> B.Get Block
+      getBlock len = Block <$> getIntB <*> getIntB <*> B.getBytes len
+      {-# INLINE getBlock #-}
+
+  put KeepAlive     = putIntB 0
+  put Choke         = putIntB 1  >> B.putWord8 0x00
+  put Unchoke       = putIntB 1  >> B.putWord8 0x01
+  put Interested    = putIntB 1  >> B.putWord8 0x02
+  put NotInterested = putIntB 1  >> B.putWord8 0x03
+  put (Have i)      = putIntB 5  >> B.putWord8 0x04 >> putIntB i
+  put (Bitfield bf) = putIntB l  >> B.putWord8 0x05 >> B.putLazyByteString b
+    where b = toBitmap bf
+          l = succ (fromIntegral (Lazy.length b))
+          {-# INLINE l #-}
+  put (Request blk) = putIntB 13 >> B.putWord8 0x06 >> B.put blk
+  put (Piece   blk) = putIntB l  >> B.putWord8 0x07 >> putBlock
+    where l = 9 + B.length (blkData blk)
+          {-# INLINE l #-}
+          putBlock = do putIntB (blkPiece blk)
+                        putIntB (blkOffset  blk)
+                        B.putByteString (blkData blk)
+          {-# INLINE putBlock #-}
+
+  put (Cancel  blk)      = putIntB 13 >> B.putWord8 0x08 >> B.put blk
+  put (Port    p  )      = putIntB 3  >> B.putWord8 0x09 >> B.putWord16be (fromIntegral p)
+  put  HaveAll           = putIntB 1  >> B.putWord8 0x0E
+  put  HaveNone          = putIntB 1  >> B.putWord8 0x0F
+  put (SuggestPiece pix) = putIntB 5  >> B.putWord8 0x0D >> putIntB pix
+  put (RejectRequest i ) = putIntB 13 >> B.putWord8 0x10 >> B.put i
+  put (AllowedFast   i ) = putIntB 5  >> B.putWord8 0x11 >> putIntB i
 
 -- | Format messages in human readable form. Note that output is
 --   compact and suitable for logging: only useful information but not

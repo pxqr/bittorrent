@@ -89,6 +89,7 @@ library
                        -- Encoding/Serialization
                      , bencoding   >= 0.1.0.1
                      , cereal      >= 0.3
+                     , binary      >= 0.5
                      , urlencoded  >= 0.4
 
                        -- Time
