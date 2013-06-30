@@ -435,7 +435,7 @@ instance Serialize Message where
 
 instance Binary Message where
   get = do
-    len <- undefined --getInt
+    len <- getIntB
 --    _   <- lookAhead $ ensure len
     if len == 0 then return KeepAlive
       else do
@@ -463,7 +463,7 @@ instance Binary Message where
 
     where
       getBlock :: Int -> B.Get Block
-      getBlock len = Block <$> getIntB <*> getIntB <*> B.getBytes len
+      getBlock len = Block <$> getIntB <*> getIntB <*> B.getByteString len
       {-# INLINE getBlock #-}
 
   put KeepAlive     = putIntB 0

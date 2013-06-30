@@ -74,6 +74,7 @@ library
                      , conduit          >= 1.0
                      , network-conduit  >= 1.0
                      , cereal-conduit   >= 0.5
+                     , binary-conduit
 
                        -- Data
                      , array       >= 0.4

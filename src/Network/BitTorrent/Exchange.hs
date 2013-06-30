@@ -79,7 +79,8 @@ import Control.Monad.Trans.Resource
 
 import Data.IORef
 import Data.Conduit as C
-import Data.Conduit.Cereal
+import Data.Conduit.Cereal as S
+import Data.Conduit.Serialization.Binary as B
 import Data.Conduit.Network
 import Data.Serialize as S
 import Text.PrettyPrint as PP hiding (($$))
@@ -103,10 +104,12 @@ type PeerWire = ConduitM Message Message IO
 
 runPeerWire :: Socket -> PeerWire () -> IO ()
 runPeerWire sock p2p =
-  sourceSocket sock   $=
-    conduitGet S.get  $=
-      p2p             $=
-    conduitPut S.put  $$
+  sourceSocket sock     $=
+    S.conduitGet S.get  $=
+--    B.conduitDecode     $=
+      p2p               $=
+    S.conduitPut S.put  $$
+--    B.conduitEncode     $$
   sinkSocket sock
 
 awaitMessage :: P2P Message
