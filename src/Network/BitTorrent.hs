@@ -102,7 +102,7 @@ defaultClient = newClient defaultThreadCount defaultExtensions
 -- thus we can obtain an unified interface
 
 discover :: SwarmSession -> P2P () -> IO ()
-discover swarm action = do
+discover swarm action = {-# SCC discover #-} do
   port <- forkListener (error "discover")
 
   let conn = TConnection (tAnnounce (torrentMeta swarm))
@@ -134,7 +134,7 @@ discover swarm action = do
 
 -- | Default P2P action.
 exchange :: Storage -> P2P ()
-exchange storage = awaitEvent >>= handler
+exchange storage = {-# SCC exchange #-} (awaitEvent >>= handler)
   where
     handler (Available bf) = do
       liftIO (print (completeness bf))

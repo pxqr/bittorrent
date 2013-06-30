@@ -110,17 +110,21 @@ runPeerWire sock p2p =
   sinkSocket sock
 
 awaitMessage :: P2P Message
-awaitMessage = P2P $ ReaderT $ const go
+awaitMessage = P2P $ ReaderT $ const $ {-# SCC awaitMessage #-} go
   where
     go = await >>= maybe (monadThrow PeerDisconnected) return
 {-# INLINE awaitMessage #-}
 
 yieldMessage :: Message -> P2P ()
-yieldMessage msg = P2P $ ReaderT $ const (C.yield msg)
+yieldMessage msg =  P2P $ ReaderT $ const $ {-# SCC yieldMessage #-} C.yield msg
 {-# INLINE yieldMessage #-}
 
 flushPending :: P2P ()
-flushPending = ask >>= liftIO . getPending >>= mapM_ yieldMessage
+flushPending = {-# SCC flushPending #-} do
+  se <- ask
+  q  <- liftIO (getPending se)
+  -- TODO send vectored
+  mapM_ yieldMessage q
 
 {-----------------------------------------------------------------------
     P2P monad
@@ -321,7 +325,7 @@ data Event
 --     forall (Fragment block). isPiece block == True
 --
 awaitEvent :: P2P Event
-awaitEvent = awaitMessage >>= go
+awaitEvent = {-# SCC awaitEvent #-} awaitMessage >>= go
   where
     go KeepAlive = awaitEvent
     go Choke     = do
@@ -439,22 +443,21 @@ awaitEvent = awaitMessage >>= go
 --   most likely will be ignored without any network IO.
 --
 yieldEvent  :: Event -> P2P ()
-yieldEvent (Available ixs) = asks swarmSession >>= liftIO . available ixs
-yieldEvent (Want      bix) = do
-  offer <- peerOffer
-  if ixPiece bix `BF.member` offer
-     then yieldMessage (Request bix)
-     else return ()
+yieldEvent e = {-# SCC yieldEvent #-} go e
+  where
+    go (Available ixs) = asks swarmSession >>= liftIO . available ixs
+    go (Want      bix) = do
+      offer <- peerOffer
+      if ixPiece bix `BF.member` offer
+        then yieldMessage (Request bix)
+        else return ()
 
-yieldEvent (Fragment  blk) = do
-  offer <- clientOffer
-  if blkPiece blk `BF.member` offer
-    then yieldMessage (Piece blk)
-    else return ()
+    go (Fragment  blk) = do
+      offer <- clientOffer
+      if blkPiece blk `BF.member` offer
+        then yieldMessage (Piece blk)
+        else return ()
 
 
 handleEvent :: (Event -> P2P Event) -> P2P ()
 handleEvent action = awaitEvent >>= action >>= yieldEvent
-
-checkPiece :: PieceLIx -> {-ByteString -> -} P2P Bool
-checkPiece = undefined

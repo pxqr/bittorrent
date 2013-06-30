@@ -110,7 +110,8 @@ withStorage se path = bracket (se `bindTo` path) unbind
 -- TODO make block_payload :: Lazy.ByteString
 
 selBlk :: MonadIO m => PieceIx -> Storage -> m [BlockIx]
-selBlk pix st @ Storage {..} = liftIO $ atomically $ do
+selBlk pix st @ Storage {..}
+  = liftIO $ {-# SCC selBlk #-} atomically $ do
     mask <- pieceMask pix st
     select mask <$> readTVar blocks
   where
@@ -137,7 +138,8 @@ selBlk pix st @ Storage {..} = liftIO $ atomically $ do
 --
 --
 putBlk :: MonadIO m => Block -> Storage -> m Bool
-putBlk blk @ Block {..}  st @ Storage {..} = liftIO $ do
+putBlk blk @ Block {..}  st @ Storage {..}
+  = liftIO $ {-# SCC putBlk #-} do
 --  let blkIx = undefined
 --  bm <- readTVarIO blocks
 --  unless (member blkIx bm) $ do
@@ -149,7 +151,7 @@ putBlk blk @ Block {..}  st @ Storage {..} = liftIO $ do
     validatePiece blkPiece st
 
 markBlock :: Block -> Storage -> IO ()
-markBlock Block {..} Storage {..} = do
+markBlock Block {..} Storage {..} = {-# SCC markBlock #-} do
   let piLen = pieceLength session
   let glIx  = (piLen `div` blockSize) * blkPiece + (blkOffset `div` blockSize)
   atomically $ modifyTVar' blocks (have glIx)
@@ -160,25 +162,27 @@ markBlock Block {..} Storage {..} = do
 --  Do not block.
 --
 getBlk :: MonadIO m => BlockIx -> Storage -> m Block
-getBlk ix @ BlockIx {..}  st @ Storage {..} = liftIO $ do
+getBlk ix @ BlockIx {..}  st @ Storage {..}
+  = liftIO $ {-# SCC getBlk #-} do
   -- TODO check if __piece__ is available
   bs <- readBytes (ixInterval (pieceLength session) ix) payload
   return $ Block ixPiece ixOffset (Lazy.toStrict bs)
 
 getPiece :: PieceIx -> Storage -> IO ByteString
-getPiece pix st @ Storage {..} = do
+getPiece pix st @ Storage {..} = {-# SCC getPiece #-} do
   let pieceLen = pieceLength session
   let bix      = BlockIx pix 0 (pieceLength session)
   bs <- readBytes (ixInterval pieceLen bix) payload
   return (Lazy.toStrict bs)
 
 resetPiece :: PieceIx -> Storage -> IO ()
-resetPiece pix st @ Storage {..} = atomically $ do
+resetPiece pix st @ Storage {..}
+  = {-# SCC resetPiece #-} atomically $ do
   mask <- pieceMask pix st
   modifyTVar' blocks (`difference` mask)
 
 validatePiece :: PieceIx -> Storage -> IO Bool
-validatePiece pix st @ Storage {..} = do
+validatePiece pix st @ Storage {..} = {-# SCC validatePiece #-} do
   downloaded <- atomically $ isDownloaded pix st
   if not downloaded then return False
     else do

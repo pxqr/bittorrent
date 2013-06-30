@@ -236,28 +236,28 @@ rarest xs
 
 -- | Find indices at least one peer have.
 union :: Bitfield -> Bitfield -> Bitfield
-union a b = Bitfield {
+union a b = {-# SCC union #-} Bitfield {
     bfSize = bfSize a `max` bfSize b
   , bfSet  = bfSet a `S.union` bfSet b
   }
 
 -- | Find indices both peers have.
 intersection :: Bitfield -> Bitfield -> Bitfield
-intersection a b = Bitfield {
+intersection a b = {-# SCC intersection #-} Bitfield {
     bfSize = bfSize a `min` bfSize b
   , bfSet  = bfSet a `S.intersection` bfSet b
   }
 
 -- | Find indices which have first peer but do not have the second peer.
 difference :: Bitfield -> Bitfield -> Bitfield
-difference a b = Bitfield {
+difference a b = {-# SCC difference #-} Bitfield {
     bfSize = bfSize a -- FIXME is it reasonable?
   , bfSet  = bfSet a `S.difference` bfSet b
   }
 
 -- | Find indices the any of the peers have.
 unions :: [Bitfield] -> Bitfield
-unions = foldl' union (haveNone 0)
+unions = {-# SCC unions #-} foldl' union (haveNone 0)
 
 {-----------------------------------------------------------------------
     Serialization
@@ -270,7 +270,7 @@ toList Bitfield {..} = S.toList bfSet
 -- | Unpack 'Bitfield' from tightly packed bit array. Note resulting
 -- size might be more than real bitfield size, use 'adjustSize'.
 fromBitmap :: ByteString -> Bitfield
-fromBitmap bs = Bitfield {
+fromBitmap bs = {-# SCC fromBitmap #-} Bitfield {
     bfSize = B.length bs * 8
   , bfSet  = S.fromByteString bs
   }
@@ -278,7 +278,7 @@ fromBitmap bs = Bitfield {
 
 -- | Pack a 'Bitfield' to tightly packed bit array.
 toBitmap :: Bitfield -> Lazy.ByteString
-toBitmap Bitfield {..} = Lazy.fromChunks [intsetBM, alignment]
+toBitmap Bitfield {..} = {-# SCC toBitmap #-} Lazy.fromChunks [intsetBM, alignment]
   where
     byteSize  = bfSize `div` 8 + if bfSize `mod` 8 == 0 then 0 else 1
     alignment = B.replicate (byteSize - B.length intsetBM) 0

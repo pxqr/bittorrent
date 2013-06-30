@@ -127,9 +127,9 @@ executable example
                      , bittorrent
                      , mtl
 
-  ghc-options:
+  ghc-options:         -prof
 -- -threaded -eventlog
-  ghc-prof-options:   -rtsopts -auto-all -caf-all
+  ghc-prof-options:   -prof -rtsopts
 
   if !flag(testing)
      buildable:        False

@@ -538,7 +538,7 @@ findPieceCount = pieceCount . tInfo . torrentMeta . swarmSession
 -- 3. Signal to the all other peer about this.
 
 available :: Bitfield -> SwarmSession -> IO ()
-available bf se @ SwarmSession {..} = do
+available bf se @ SwarmSession {..} = {-# SCC available #-} do
     mark >> atomically broadcast
   where
     mark = do
@@ -561,7 +561,8 @@ available bf se @ SwarmSession {..} = do
 -- changed client state. Resulting queue should be sent to a peer
 -- immediately.
 getPending :: PeerSession -> IO [Message]
-getPending PeerSession {..} = atomically (readAvail pendingMessages)
+getPending PeerSession {..} = {-# SCC getPending #-} do
+  atomically (readAvail pendingMessages)
 
 readAvail :: TChan a -> STM [a]
 readAvail chan = do
