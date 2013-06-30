@@ -153,14 +153,14 @@ uploadedProgress (fromIntegral -> amount) = uploaded +~ amount
 {-# INLINE uploadedProgress #-}
 
 -- | Used when leecher join client session.
-enqueuedProgress :: Int -> Progress -> Progress
-enqueuedProgress (fromIntegral -> amount) = left +~ amount
+enqueuedProgress :: Integer -> Progress -> Progress
+enqueuedProgress amount = left +~ amount
 {-# INLINE enqueuedProgress #-}
 
 -- | Used when leecher leave client session.
 --   (e.g. user deletes not completed torrent)
-dequeuedProgress :: Int -> Progress -> Progress
-dequeuedProgress (fromIntegral -> amount) = left -~ amount
+dequeuedProgress :: Integer -> Progress -> Progress
+dequeuedProgress amount = left -~ amount
 {-# INLINE dequeuedProgress #-}
 
 {-----------------------------------------------------------------------
@@ -349,8 +349,10 @@ newSeeder cs t @ Torrent {..}
 
 -- | New swarm in which the client allowed both download and upload.
 newLeecher :: ClientSession -> Torrent -> IO SwarmSession
-newLeecher cs t @ Torrent {..}
-  = newSwarmSession defLeacherConns (haveNone (pieceCount tInfo)) cs t
+newLeecher cs t @ Torrent {..} = do
+  se <- newSwarmSession defLeacherConns (haveNone (pieceCount tInfo)) cs t
+  atomically $ modifyTVar' (currentProgress cs) (enqueuedProgress (contentLength tInfo))
+  return se
 
 --isLeacher :: SwarmSession -> IO Bool
 --isLeacher = undefined

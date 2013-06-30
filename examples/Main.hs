@@ -13,7 +13,7 @@ main = do
 
   print (contentLayout "./" (tInfo torrent))
 
-  client  <- newClient 100 []
+  client  <- newClient 10 []
   swarm   <- newLeecher  client torrent
 
   storage <- swarm `bindTo`  "/tmp/"
@@ -22,5 +22,7 @@ main = do
 
   discover swarm $ do
     liftIO $ print "connected to peer"
-    forever $ exchange storage
-    liftIO $ print "disconnect to peer"
+    forever $ do
+      liftIO (getCurrentProgress client >>= print)
+      exchange storage
+    liftIO $ print "disconnected"
