@@ -260,7 +260,7 @@ data Block = Block {
   , blkOffset :: {-# UNPACK #-} !Int
 
     -- | Payload.
-  , blkData   :: !ByteString -- TODO make lazy bytestring
+  , blkData   :: !Lazy.ByteString -- TODO make lazy bytestring
   } deriving (Show, Eq)
 
 -- | Format block in human readable form. Payload is ommitted.
@@ -268,7 +268,8 @@ ppBlock :: Block -> Doc
 ppBlock = ppBlockIx . blockIx
 
 blockSize :: Block -> Int
-blockSize blk = B.length (blkData blk)
+blockSize blk = fromIntegral (Lazy.length (blkData blk))
+{-# INLINE blockSize #-}
 
 -- | Widely used semi-official block size.
 defaultBlockSize :: Int
@@ -277,7 +278,9 @@ defaultBlockSize = 16 * 1024
 
 isPiece :: Int -> Block -> Bool
 isPiece pieceSize (Block i offset bs) =
-  offset == 0 && B.length bs == pieceSize && i >= 0
+     offset == 0
+  && fromIntegral (Lazy.length bs) == pieceSize
+  && i >= 0
 {-# INLINE isPiece #-}
 
 pieceIx :: Int -> Int -> BlockIx
@@ -285,14 +288,14 @@ pieceIx i = BlockIx i 0
 {-# INLINE pieceIx #-}
 
 blockIx :: Block -> BlockIx
-blockIx = BlockIx <$> blkPiece <*> blkOffset <*> B.length . blkData
+blockIx = BlockIx <$> blkPiece <*> blkOffset <*> blockSize
 
 blockRange :: (Num a, Integral a) => Int -> Block -> (a, a)
 blockRange pieceSize blk = (offset, offset + len)
   where
     offset = fromIntegral pieceSize * fromIntegral (blkPiece blk)
            + fromIntegral (blkOffset blk)
-    len    = fromIntegral (B.length (blkData blk))
+    len    = fromIntegral (Lazy.length (blkData blk))
 {-# INLINE blockRange #-}
 {-# SPECIALIZE blockRange :: Int -> Block -> (Int64, Int64) #-}
 
@@ -402,7 +405,7 @@ instance Serialize Message where
 
     where
       getBlock :: Int -> S.Get Block
-      getBlock len = Block <$> getInt <*> getInt <*> S.getBytes len
+      getBlock len = Block <$> getInt <*> getInt <*> S.getLazyByteString (fromIntegral len)
       {-# INLINE getBlock #-}
 
 
@@ -418,11 +421,11 @@ instance Serialize Message where
           {-# INLINE l #-}
   put (Request blk) = putInt 13 >> S.putWord8 0x06 >> S.put blk
   put (Piece   blk) = putInt l  >> S.putWord8 0x07 >> putBlock
-    where l = 9 + B.length (blkData blk)
+    where l = 9 + fromIntegral (Lazy.length (blkData blk))
           {-# INLINE l #-}
           putBlock = do putInt (blkPiece blk)
                         putInt (blkOffset  blk)
-                        S.putByteString (blkData blk)
+                        S.putLazyByteString (blkData blk)
           {-# INLINE putBlock #-}
 
   put (Cancel  blk)      = putInt 13 >> S.putWord8 0x08 >> S.put blk
@@ -463,7 +466,8 @@ instance Binary Message where
 
     where
       getBlock :: Int -> B.Get Block
-      getBlock len = Block <$> getIntB <*> getIntB <*> B.getByteString len
+      getBlock len = Block <$> getIntB <*> getIntB
+                           <*> B.getLazyByteString (fromIntegral len)
       {-# INLINE getBlock #-}
 
   put KeepAlive     = putIntB 0
@@ -478,11 +482,11 @@ instance Binary Message where
           {-# INLINE l #-}
   put (Request blk) = putIntB 13 >> B.putWord8 0x06 >> B.put blk
   put (Piece   blk) = putIntB l  >> B.putWord8 0x07 >> putBlock
-    where l = 9 + B.length (blkData blk)
+    where l = 9 + fromIntegral (Lazy.length (blkData blk))
           {-# INLINE l #-}
           putBlock = do putIntB (blkPiece blk)
                         putIntB (blkOffset  blk)
-                        B.putByteString (blkData blk)
+                        B.putLazyByteString (blkData blk)
           {-# INLINE putBlock #-}
 
   put (Cancel  blk)      = putIntB 13 >> B.putWord8 0x08 >> B.put blk

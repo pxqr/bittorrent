@@ -143,9 +143,7 @@ putBlk blk @ Block {..}  st @ Storage {..}
 --  let blkIx = undefined
 --  bm <- readTVarIO blocks
 --  unless (member blkIx bm) $ do
-    writeBytes (blkInterval (pieceLength session) blk)
-               (Lazy.fromChunks [blkData])
-                payload
+    writeBytes (blkInterval (pieceLength session) blk)  blkData  payload
 
     markBlock blk st
     validatePiece blkPiece st
@@ -166,7 +164,7 @@ getBlk ix @ BlockIx {..}  st @ Storage {..}
   = liftIO $ {-# SCC getBlk #-} do
   -- TODO check if __piece__ is available
   bs <- readBytes (ixInterval (pieceLength session) ix) payload
-  return $ Block ixPiece ixOffset (Lazy.toStrict bs)
+  return $ Block ixPiece ixOffset bs
 
 getPiece :: PieceIx -> Storage -> IO ByteString
 getPiece pix st @ Storage {..} = {-# SCC getPiece #-} do
@@ -220,4 +218,5 @@ ixInterval pieceSize BlockIx {..} =
 
 blkInterval :: Int -> Block -> FixedInterval
 blkInterval pieceSize Block {..} =
-  Fixed.interval (blkPiece * pieceSize + blkOffset) (B.length blkData)
+  Fixed.interval (blkPiece * pieceSize + blkOffset)
+                 (fromIntegral (Lazy.length blkData))

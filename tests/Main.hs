@@ -161,6 +161,9 @@ positive = fromIntegral <$> (arbitrary :: Gen Word32)
 instance Arbitrary ByteString where
   arbitrary = B.pack <$> arbitrary
 
+instance Arbitrary Lazy.ByteString where
+  arbitrary = Lazy.pack <$> arbitrary
+
 instance Arbitrary BlockIx where
   arbitrary = BlockIx <$> positive <*> positive <*> positive
 

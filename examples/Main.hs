@@ -13,7 +13,7 @@ main = do
 
   print (contentLayout "./" (tInfo torrent))
 
-  client  <- newClient 10 []
+  client  <- newClient 2 []
   swarm   <- newLeecher  client torrent
 
   storage <- swarm `bindTo`  "/tmp/"
