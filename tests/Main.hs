@@ -16,7 +16,9 @@ import Data.Text as T
 
 import Network
 import Network.URI
+
 import System.Directory
+import System.FilePath
 
 import Test.QuickCheck as QC
 import Test.HUnit as HU
@@ -104,6 +106,18 @@ instance Arbitrary Torrent where
                  <*> arbitrary <*> arbitrary <*> arbitrary
                  <*> arbitrary <*> arbitrary <*> arbitrary
                  <*> arbitrary <*> pure Nothing <*> arbitrary
+
+-- TODO add a few more torrents here
+torrentList :: [(FilePath, String)]
+torrentList =
+  [ ( "res" </> "dapper-dvd-amd64.iso.torrent"
+    , "0221caf96aa3cb94f0f58d458e78b0fc344ad8bf")
+  ]
+
+checkInfoHash :: (FilePath, String) -> Assertion
+checkInfoHash (path, expectedHash) = check =<< fromFile path
+  where
+    check t = expectedHash @=? show (ppInfoHash (tInfoHash t))
 
 {-----------------------------------------------------------------------
     Handshake
@@ -210,6 +224,10 @@ prop_messageEncoding msg
     MemMap
 -----------------------------------------------------------------------}
 
+tmpdir :: FilePath
+tmpdir = "tmp"
+
+boundaryTest :: Assertion
 boundaryTest = do
   f <- mallocTo (Fixed.interval 0 1) Fixed.empty
   f <- mallocTo (Fixed.interval 1 2) f
@@ -218,16 +236,18 @@ boundaryTest = do
   bs <- readBytes (Fixed.interval 0 2) f
   "\x1\x2" @=? bs
 
+mmapSingle :: Assertion
 mmapSingle = do
-  f  <- mmapTo "single.test" (10, 5) 5 Fixed.empty
+  f  <- mmapTo (tmpdir </> "single.test") (10, 5) 5 Fixed.empty
   writeBytes (Fixed.interval 5 5) "abcde" f
   bs <- readBytes (Fixed.interval 5 5) f
   "abcde" @=? bs
 
+coalesceTest :: Assertion
 coalesceTest = do
-  f <- mmapTo "a.test"  (0, 1) 10 Fixed.empty
-  f <- mmapTo "bc.test" (0, 2) 12 f
-  f <- mmapTo "c.test"  (0, 1) 13 f
+  f <- mmapTo (tmpdir </> "a.test")  (0, 1) 10 Fixed.empty
+  f <- mmapTo (tmpdir </> "bc.test") (0, 2) 12 f
+  f <- mmapTo (tmpdir </> "c.test")  (0, 1) 13 f
   writeBytes (Fixed.interval 10 4) "abcd" f
   bs <- readBytes  (Fixed.interval 10 4) f
   "abcd" @=? bs
@@ -243,6 +263,7 @@ allTests =
   , testProperty "rarest in range"         prop_rarestInRange
   , testProperty "min less that max"       prop_minMax
   , testProperty "difference de morgan"    prop_differenceDeMorgan
+
      -- torrent module
   , testProperty "file info encoding"      $
       prop_properBEncode (T :: T FileInfo)
@@ -250,9 +271,11 @@ allTests =
       prop_properBEncode (T :: T ContentInfo)
   , testProperty "torrent encoding" $
       prop_properBEncode (T :: T Torrent)
-
-    -- handshake module
-  , testProperty "handshake encoding" $
+  ] ++
+    fmap (testCase "info hash" . checkInfoHash) torrentList
+    ++
+  [ -- handshake module
+    testProperty "handshake encoding" $
       prop_cerealEncoding  (T :: T Handshake)
   , testProperty "message encoding" prop_messageEncoding
 
@@ -264,8 +287,5 @@ allTests =
 
 main :: IO ()
 main = do
-  let tmpdir =  "tmp"   -- for mem map test cases
   createDirectoryIfMissing True tmpdir
-  setCurrentDirectory tmpdir
-
   defaultMain allTests

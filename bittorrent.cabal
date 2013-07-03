@@ -29,9 +29,11 @@ source-repository head
   type:                git
   location:            git://github.com/pxqr/bittorrent.git
 
+
 flag testing
   description:         Expose debug stuff in export declarations.
   default:             False
+
 
 library
   exposed-modules:     Data.Torrent
@@ -138,24 +140,6 @@ executable example
 
 
 
-test-suite info-hash
-  type:                exitcode-stdio-1.0
-  main-is:             InfoHash.hs
-  hs-source-dirs:      tests
-
-  build-depends:       base
-                     , bytestring
-                     , containers
-                     , bencoding
-                     , bittorrent
-                     , Diff
-
-  ghc-options:         -Wall
-
-  if !flag(testing)
-     buildable:        False
-
-
 test-suite properties
   type:                exitcode-stdio-1.0
   main-is:             Main.hs
@@ -163,6 +147,7 @@ test-suite properties
   build-depends:       base == 4.*
                      , bytestring
                      , directory
+                     , filepath
 
                      , cereal
                      , network
