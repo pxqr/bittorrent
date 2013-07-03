@@ -156,40 +156,23 @@ test-suite info-hash
      buildable:        False
 
 
-
-test-suite mmap
-  type:                exitcode-stdio-1.0
-  main-is:             MMap.hs
-  build-depends:       base
-                     , bittorrent
-                     , bytestring
-                     , directory
-
-                     , HUnit
-                     , test-framework
-                     , test-framework-hunit
-
-  hs-source-dirs:      tests
-
-  if !flag(testing)
-     buildable:        False
-
-
-
 test-suite properties
   type:                exitcode-stdio-1.0
   main-is:             Main.hs
   hs-source-dirs:      tests
   build-depends:       base == 4.*
                      , bytestring
+                     , directory
 
                      , cereal
                      , network
                      , text
 
+                     , QuickCheck
+                     , HUnit
                      , test-framework
                      , test-framework-quickcheck2
-                     , QuickCheck
+                     , test-framework-hunit
 
                      , bencoding
                      , bittorrent

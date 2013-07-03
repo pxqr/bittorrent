@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 module Main (main) where
 
-import Control.Applicative
+import Control.Applicative hiding (empty)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as Lazy
@@ -16,10 +16,13 @@ import Data.Text as T
 
 import Network
 import Network.URI
+import System.Directory
 
-import Test.Framework (Test, defaultMain)
+import Test.QuickCheck as QC
+import Test.HUnit as HU
+import Test.Framework as Framework (Test, defaultMain)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
-import Test.QuickCheck
+import Test.Framework.Providers.HUnit (testCase)
 
 import Data.BEncode as BE
 import Data.Bitfield as BF
@@ -28,6 +31,8 @@ import Network.BitTorrent as BT
 import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker
 import Network.BitTorrent.Peer
+import System.IO.MMap.Fixed hiding (empty, interval)
+import qualified System.IO.MMap.Fixed as Fixed
 
 -- import Debug.Trace
 
@@ -128,7 +133,7 @@ prop_cerealEncoding _ msgs = S.decode (S.encode msgs) == Right msgs
 -- chunk uri by parts) Moreover in practice there should be no
 -- difference. (I think so)
 --
-test_scrape_url :: [Test]
+test_scrape_url :: [Framework.Test]
 test_scrape_url = L.zipWith mkTest [1 :: Int ..] (check `L.map` tests)
   where
     check (iu, ou) = (parseURI iu >>= (`scrapeURL` [])
@@ -202,18 +207,43 @@ prop_messageEncoding msg
   = S.decode (S.encode msg) == Right msg
 
 {-----------------------------------------------------------------------
+    MemMap
+-----------------------------------------------------------------------}
+
+boundaryTest = do
+  f <- mallocTo (Fixed.interval 0 1) Fixed.empty
+  f <- mallocTo (Fixed.interval 1 2) f
+  writeElem f 0 (1 :: Word8)
+  writeElem f 1 (2 :: Word8)
+  bs <- readBytes (Fixed.interval 0 2) f
+  "\x1\x2" @=? bs
+
+mmapSingle = do
+  f  <- mmapTo "single.test" (10, 5) 5 Fixed.empty
+  writeBytes (Fixed.interval 5 5) "abcde" f
+  bs <- readBytes (Fixed.interval 5 5) f
+  "abcde" @=? bs
+
+coalesceTest = do
+  f <- mmapTo "a.test"  (0, 1) 10 Fixed.empty
+  f <- mmapTo "bc.test" (0, 2) 12 f
+  f <- mmapTo "c.test"  (0, 1) 13 f
+  writeBytes (Fixed.interval 10 4) "abcd" f
+  bs <- readBytes  (Fixed.interval 10 4) f
+  "abcd" @=? bs
+
+{-----------------------------------------------------------------------
     Main
 -----------------------------------------------------------------------}
 
-main :: IO ()
-main = defaultMain $
+allTests :: [Framework.Test]
+allTests =
   [ -- bitfield module
     testProperty "completeness range"      prop_completenessRange
   , testProperty "rarest in range"         prop_rarestInRange
   , testProperty "min less that max"       prop_minMax
   , testProperty "difference de morgan"    prop_differenceDeMorgan
-
-    -- torrent module
+     -- torrent module
   , testProperty "file info encoding"      $
       prop_properBEncode (T :: T FileInfo)
   , testProperty "content info encoding"   $
@@ -226,4 +256,16 @@ main = defaultMain $
       prop_cerealEncoding  (T :: T Handshake)
   , testProperty "message encoding" prop_messageEncoding
 
+    -- mem map
+  , testCase "boudary"  boundaryTest
+  , testCase "single"   mmapSingle
+  , testCase "coalesce" coalesceTest
   ] ++ test_scrape_url
+
+main :: IO ()
+main = do
+  let tmpdir =  "tmp"   -- for mem map test cases
+  createDirectoryIfMissing True tmpdir
+  setCurrentDirectory tmpdir
+
+  defaultMain allTests
