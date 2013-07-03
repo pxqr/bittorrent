@@ -85,6 +85,7 @@ library
                      , vector
 
                        -- Encoding/Serialization
+                     , aeson
                      , bencoding   >= 0.1.0.1
                      , cereal      >= 0.3
                      , binary      >= 0.5
@@ -128,6 +129,7 @@ test-suite properties
                      , directory
                      , filepath
 
+                     , aeson
                      , cereal
                      , network
                      , text

@@ -151,6 +151,8 @@ exchange storage = {-# SCC exchange #-} (awaitEvent >>= handler)
       when done $ do
         yieldEvent $ Available $ singleton blkPiece (succ blkPiece)
 
+        -- WARN this is not reliable: if peer do not return all piece
+        -- block we could slow don't until some other event occured
         offer <- peerOffer
         if BF.null offer
           then return ()

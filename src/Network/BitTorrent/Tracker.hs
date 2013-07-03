@@ -42,6 +42,8 @@ import Control.Concurrent.BoundedChan as BC
 import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
+
+import Data.Aeson hiding (Result)
 import Data.BEncode
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -286,6 +288,23 @@ instance BEncodable ScrapeInfo where
                <*> d >--  "incomplete"
                <*> d >--? "name"
   fromBEncode _ = decodingError "ScrapeInfo"
+
+instance ToJSON ScrapeInfo where
+  toJSON ScrapeInfo {..} = object
+    [ "complete"   .= siComplete
+    , "downloaded" .= siDownloaded
+    , "incomplete" .= siIncomplete
+    , "name"       .= siName
+    ]
+
+instance FromJSON ScrapeInfo where
+  parseJSON (Object obj) = do
+    ScrapeInfo <$> obj .:  "complete"
+               <*> obj .:  "downloaded"
+               <*> obj .:  "incomplete"
+               <*> obj .:? "name"
+
+  parseJSON _ = fail "ScrapeInfo"
 
 -- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'
 --   gives 'Nothing' then tracker do not support scraping. The info hash
