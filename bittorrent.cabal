@@ -44,22 +44,17 @@ library
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Exchange
                      , System.Torrent.Storage
-
   other-modules:       Network.BitTorrent.Internal
-
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
                      , System.IO.MMap.Fixed
-
   if !flag(testing)
      other-modules:    Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
                      , System.IO.MMap.Fixed
 
-
-  build-depends:
-                       base       == 4.*
+  build-depends:       base       == 4.*
 
                        -- Control
                      , mtl
@@ -124,22 +119,6 @@ library
 
 
 
-executable example
-  main-is:             Main.hs
-  hs-source-dirs:      examples
-  build-depends:       base == 4.*
-                     , bittorrent
-                     , mtl
-
-  ghc-options:         -prof
--- -threaded -eventlog
-  ghc-prof-options:   -prof -rtsopts
-
-  if !flag(testing)
-     buildable:        False
-
-
-
 test-suite properties
   type:                exitcode-stdio-1.0
   main-is:             Main.hs
@@ -163,7 +142,6 @@ test-suite properties
                      , bittorrent
 
   ghc-options:         -Wall -fno-warn-orphans
-
   if !flag(testing)
      buildable:        False
 
@@ -173,7 +151,6 @@ benchmark benchmarks
   type:                exitcode-stdio-1.0
   main-is:             Main.hs
   hs-source-dirs:      bench
-
   build-depends:       base
                      , bytestring
                      , cereal
@@ -185,6 +162,19 @@ benchmark benchmarks
                      , bittorrent
 
   ghc-options:         -O2 -Wall -fno-warn-orphans
+  if !flag(testing)
+     buildable:        False
 
+
+
+executable example
+  main-is:             Main.hs
+  hs-source-dirs:      examples
+  build-depends:       base == 4.*
+                     , bittorrent
+                     , mtl
+  ghc-options:         -prof
+-- -threaded -eventlog
+  ghc-prof-options:   -prof -rtsopts
   if !flag(testing)
      buildable:        False

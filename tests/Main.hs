@@ -1,3 +1,13 @@
+-- |
+--   Copyright   :  (c) Sam T. 2013
+--   License     :  MIT
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   Do not add other (than this) test suites without need. Do not use
+--   linux-specific paths, use 'filepath' and 'directory' machinery.
+--
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
