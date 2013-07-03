@@ -36,6 +36,7 @@ import Test.Framework as Framework (Test, defaultMain)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.Framework.Providers.HUnit (testCase)
 
+import Data.Aeson as JSON
 import Data.BEncode as BE
 import Data.Bitfield as BF
 import Data.Torrent
@@ -50,6 +51,17 @@ import qualified System.IO.MMap.Fixed as Fixed
 
 
 data T a = T
+
+
+prop_properBEncode :: Show a => BEncodable a => Eq a => T a -> a -> Bool
+prop_properBEncode _ expected = actual == Right expected
+  where
+    actual = decoded $ Lazy.toStrict $ encoded expected
+
+prop_properJSON :: (FromJSON a, ToJSON a) => Eq a => T a -> a -> Bool
+prop_properJSON _ expected = actual == Just expected
+  where
+    actual = JSON.decode $ JSON.encode expected
 
 instance Arbitrary URI where
   arbitrary = pure $ fromJust
@@ -92,12 +104,6 @@ prop_differenceDeMorgan a b c =
 {-----------------------------------------------------------------------
     Torrent
 -----------------------------------------------------------------------}
-
-prop_properBEncode :: Show a => BEncodable a => Eq a => T a -> a -> Bool
-prop_properBEncode _ expected = actual == Right expected
-  where
-    actual = decoded $ Lazy.toStrict $ encoded expected
-
 
 -- TODO tests for torrent: encoding <-> decoding
 instance Arbitrary FileInfo where
@@ -150,6 +156,10 @@ prop_cerealEncoding _ msgs = S.decode (S.encode msgs) == Right msgs
 {-----------------------------------------------------------------------
     Tracker/Scrape
 -----------------------------------------------------------------------}
+
+instance Arbitrary ScrapeInfo where
+  arbitrary = ScrapeInfo <$> arbitrary <*> arbitrary
+                         <*> arbitrary <*> arbitrary
 
 -- | Note that in 6 esample we intensionally do not agree with
 -- specification, because taking in account '/' in query parameter
@@ -294,6 +304,12 @@ allTests =
   , testCase "single"   mmapSingle
   , testCase "coalesce" coalesceTest
   ] ++ test_scrape_url
+    ++
+  [ testProperty "scrape bencode" $
+      prop_properBEncode (T :: T ScrapeInfo)
+  , testProperty "scrape json" $
+      prop_properJSON (T :: T ScrapeInfo)
+  ]
 
 main :: IO ()
 main = do
