@@ -50,7 +50,8 @@ module Data.Torrent
 
 #if defined (TESTING)
          -- * Internal
-       , hash, hashlazy
+       , Data.Torrent.hash
+       , Data.Torrent.hashlazy
 #endif
        ) where
 
@@ -71,6 +72,7 @@ import qualified Data.ByteString.Lazy as Lazy
 import qualified Data.ByteString.Lazy.Builder as B
 import qualified Data.ByteString.Lazy.Builder.ASCII as B
 import qualified Data.List as L
+import           Data.Hashable as Hashable
 import           Data.Text (Text)
 import           Data.Serialize as S hiding (Result)
 import           Text.PrettyPrint
@@ -126,6 +128,9 @@ data Torrent = Torrent {
       -- ^ The RSA signature of the info dictionary (specifically,
       --   the encrypted SHA-1 hash of the info dictionary).
     } deriving (Show, Eq)
+
+instance Hashable Torrent where
+  hash = Hashable.hash . tInfoHash
 
 {- note that info hash is actually reduntant field
    but it's better to keep it here to avoid heavy recomputations
@@ -377,7 +382,7 @@ checkPiece :: ContentInfo -> Int -> ByteString -> Bool
 checkPiece ci ix piece @ (PS _ off si)
   | traceShow (ix, off, si) True
   =  B.length piece == ciPieceLength ci
-  && hash piece     == InfoHash (pieceHash ci ix)
+  && C.hash   piece == pieceHash ci ix
 
 -- | Read and decode a .torrent file.
 fromFile :: FilePath -> IO Torrent
@@ -394,6 +399,9 @@ fromFile filepath = do
 -- | Exactly 20 bytes long SHA1 hash of the info part of torrent file.
 newtype InfoHash = InfoHash { getInfoHash :: ByteString }
                    deriving (Eq, Ord)
+
+instance Hashable InfoHash where
+  hash = Hashable.hash . getInfoHash
 
 instance BEncodable InfoHash where
   toBEncode = toBEncode . getInfoHash

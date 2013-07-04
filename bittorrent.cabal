@@ -74,6 +74,8 @@ library
                      , binary-conduit
 
                        -- Data
+                     , data-default
+
                      , array       >= 0.4
                      , bytestring  >= 0.10.0.0
 
@@ -105,9 +107,11 @@ library
                      , directory   >= 1
                      , mmap        >= 0.5.2
 
-                       -- Misc
-                     , data-default
+                       -- Hash
                      , cryptohash
+                     , hashable
+
+                       -- Misc
                      , pretty
 
 --                     , bits-atomic >= 0.1
