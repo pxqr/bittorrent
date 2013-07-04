@@ -17,11 +17,12 @@
 --   <https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure>
 --
 {-# OPTIONS -fno-warn-orphans #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE TemplateHaskell   #-}
 -- TODO refine interface
 module Data.Torrent
        ( -- * Torrent
@@ -60,6 +61,10 @@ import Prelude hiding (sum)
 import Control.Applicative
 import Control.Arrow
 import Control.Exception
+
+import qualified Crypto.Hash.SHA1 as C
+
+import Data.Aeson.TH
 import Data.BEncode as BE
 import Data.Char
 import Data.Foldable
@@ -67,6 +72,7 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import           Data.ByteString.Internal
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
 import qualified Data.ByteString.Lazy as Lazy
 import qualified Data.ByteString.Lazy.Builder as B
@@ -76,16 +82,154 @@ import           Data.Hashable as Hashable
 import           Data.Text (Text)
 import           Data.Serialize as S hiding (Result)
 import           Text.PrettyPrint
-import qualified Crypto.Hash.SHA1 as C
+
 import Network.URI
 import System.FilePath
 import Numeric
 
-import Data.ByteString.Internal
 import Debug.Trace
 
+{-----------------------------------------------------------------------
+    Info hash
+-----------------------------------------------------------------------}
+
+-- | Exactly 20 bytes long SHA1 hash of the info part of torrent file.
+newtype InfoHash = InfoHash { getInfoHash :: ByteString }
+                   deriving (Eq, Ord)
+
+instance Show InfoHash where
+  show = render . ppInfoHash
+
+instance Hashable InfoHash where
+  hash = Hashable.hash . getInfoHash
+
+instance BEncodable InfoHash where
+  toBEncode = toBEncode . getInfoHash
+  fromBEncode be = InfoHash <$> fromBEncode be
+
+instance Serialize InfoHash where
+  put = putByteString . getInfoHash
+  get = InfoHash <$> getBytes 20
+
+instance BEncodable a => BEncodable (Map InfoHash a) where
+  {-# SPECIALIZE instance BEncodable a => BEncodable (Map InfoHash a)  #-}
+  fromBEncode b = M.mapKeys InfoHash <$> fromBEncode b
+  {-# INLINE fromBEncode #-}
+
+  toBEncode = toBEncode . M.mapKeys getInfoHash
+  {-# INLINE toBEncode #-}
+
+-- | Hash strict bytestring using SHA1 algorithm.
+hash :: ByteString -> InfoHash
+hash = InfoHash . C.hash
+
+-- | Hash lazy bytestring using SHA1 algorithm.
+hashlazy :: Lazy.ByteString -> InfoHash
+hashlazy = InfoHash . C.hashlazy
+
+-- | Pretty print info hash in hexadecimal format.
+ppInfoHash :: InfoHash -> Doc
+ppInfoHash = text . BC.unpack . ppHex . getInfoHash
+
+ppHex :: ByteString -> ByteString
+ppHex = Lazy.toStrict . B.toLazyByteString . B.byteStringHexFixed
+
+-- | Add query info hash parameter to uri.
+--
+--   > info_hash=<url_encoded_info_hash>
+--
+addHashToURI :: URI -> InfoHash -> URI
+addHashToURI uri s = uri {
+    uriQuery = uriQuery uri ++ mkPref (uriQuery uri) ++
+               "info_hash=" ++ rfc1738Encode (BC.unpack (getInfoHash s))
+  }
+  where
+    mkPref [] = "?"
+    mkPref ('?' : _) = "&"
+    mkPref _ = error "addHashToURI"
+
+    rfc1738Encode = L.concatMap (\c -> if unreservedS c then [c] else encodeHex c)
+      where
+        unreservedS = (`L.elem` chars)
+        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_./"
+        encodeHex c = '%' : pHex c
+        pHex c = let p = (showHex . ord $ c) ""
+                 in if L.length p == 1 then '0' : p else p
+
+{-----------------------------------------------------------------------
+    Torrent metainfo
+-----------------------------------------------------------------------}
 
 type Time = Text
+
+-- | Contain info about one single file.
+data FileInfo = FileInfo {
+      fiLength      :: !Integer
+      -- ^ Length of the file in bytes.
+
+    , fiMD5sum      ::  Maybe ByteString
+      -- ^ 32 character long MD5 sum of the file.
+      --   Used by third-party tools, not by bittorrent protocol itself.
+
+    , fiPath        :: ![ByteString]
+      -- ^ One or more string elements that together represent the
+      --   path and filename. Each element in the list corresponds to
+      --   either a directory name or (in the case of the last
+      --   element) the filename.  For example, the file:
+      --
+      --   > "dir1/dir2/file.ext"
+      --
+      --   would consist of three string elements:
+      --
+      --   > ["dir1", "dir2", "file.ext"]
+      --
+    } deriving (Show, Read, Eq)
+
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''FileInfo)
+
+
+-- | Info part of the .torrent file contain info about each content file.
+data ContentInfo =
+    SingleFile {
+      ciLength       :: !Integer
+      -- ^ Length of the file in bytes.
+
+    , ciMD5sum       :: Maybe ByteString
+      -- ^ 32 character long MD5 sum of the file.
+      --   Used by third-party tools, not by bittorrent protocol itself.
+
+    , ciName         :: !ByteString
+      -- ^ Suggested name of the file single file.
+
+
+
+    , ciPieceLength  :: !Int
+      -- ^ Number of bytes in each piece.
+
+    , ciPieces       :: !ByteString
+      -- ^ Concatenation of all 20-byte SHA1 hash values.
+
+    , ciPrivate      :: Maybe Bool
+      -- ^ If set the client MUST publish its presence to get other
+      -- peers ONLY via the trackers explicity described in the
+      -- metainfo file.
+      --
+      --   BEP 27: <http://www.bittorrent.org/beps/bep_0027.html>
+    }
+
+  | MultiFile {
+      ciFiles        :: ![FileInfo]
+      -- ^ List of the all files that torrent contains.
+
+    , ciName         :: !ByteString
+      -- | The file path of the directory in which to store all the files.
+
+    , ciPieceLength  :: !Int
+    , ciPieces       :: !ByteString
+    , ciPrivate      :: Maybe Bool
+    } deriving (Show, Read, Eq)
+
+$(deriveJSON id ''ContentInfo)
 
 -- TODO more convenient form of torrent info.
 -- | Metainfo about particular torrent.
@@ -152,72 +296,6 @@ simpleTorrent announce info = torrent announce info
                               Nothing Nothing
 
 -- TODO check if pieceLength is power of 2
-
--- | Info part of the .torrent file contain info about each content file.
-data ContentInfo =
-    SingleFile {
-      ciLength       :: !Integer
-      -- ^ Length of the file in bytes.
-
-    , ciMD5sum       :: Maybe ByteString
-      -- ^ 32 character long MD5 sum of the file.
-      --   Used by third-party tools, not by bittorrent protocol itself.
-
-    , ciName         :: !ByteString
-      -- ^ Suggested name of the file single file.
-
-
-
-    , ciPieceLength  :: !Int
-      -- ^ Number of bytes in each piece.
-
-    , ciPieces       :: !ByteString
-      -- ^ Concatenation of all 20-byte SHA1 hash values.
-
-    , ciPrivate      :: Maybe Bool
-      -- ^ If set the client MUST publish its presence to get other
-      -- peers ONLY via the trackers explicity described in the
-      -- metainfo file.
-      --
-      --   BEP 27: <http://www.bittorrent.org/beps/bep_0027.html>
-    }
-
-  | MultiFile {
-      ciFiles        :: ![FileInfo]
-      -- ^ List of the all files that torrent contains.
-
-    , ciName         :: !ByteString
-      -- | The file path of the directory in which to store all the files.
-
-    , ciPieceLength  :: !Int
-    , ciPieces       :: !ByteString
-    , ciPrivate      :: Maybe Bool
-    } deriving (Show, Read, Eq)
-
-
--- | Contain info about one single file.
-data FileInfo = FileInfo {
-      fiLength      :: !Integer
-      -- ^ Length of the file in bytes.
-
-    , fiMD5sum      ::  Maybe ByteString
-      -- ^ 32 character long MD5 sum of the file.
-      --   Used by third-party tools, not by bittorrent protocol itself.
-
-    , fiPath        :: ![ByteString]
-      -- ^ One or more string elements that together represent the
-      --   path and filename. Each element in the list corresponds to
-      --   either a directory name or (in the case of the last
-      --   element) the filename.  For example, the file:
-      --
-      --   > "dir1/dir2/file.ext"
-      --
-      --   would consist of three string elements:
-      --
-      --   > ["dir1", "dir2", "file.ext"]
-      --
-    } deriving (Show, Read, Eq)
-
 
 instance BEncodable URI where
   toBEncode uri = toBEncode (BC.pack (uriToString id uri ""))
@@ -391,70 +469,3 @@ fromFile filepath = do
   case decoded contents of
     Right !t -> return t
     Left msg -> throwIO $ userError  $ msg ++ " while reading torrent"
-
-{-----------------------------------------------------------------------
-    Info hash
------------------------------------------------------------------------}
-
--- | Exactly 20 bytes long SHA1 hash of the info part of torrent file.
-newtype InfoHash = InfoHash { getInfoHash :: ByteString }
-                   deriving (Eq, Ord)
-
-instance Hashable InfoHash where
-  hash = Hashable.hash . getInfoHash
-
-instance BEncodable InfoHash where
-  toBEncode = toBEncode . getInfoHash
-  fromBEncode be = InfoHash <$> fromBEncode be
-
-instance Show InfoHash where
-  show = render . ppInfoHash
-
-instance Serialize InfoHash where
-  put = putByteString . getInfoHash
-  get = InfoHash <$> getBytes 20
-
-instance BEncodable a => BEncodable (Map InfoHash a) where
-  {-# SPECIALIZE instance BEncodable a => BEncodable (Map InfoHash a)  #-}
-  fromBEncode b = M.mapKeys InfoHash <$> fromBEncode b
-  {-# INLINE fromBEncode #-}
-
-  toBEncode = toBEncode . M.mapKeys getInfoHash
-  {-# INLINE toBEncode #-}
-
--- | Hash strict bytestring using SHA1 algorithm.
-hash :: ByteString -> InfoHash
-hash = InfoHash . C.hash
-
--- | Hash lazy bytestring using SHA1 algorithm.
-hashlazy :: Lazy.ByteString -> InfoHash
-hashlazy = InfoHash . C.hashlazy
-
--- | Pretty print info hash in hexadecimal format.
-ppInfoHash :: InfoHash -> Doc
-ppInfoHash = text . BC.unpack . ppHex . getInfoHash
-
-ppHex :: ByteString -> ByteString
-ppHex = Lazy.toStrict . B.toLazyByteString . B.byteStringHexFixed
-
--- | Add query info hash parameter to uri.
---
---   > info_hash=<url_encoded_info_hash>
---
-addHashToURI :: URI -> InfoHash -> URI
-addHashToURI uri s = uri {
-    uriQuery = uriQuery uri ++ mkPref (uriQuery uri) ++
-               "info_hash=" ++ rfc1738Encode (BC.unpack (getInfoHash s))
-  }
-  where
-    mkPref [] = "?"
-    mkPref ('?' : _) = "&"
-    mkPref _ = error "addHashToURI"
-
-    rfc1738Encode = L.concatMap (\c -> if unreservedS c then [c] else encodeHex c)
-      where
-        unreservedS = (`L.elem` chars)
-        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_./"
-        encodeHex c = '%' : pHex c
-        pHex c = let p = (showHex . ord $ c) ""
-                 in if L.length p == 1 then '0' : p else p
