@@ -15,7 +15,7 @@ module Network.BitTorrent
        , defaultThreadCount
 
          -- ** Client
-       , ClientSession( clientPeerID, allowedExtensions )
+       , ClientSession( clientPeerId, allowedExtensions )
 
        , newClient
        , defaultClient
@@ -107,7 +107,7 @@ discover swarm action = {-# SCC discover #-} do
 
   let conn = TConnection (tAnnounce (torrentMeta swarm))
                          (tInfoHash (torrentMeta swarm))
-                         (clientPeerID (clientSession swarm))
+                         (clientPeerId (clientSession swarm))
                           port
 
   progress <- getCurrentProgress (clientSession swarm)

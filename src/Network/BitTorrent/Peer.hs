@@ -34,16 +34,16 @@
 {-# OPTIONS  -fno-warn-orphans #-}
 module Network.BitTorrent.Peer
        ( -- * Peer identificators
-         PeerID (getPeerID), ppPeerID
+         PeerId (getPeerId), ppPeerId
 
          -- ** Encoding styles
        , azureusStyle, shadowStyle
 
          -- ** Defaults
-       , defaultClientID, defaultVersionNumber
+       , defaultClientId, defaultVersionNumber
 
          -- ** Generation
-       , newPeerID, timestampByteString
+       , newPeerId, timestampByteString
 
          -- ** Extra
        , byteStringPadded
@@ -104,19 +104,19 @@ version = Version [0, 10, 0, 0] []
 -----------------------------------------------------------------------}
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
-newtype PeerID = PeerID { getPeerID :: ByteString }
+newtype PeerId = PeerId { getPeerId :: ByteString }
                  deriving (Show, Eq, Ord, BEncodable)
 
-instance Serialize PeerID where
-  put = putByteString . getPeerID
-  get = PeerID <$> getBytes 20
+instance Serialize PeerId where
+  put = putByteString . getPeerId
+  get = PeerId <$> getBytes 20
 
-instance URLShow PeerID where
-  urlShow = BC.unpack . getPeerID
+instance URLShow PeerId where
+  urlShow = BC.unpack . getPeerId
 
 -- | Format peer id in human readable form.
-ppPeerID :: PeerID -> Doc
-ppPeerID = text . BC.unpack . getPeerID
+ppPeerId :: PeerId -> Doc
+ppPeerId = text . BC.unpack . getPeerId
 
 
 -- | Azureus-style encoding have the following layout:
@@ -134,8 +134,8 @@ ppPeerID = text . BC.unpack . getPeerID
 azureusStyle :: ByteString -- ^ 2 character client ID, padded with 'H'.
              -> ByteString -- ^ Version number, padded with 'X'.
              -> ByteString -- ^ Random number, padded with '0'.
-             -> PeerID     -- ^ Azureus-style encoded peer ID.
-azureusStyle cid ver rnd = PeerID $ BL.toStrict $ B.toLazyByteString $
+             -> PeerId     -- ^ Azureus-style encoded peer ID.
+azureusStyle cid ver rnd = PeerId $ BL.toStrict $ B.toLazyByteString $
     B.char8 '-' <>
       byteStringPadded cid 2  'H' <>
       byteStringPadded ver 4  'X' <>
@@ -155,16 +155,16 @@ azureusStyle cid ver rnd = PeerID $ BL.toStrict $ B.toLazyByteString $
 shadowStyle :: Char       -- ^ Client ID.
             -> ByteString -- ^ Version number.
             -> ByteString -- ^ Random number.
-            -> PeerID     -- ^ Shadow style encoded peer ID.
-shadowStyle cid ver rnd = PeerID $ BL.toStrict $ B.toLazyByteString $
+            -> PeerId     -- ^ Shadow style encoded peer ID.
+shadowStyle cid ver rnd = PeerId $ BL.toStrict $ B.toLazyByteString $
     B.char8 cid <>
       byteStringPadded ver 4  '-' <>
       byteStringPadded rnd 15 '0'
 
 
 -- | "HS" - 2 bytes long client identifier.
-defaultClientID :: ByteString
-defaultClientID = "HS"
+defaultClientId :: ByteString
+defaultClientId = "HS"
 
 -- | Gives exactly 4 bytes long version number for any version of the
 -- package.  Version is taken from .cabal.
@@ -199,8 +199,8 @@ timestampByteString = (BC.pack . format) <$> getCurrentTime
 --
 --      * UTC time day ++ day time for the random number.
 --
-newPeerID :: IO PeerID
-newPeerID = azureusStyle defaultClientID defaultVersionNumber
+newPeerId :: IO PeerId
+newPeerId = azureusStyle defaultClientId defaultVersionNumber
                                      <$> timestampByteString
 
 -- | Pad bytestring so it's becomes exactly request length. Conversion
@@ -398,9 +398,9 @@ unknownClient = ClientInfo unknownImpl unknownVersion
 -- peer id uses unknown coding style then client info returned is
 -- 'unknownClient'.
 --
-clientInfo :: PeerID -> ClientInfo
+clientInfo :: PeerId -> ClientInfo
 clientInfo pid = either (const unknownClient) id $
-                     runGet getCI (getPeerID pid)
+                     runGet getCI (getPeerId pid)
   where -- TODO other styles
     getCI = do
       _ <- getWord8
@@ -489,7 +489,7 @@ nameMap =
 -- | Peer address info normally extracted from peer list or peer
 -- compact list encoding.
 data PeerAddr = PeerAddr {
-      peerID   :: Maybe PeerID
+      peerID   :: Maybe PeerId
     , peerIP   :: HostAddress
     , peerPort :: PortNumber
     } deriving (Show, Eq, Ord)

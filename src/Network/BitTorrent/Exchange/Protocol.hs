@@ -116,7 +116,7 @@ data Handshake = Handshake {
     -- | Peer id of the initiator. This is usually the same peer id
     -- that is transmitted in tracker requests.
     --
-  , hsPeerID      :: PeerID
+  , hsPeerId      :: PeerId
 
   } deriving (Show, Eq)
 
@@ -126,7 +126,7 @@ instance Serialize Handshake where
     S.putByteString (hsProtocol hs)
     S.putWord64be   (hsReserved hs)
     S.put (hsInfoHash hs)
-    S.put (hsPeerID hs)
+    S.put (hsPeerId hs)
 
   get = do
     len  <- S.getWord8
@@ -142,7 +142,7 @@ handshakeCaps = hsReserved
 -- | Format handshake in human readable form.
 ppHandshake :: Handshake -> Doc
 ppHandshake Handshake {..} =
-  text (BC.unpack hsProtocol) <+> ppClientInfo (clientInfo hsPeerID)
+  text (BC.unpack hsProtocol) <+> ppClientInfo (clientInfo hsPeerId)
 
 -- | Get handshake message size in bytes from the length of protocol
 -- string.
@@ -163,7 +163,7 @@ defaultReserved = 0
 
 -- | Length of info hash and peer id is unchecked, so it /should/ be
 -- equal 20.
-defaultHandshake :: InfoHash -> PeerID -> Handshake
+defaultHandshake :: InfoHash -> PeerId -> Handshake
 defaultHandshake = Handshake defaultBTProtocol defaultReserved
 
 -- | Handshaking with a peer specified by the second argument.

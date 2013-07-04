@@ -74,7 +74,7 @@ data TRequest = TRequest { -- TODO peer here -- TODO detach announce
      -- ^ Hash of info part of the torrent usually obtained from
      -- 'Torrent'.
 
-   , reqPeerID     :: !PeerID
+   , reqPeerId     :: !PeerId
      -- ^ ID of the peer doing request.
 
    , reqPort       :: !PortNumber
@@ -186,7 +186,7 @@ instance URLShow Event where
 
 instance URLEncode TRequest where
   urlEncode req = mconcat
-      [ s "peer_id"    %=  reqPeerID req
+      [ s "peer_id"    %=  reqPeerId req
       , s "port"       %=  reqPort req
       , s "uploaded"   %=  reqUploaded req
       , s "downloaded" %=  reqDownloaded req

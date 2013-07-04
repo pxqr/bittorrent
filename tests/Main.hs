@@ -139,8 +139,8 @@ checkInfoHash (path, expectedHash) = check =<< fromFile path
     Handshake
 -----------------------------------------------------------------------}
 
-instance Arbitrary PeerID where
-  arbitrary = azureusStyle <$> pure defaultClientID
+instance Arbitrary PeerId where
+  arbitrary = azureusStyle <$> pure defaultClientId
                            <*> arbitrary
                            <*> arbitrary
 

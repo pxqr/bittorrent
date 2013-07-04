@@ -22,7 +22,7 @@ module Network.BitTorrent.Internal
        ( Progress(..), startProgress
 
          -- * Client
-       , ClientSession (clientPeerID, allowedExtensions)
+       , ClientSession (clientPeerId, allowedExtensions)
 
        , ThreadCount
        , defaultThreadCount
@@ -206,7 +206,7 @@ it should contain the all client identification info. (e.g. DHT)  -}
 --
 data ClientSession = ClientSession {
     -- | Used in handshakes and discovery mechanism.
-    clientPeerID      :: !PeerID
+    clientPeerId      :: !PeerId
 
     -- | Extensions we should try to use. Hovewer some particular peer
     -- might not support some extension, so we keep enabledExtension in
@@ -232,10 +232,10 @@ data ClientSession = ClientSession {
 -- maybe we can remove the 'currentProgress' and compute it on demand?
 
 instance Eq ClientSession where
-  (==) = (==) `on` clientPeerID
+  (==) = (==) `on` clientPeerId
 
 instance Ord ClientSession where
-  compare = comparing clientPeerID
+  compare = comparing clientPeerId
 
 -- | Get current global progress of the client. This value is usually
 -- shown to a user.
@@ -265,7 +265,7 @@ newClient n exts = do
   _   <- forkIO $ loop mgr
 
   ClientSession
-    <$> newPeerID
+    <$> newPeerId
     <*> pure exts
     <*> MSem.new n
     <*> pure n
@@ -487,7 +487,7 @@ withPeerSession ss @ SwarmSession {..} addr
     openSession = do
       let caps  = encodeExts $ allowedExtensions $ clientSession
       let ihash = tInfoHash torrentMeta
-      let pid   = clientPeerID $ clientSession
+      let pid   = clientPeerId $ clientSession
       let chs   = Handshake defaultBTProtocol caps ihash pid
 
       sock <- connectToPeer addr

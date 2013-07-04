@@ -79,11 +79,11 @@ import Network.BitTorrent.Tracker.Protocol
 data TConnection = TConnection {
     tconnAnnounce :: URI        -- ^ Announce URL.
   , tconnInfoHash :: InfoHash   -- ^ Hash of info part of current .torrent file.
-  , tconnPeerID   :: PeerID     -- ^ Client peer ID.
+  , tconnPeerId   :: PeerId     -- ^ Client peer ID.
   , tconnPort     :: PortNumber -- ^ The port number the client is listenning on.
   } deriving Show
 
-tconnection :: Torrent -> PeerID -> PortNumber -> TConnection
+tconnection :: Torrent -> PeerId -> PortNumber -> TConnection
 tconnection t = TConnection (tAnnounce t) (tInfoHash t)
 
 
@@ -92,7 +92,7 @@ genericReq :: TConnection -> Progress -> TRequest
 genericReq ses pr =   TRequest {
     reqAnnounce   = tconnAnnounce ses
   , reqInfoHash   = tconnInfoHash ses
-  , reqPeerID     = tconnPeerID   ses
+  , reqPeerId     = tconnPeerId   ses
   , reqPort       = tconnPort     ses
 
   , reqUploaded   = _uploaded   pr
