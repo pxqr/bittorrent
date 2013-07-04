@@ -193,6 +193,15 @@ validatePiece pix st @ Storage {..} = {-# SCC validatePiece #-} do
 --          resetPiece pix st
           return True
 
+-- | Check each piece in the storage against content info hash.
+--
+--   Note that this function will block until each the entire storage
+--   checked. This may take a long time for a big torrents ­ use fork
+--   if needed.
+--
+validateStorage :: Storage -> IO ()
+validateStorage st = undefined -- (`validatePiece` st) [0..pieceCount st]
+
 {-----------------------------------------------------------------------
     Internal
 -----------------------------------------------------------------------}

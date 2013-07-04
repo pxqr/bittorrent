@@ -67,12 +67,16 @@ import Control.Applicative
 import Control.Exception
 import Control.Monad
 import Control.Lens
+
+import Data.Aeson.TH
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as Lazy
+import Data.Char
 import Data.Default
 import Data.Int
+import Data.List as L
 import Data.Word
 
 import Data.Binary as B
@@ -191,7 +195,7 @@ handshake sock hs = do
     checkIH x = x
 
 {-----------------------------------------------------------------------
-    Blocks
+    Block Index
 -----------------------------------------------------------------------}
 
 type BlockLIx = Int
@@ -208,6 +212,8 @@ data BlockIx = BlockIx {
     -- | Block size starting from offset.
   , ixLength :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
+
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''BlockIx)
 
 getInt :: S.Get Int
 getInt = fromIntegral <$> S.getWord32be
@@ -252,6 +258,10 @@ ppBlockIx BlockIx {..} =
   "offset = " <> int ixOffset <> "," <+>
   "length = " <> int ixLength
 
+{-----------------------------------------------------------------------
+    Block
+-----------------------------------------------------------------------}
+
 data Block = Block {
     -- | Zero-based piece index.
     blkPiece  :: {-# UNPACK #-} !PieceLIx
@@ -260,7 +270,7 @@ data Block = Block {
   , blkOffset :: {-# UNPACK #-} !Int
 
     -- | Payload.
-  , blkData   :: !Lazy.ByteString -- TODO make lazy bytestring
+  , blkData   :: !Lazy.ByteString
   } deriving (Show, Eq)
 
 -- | Format block in human readable form. Payload is ommitted.
@@ -520,6 +530,7 @@ data PeerStatus = PeerStatus {
   } deriving (Show, Eq)
 
 $(makeLenses ''PeerStatus)
+$(deriveJSON (L.dropWhile (== '_')) ''PeerStatus)
 
 instance Default PeerStatus where
   def = PeerStatus True False
@@ -531,6 +542,7 @@ data SessionStatus = SessionStatus {
   } deriving (Show, Eq)
 
 $(makeLenses ''SessionStatus)
+$(deriveJSON (L.dropWhile (== '_')) ''SessionStatus)
 
 instance Default SessionStatus where
   def = SessionStatus def def

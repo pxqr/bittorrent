@@ -277,6 +277,8 @@ data ScrapeInfo = ScrapeInfo {
   , siName       :: !(Maybe Text)
   } deriving (Show, Eq)
 
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
+
 -- | Scrape info about a set of torrents.
 type Scrape = Map InfoHash ScrapeInfo
 
@@ -294,8 +296,6 @@ instance BEncodable ScrapeInfo where
                <*> d >--  "incomplete"
                <*> d >--? "name"
   fromBEncode _ = decodingError "ScrapeInfo"
-
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
 
 -- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'
 --   gives 'Nothing' then tracker do not support scraping. The info hash
