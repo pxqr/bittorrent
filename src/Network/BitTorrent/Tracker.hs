@@ -15,7 +15,8 @@
 --   easily request scrape info for a particular torrent list.
 --
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Network.BitTorrent.Tracker
        ( withTracker, completedReq
 
@@ -43,11 +44,12 @@ import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
 
-import Data.Aeson hiding (Result)
+import Data.Aeson.TH
 import Data.BEncode
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import           Data.Char
 import           Data.List as L
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -293,22 +295,7 @@ instance BEncodable ScrapeInfo where
                <*> d >--? "name"
   fromBEncode _ = decodingError "ScrapeInfo"
 
-instance ToJSON ScrapeInfo where
-  toJSON ScrapeInfo {..} = object
-    [ "complete"   .= siComplete
-    , "downloaded" .= siDownloaded
-    , "incomplete" .= siIncomplete
-    , "name"       .= siName
-    ]
-
-instance FromJSON ScrapeInfo where
-  parseJSON (Object obj) = do
-    ScrapeInfo <$> obj .:  "complete"
-               <*> obj .:  "downloaded"
-               <*> obj .:  "incomplete"
-               <*> obj .:? "name"
-
-  parseJSON _ = fail "ScrapeInfo"
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
 
 -- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'
 --   gives 'Nothing' then tracker do not support scraping. The info hash

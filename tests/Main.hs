@@ -307,8 +307,6 @@ allTests =
     ++
   [ testProperty "scrape bencode" $
       prop_properBEncode (T :: T ScrapeInfo)
-  , testProperty "scrape json" $
-      prop_properJSON (T :: T ScrapeInfo)
   ]
 
 main :: IO ()
