@@ -48,11 +48,12 @@ import Data.BEncode
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import Data.List as L
+import           Data.List as L
 import           Data.Map (Map)
 import qualified Data.Map as M
-import Data.Monoid
-import Data.IORef
+import           Data.Monoid
+import           Data.IORef
+import           Data.Text (Text)
 
 import Network
 import Network.HTTP
@@ -260,26 +261,29 @@ withTracker initProgress conn action = bracket start end (action . fst)
 
 -- | Information about particular torrent.
 data ScrapeInfo = ScrapeInfo {
-    siComplete   :: Int
-    -- ^ Number of seeders - peers with the entire file.
-  , siDownloaded :: Int
-    -- ^ Total number of times the tracker has registered a completion.
-  , siIncomplete :: Int
-    -- ^ Number of leechers.
-  , siName       :: Maybe ByteString
-    -- ^ Name of the torrent file, as specified by the "name"
+    -- | Number of seeders - peers with the entire file.
+    siComplete   :: !Int
+
+    -- | Total number of times the tracker has registered a completion.
+  , siDownloaded :: !Int
+
+    -- | Number of leechers.
+  , siIncomplete :: !Int
+
+    -- | Name of the torrent file, as specified by the "name"
     --   file in the info section of the .torrent file.
+  , siName       :: !(Maybe Text)
   } deriving (Show, Eq)
 
 -- | Scrape info about a set of torrents.
 type Scrape = Map InfoHash ScrapeInfo
 
 instance BEncodable ScrapeInfo where
-  toBEncode si = fromAssocs
-    [ "complete"   -->  siComplete si
-    , "downloaded" -->  siDownloaded si
-    , "incomplete" -->  siIncomplete si
-    , "name"       -->? siName si
+  toBEncode ScrapeInfo {..} = fromAssocs
+    [ "complete"   -->  siComplete
+    , "downloaded" -->  siDownloaded
+    , "incomplete" -->  siIncomplete
+    , "name"       -->? siName
     ]
 
   fromBEncode (BDict d) =
