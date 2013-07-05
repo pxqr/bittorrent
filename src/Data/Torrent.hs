@@ -28,6 +28,7 @@ module Data.Torrent
        ( -- * Torrent
          Torrent(..), ContentInfo(..), FileInfo(..)
        , torrent, simpleTorrent
+       , torrentExt, isTorrentPath
        , fromFile
 
          -- * Files layout
@@ -457,10 +458,17 @@ pieceHash ci ix = slice (hashsize * ix) hashsize (ciPieces ci)
 
 -- | Validate piece with metainfo hash.
 checkPiece :: ContentInfo -> Int -> ByteString -> Bool
-checkPiece ci ix piece @ (PS _ off si)
-  | traceShow (ix, off, si) True
+checkPiece ci ix piece
   =  B.length piece == ciPieceLength ci
   && C.hash   piece == pieceHash ci ix
+
+-- | Extension usually used for torrent metafiles.
+torrentExt :: String
+torrentExt = "torrent"
+
+-- | Test if this path has proper extension.
+isTorrentPath :: FilePath -> Bool
+isTorrentPath filepath = takeExtension filepath == extSeparator : torrentExt
 
 -- | Read and decode a .torrent file.
 fromFile :: FilePath -> IO Torrent
