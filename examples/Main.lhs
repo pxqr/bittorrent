@@ -1,3 +1,6 @@
+A very helpful and literate comment.
+% A very helpful comment for very helpful and very literate comment.
+\begin{code}
 module Main (main) where
 
 import Control.Monad
@@ -26,3 +29,4 @@ main = do
       liftIO (getCurrentProgress client >>= print)
       exchange storage
     liftIO $ print "disconnected"
+\end{code}
