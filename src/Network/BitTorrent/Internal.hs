@@ -55,6 +55,10 @@ module Network.BitTorrent.Internal
        , ThreadCount
        , defaultThreadCount
 
+       , TorrentLoc(..)
+       , registerTorrent
+       , unregisterTorrent
+
        , newClient
 
        , getCurrentProgress

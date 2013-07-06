@@ -115,3 +115,25 @@ discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
       addr <- getPeerAddr tses
       spawnP2P swarm addr $ do
         action
+
+{-----------------------------------------------------------------------
+    Torrent management
+-----------------------------------------------------------------------}
+{-
+addTorrent :: ClientSession -> TorrentLoc -> IO ()
+addTorrent ClientSession {..} TorrentLoc {..} = do
+  torrent <- fromFile metafilePath
+  swarm   <- newLeecher  clientSession torrent
+  storage <- swarm `bindTo` dataDir
+  discover swarm $ do
+    liftIO $ putStrLn "connected to peer"
+    forever $ do
+      liftIO $ putStrLn "from mesage loop"
+      exchange storage
+
+removeTorrent :: ClientSession -> TorrentLoc ->  IO ()
+removeTorrent ClientSession {..} TorrentLoc {..} = undefined
+
+deleteTorrent :: ClientSession -> TorrentLoc -> IO ()
+deleteTorrent ClientSession {..} TorrentLoc {..} = undefined
+-}
