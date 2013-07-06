@@ -60,6 +60,7 @@ module Network.BitTorrent.Exchange
        , awaitEvent
        , yieldEvent
        , handleEvent
+       , exchange
 
          -- * Exceptions
        , disconnect
@@ -85,16 +86,14 @@ import Data.Conduit.Network
 import Data.Serialize as S
 import Text.PrettyPrint as PP hiding (($$))
 
-
 import Network
 
-
+import Data.Bitfield as BF
 import Network.BitTorrent.Internal
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Exchange.Protocol
-import Data.Bitfield as BF
-
+import System.Torrent.Storage
 
 {-----------------------------------------------------------------------
     Peer wire
@@ -464,3 +463,43 @@ yieldEvent e = {-# SCC yieldEvent #-} go e
 
 handleEvent :: (Event -> P2P Event) -> P2P ()
 handleEvent action = awaitEvent >>= action >>= yieldEvent
+
+-- Event translation table looks like:
+--
+--   Available -> Want
+--   Want      -> Fragment
+--   Fragment  -> Available
+--
+-- If we join the chain we get the event loop:
+--
+--   Available -> Want -> Fragment --\
+--      /|\                           |
+--       \---------------------------/
+--
+
+
+-- | Default P2P action.
+exchange :: Storage -> P2P ()
+exchange storage = {-# SCC exchange #-} (awaitEvent >>= handler)
+  where
+    handler (Available bf) = do
+      liftIO (print (completeness bf))
+      ixs <- selBlk (findMin bf) storage
+      mapM_ (yieldEvent . Want) ixs -- TODO yield vectored
+
+    handler (Want     bix) = do
+      blk <- liftIO $ getBlk bix storage
+      yieldEvent (Fragment blk)
+
+    handler (Fragment blk @ Block {..}) = do
+      liftIO $ print (ppBlock blk)
+      done <- liftIO $ putBlk blk storage
+      when done $ do
+        yieldEvent $ Available $ singleton blkPiece (succ blkPiece)
+
+        -- WARN this is not reliable: if peer do not return all piece
+        -- block we could slow don't until some other event occured
+        offer <- peerOffer
+        if BF.null offer
+          then return ()
+          else handler (Available offer)
