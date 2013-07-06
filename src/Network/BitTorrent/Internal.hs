@@ -89,6 +89,7 @@ import Data.IORef
 import Data.Default
 import Data.Function
 import Data.Foldable (mapM_)
+import Data.HashMap.Strict as HM
 import Data.Ord
 import Data.Set as S
 import Data.Typeable
@@ -182,6 +183,33 @@ type ThreadCount = Int
 defaultThreadCount :: ThreadCount
 defaultThreadCount = 1000
 
+{- PERFORMANCE NOTE: keeping torrent metafiles in memory is a _bad_
+idea: for 1TB of data we need at least 100MB of metadata. (using 256KB
+piece size). This solution do not scale further. Solution with
+TorrentLoc is much better and takes much more less space, moreover it
+depends on count of torrents but not on count of data itself. To scale
+further, in future we might add something like database (for
+e.g. sqlite) for this kind of things.-}
+
+-- | Identifies location of
+data TorrentLoc = TorrentLoc {
+    metafilePath :: FilePath
+  , dataPath     :: FilePath
+  }
+
+validateTorrent :: TorrentLoc -> IO ()
+validateTorrent = error "validateTorrent: not implemented"
+
+-- | TorrentMap is used to keep track all known torrents for the
+--   client. When some peer trying to connect to us it's necessary to
+--   dispatch appropriate 'SwarmSession' (or start new one if there are
+--   none) in the listener loop: we only know 'InfoHash' from
+--   'Handshake' but nothing more. So to accept new 'PeerSession' we
+--   need to lookup torrent metainfo and content files (if there are
+--   some) by the 'InfoHash' and only after that enter exchange loop.
+--
+type TorrentMap = HashMap InfoHash TorrentLoc
+
 {- NOTE: basically, client session should contain options which user
 app store in configuration files. (related to the protocol) Moreover
 it should contain the all client identification info. (e.g. DHT)  -}
@@ -226,6 +254,9 @@ data ClientSession = ClientSession {
 
     -- | Used to keep track global client progress.
   , currentProgress   :: !(TVar  Progress)
+
+    -- | Used to keep track available torrents.
+  , torrentMap        :: !(TVar TorrentMap)
   }
 
 -- currentProgress field is reduntant: progress depends on the all swarm bitfields
@@ -272,6 +303,15 @@ newClient n exts = do
     <*> newTVarIO S.empty
     <*> pure mgr
     <*> newTVarIO (startProgress 0)
+    <*> newTVarIO HM.empty
+
+registerTorrent :: ClientSession -> InfoHash -> TorrentLoc -> STM ()
+registerTorrent ClientSession {..} ih tl = do
+  modifyTVar' torrentMap $ HM.insert ih tl
+
+unregisterTorrent :: ClientSession -> InfoHash -> STM ()
+unregisterTorrent ClientSession {..} ih = do
+  modifyTVar' torrentMap $ HM.delete ih
 
 {-----------------------------------------------------------------------
     Swarm session

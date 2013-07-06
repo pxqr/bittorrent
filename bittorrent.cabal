@@ -80,6 +80,7 @@ library
                      , bytestring  >= 0.10.0.0
 
                      , containers  >= 0.4
+                     , unordered-containers
                      , intset      >= 0.1
                      , IntervalMap >= 0.3
 
