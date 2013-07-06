@@ -170,7 +170,7 @@
 
 
 Thread layout
--------------
+------------------------------------------------------------------------
 
 When client session created 2 new threads appear:
 
@@ -193,20 +193,19 @@ When client\/swarm\/peer session gets closed kill the corresponding
 threads, but flush data to disc. (for e.g. storage block map)
 
 So for e.g., in order to obtain our first block we need to run at
-least 7 threads: main thread, 2 client session thread, 3 swarm session
+least 7 threads: main thread, 2 client session threads, 3 swarm session
 threads and PeerSession thread.
 
-> {-----------------------------------------------------------------------
->     Client session
-> -----------------------------------------------------------------------}
+Thread throttling
+------------------------------------------------------------------------
 
-> {- NOTE: If we will not restrict number of threads we could end up
-> with thousands of connected swarm and make no particular progress.
->
-> Note also we do not bound number of swarms! This is not optimal
-> strategy because each swarm might have say 1 thread and we could end
-> up bounded by the meaningless limit. Bounding global number of p2p
-> sessions should work better, and simpler.-}
+If we will not restrict number of threads we could end up
+with thousands of connected swarm and make no particular progress.
+
+Note also we do not bound number of swarms! This is not optimal
+strategy because each swarm might have say 1 thread and we could end
+up bounded by the meaningless limit. Bounding global number of p2p
+sessions should work better, and simpler.
 
 > -- | Each client might have a limited number of threads.
 > type ThreadCount = Int
@@ -215,16 +214,28 @@ threads and PeerSession thread.
 > defaultThreadCount :: ThreadCount
 > defaultThreadCount = 1000
 
-> {- PERFORMANCE NOTE: keeping torrent metafiles in memory is a _bad_
-> idea: for 1TB of data we need at least 100MB of metadata. (using 256KB
-> piece size). This solution do not scale further. Solution with
-> TorrentLoc is much better and takes much more less space, moreover it
-> depends on count of torrents but not on count of data itself. To scale
-> further, in future we might add something like database (for
-> e.g. sqlite) for this kind of things.-}
+Torrent Map
+------------------------------------------------------------------------
 
-> -- | Identifies location of
+TorrentMap is used to keep track all known torrents for the
+client. When some peer trying to connect to us it's necessary to
+dispatch appropriate 'SwarmSession' (or start new one if there are
+none) in the listener loop: we only know 'InfoHash' from 'Handshake'
+but nothing more. So to accept new 'PeerSession' we need to lookup
+torrent metainfo and content files (if there are some) by the
+'InfoHash' and only after that enter exchange loop.
+
+*PERFORMANCE NOTE:* keeping torrent metafiles in memory is a _bad_
+idea: for 1TB of data we need at least 100MB of metadata. (using 256KB
+piece size). This solution do not scale further. Solution with
+TorrentLoc is much better and takes much more less space, moreover it
+depends on count of torrents but not on count of data itself. To scale
+further, in future we might add something like database (for
+e.g. sqlite) for this kind of things.
+
+> -- | Local identification info location about
 > data TorrentLoc = TorrentLoc {
+>     -- |
 >     metafilePath :: FilePath
 >   , dataPath     :: FilePath
 >   }
@@ -232,19 +243,16 @@ threads and PeerSession thread.
 > validateTorrent :: TorrentLoc -> IO ()
 > validateTorrent = error "validateTorrent: not implemented"
 
-> -- | TorrentMap is used to keep track all known torrents for the
-> --   client. When some peer trying to connect to us it's necessary to
-> --   dispatch appropriate 'SwarmSession' (or start new one if there are
-> --   none) in the listener loop: we only know 'InfoHash' from
-> --   'Handshake' but nothing more. So to accept new 'PeerSession' we
-> --   need to lookup torrent metainfo and content files (if there are
-> --   some) by the 'InfoHash' and only after that enter exchange loop.
+
 > --
 > type TorrentMap = HashMap InfoHash TorrentLoc
 
-> {- NOTE: basically, client session should contain options which user
-> app store in configuration files. (related to the protocol) Moreover
-> it should contain the all client identification info. (e.g. DHT)  -}
+Client session
+------------------------------------------------------------------------
+
+Basically, client session should contain options which user app store
+in configuration files. (related to the protocol) Moreover it should
+contain the all client identification info. (e.g. DHT)
 
 > -- | Client session is the basic unit of bittorrent network, it has:
 > --
