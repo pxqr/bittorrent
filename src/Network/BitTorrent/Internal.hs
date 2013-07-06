@@ -10,7 +10,35 @@
 --   Network.BitTorrent.Exchange and modules. To hide some internals
 --   of this module we detach it from Exchange.
 --
---   Note: expose only static data in data field lists, all dynamic
+--               Thread layout
+--
+--   When client session created 2 new threads appear:
+--
+--      * DHT listener - replies to DHT requests;
+--
+--      * Peer listener - accept new P2P connection initiated by other
+--      peers.
+--
+--   When swarn session created 3 new threads appear:
+--
+--      * DHT request loop asks for new peers;
+--
+--      * Tracker request loop asks for new peers;
+--
+--      * controller which fork new avaand manage running P2P sessions.
+--
+--   Peer session is one always forked thread.
+--
+--   When client\/swarm\/peer session gets closed kill the
+--   corresponding threads, but flush data to disc. (for e.g. storage
+--   block map)
+--
+--   So for e.g., in order to obtain our first block we need to run at
+--   least 7 threads: main thread, 2 client session thread, 3 swarm
+--   session threads and PeerSession thread.
+--
+--
+--   NOTE: expose only static data in data field lists, all dynamic
 --   data should be modified through standalone functions.
 --
 {-# LANGUAGE OverloadedStrings     #-}
@@ -22,7 +50,7 @@ module Network.BitTorrent.Internal
        ( Progress(..), startProgress
 
          -- * Client
-       , ClientSession (clientPeerId, allowedExtensions)
+       , ClientSession (clientPeerId, allowedExtensions, listenerPort)
 
        , ThreadCount
        , defaultThreadCount
@@ -241,6 +269,10 @@ data ClientSession = ClientSession {
     -- 'PeerSession'.
   , allowedExtensions :: [Extension]
 
+    -- | Port where client listen for other peers
+  , listenerPort      :: PortNumber
+    -- TODO restart listener if it fail
+
     -- | Semaphor used to bound number of active P2P sessions.
   , activeThreads     :: !(MSem ThreadCount)
 
@@ -261,6 +293,7 @@ data ClientSession = ClientSession {
 
 -- currentProgress field is reduntant: progress depends on the all swarm bitfields
 -- maybe we can remove the 'currentProgress' and compute it on demand?
+
 
 instance Eq ClientSession where
   (==) = (==) `on` clientPeerId
@@ -298,6 +331,7 @@ newClient n exts = do
   ClientSession
     <$> newPeerId
     <*> pure exts
+    <*> forkListener (error "listener")
     <*> MSem.new n
     <*> pure n
     <*> newTVarIO S.empty

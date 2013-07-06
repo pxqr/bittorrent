@@ -102,15 +102,13 @@ defaultClient = newClient defaultThreadCount defaultExtensions
 -- thus we can obtain an unified interface
 
 discover :: SwarmSession -> P2P () -> IO ()
-discover swarm action = {-# SCC discover #-} do
-  port <- forkListener (error "discover")
+discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
+  let conn = TConnection (tAnnounce torrentMeta)
+                         (tInfoHash torrentMeta)
+                         (clientPeerId clientSession)
+                         (listenerPort clientSession)
 
-  let conn = TConnection (tAnnounce (torrentMeta swarm))
-                         (tInfoHash (torrentMeta swarm))
-                         (clientPeerId (clientSession swarm))
-                          port
-
-  progress <- getCurrentProgress (clientSession swarm)
+  progress <- getCurrentProgress clientSession
 
   withTracker progress conn $ \tses -> do
     forever $ do
