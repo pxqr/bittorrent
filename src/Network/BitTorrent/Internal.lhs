@@ -114,9 +114,8 @@
 > import Network.BitTorrent.Exchange.Protocol as BT
 > import Network.BitTorrent.Tracker.Protocol as BT
 
-> {-----------------------------------------------------------------------
->     Progress
-> -----------------------------------------------------------------------}
+    Progress
+------------------------------------------------------------------------
 
 > -- | 'Progress' contains upload/download/left stats about
 > --   current client state and used to notify the tracker.
@@ -131,17 +130,18 @@
 >   , _downloaded :: !Integer -- ^ Total amount of bytes downloaded.
 >   , _left       :: !Integer -- ^ Total amount of bytes left.
 >   } deriving (Show, Read, Eq)
-
-> -- TODO use atomic bits and Word64
-
+>
 > $(makeLenses ''Progress)
 
+TODO use Word64?
+TODO use atomic bits?
+
+
+Please note that tracker might penalize client some way if the do
+not accumulate progress. If possible and save 'Progress' between
+client sessions to avoid that.
+
 > -- | Initial progress is used when there are no session before.
-> --
-> --   Please note that tracker might penalize client some way if the do
-> --   not accumulate progress. If possible and save 'Progress' between
-> --   client sessions to avoid that.
-> --
 > startProgress :: Integer -> Progress
 > startProgress = Progress 0 0
 
@@ -169,7 +169,7 @@
 > {-# INLINE dequeuedProgress #-}
 
 
-Thread layout
+    Thread layout
 ------------------------------------------------------------------------
 
 When client session created 2 new threads appear:
@@ -196,7 +196,7 @@ So for e.g., in order to obtain our first block we need to run at
 least 7 threads: main thread, 2 client session threads, 3 swarm session
 threads and PeerSession thread.
 
-Thread throttling
+    Thread throttling
 ------------------------------------------------------------------------
 
 If we will not restrict number of threads we could end up
@@ -207,6 +207,9 @@ strategy because each swarm might have say 1 thread and we could end
 up bounded by the meaningless limit. Bounding global number of p2p
 sessions should work better, and simpler.
 
+**TODO:** priority based throttling: leecher thread have more priority
+than seeder threads.
+
 > -- | Each client might have a limited number of threads.
 > type ThreadCount = Int
 
@@ -214,8 +217,23 @@ sessions should work better, and simpler.
 > defaultThreadCount :: ThreadCount
 > defaultThreadCount = 1000
 
-Torrent Map
+    Torrent Map
 ------------------------------------------------------------------------
+
+Keeping all seeding torrent metafiles in memory is a _bad_ idea: for
+1TB of data we need at least 100MB of metadata. (using 256KB piece
+size). This solution do not scale further.
+
+To avoid this we keep just *metainfo* about *metainfo*:
+
+> -- | Local info about torrent location.
+> data TorrentLoc = TorrentLoc {
+>     -- | Full path to .torrent metafile.
+>     metafilePath :: FilePath
+>     -- | Full path to directory contating content files associated
+>     -- with the metafile.
+>   , dataPath     :: FilePath
+>   }
 
 TorrentMap is used to keep track all known torrents for the
 client. When some peer trying to connect to us it's necessary to
@@ -225,53 +243,51 @@ but nothing more. So to accept new 'PeerSession' we need to lookup
 torrent metainfo and content files (if there are some) by the
 'InfoHash' and only after that enter exchange loop.
 
-*PERFORMANCE NOTE:* keeping torrent metafiles in memory is a _bad_
-idea: for 1TB of data we need at least 100MB of metadata. (using 256KB
-piece size). This solution do not scale further. Solution with
-TorrentLoc is much better and takes much more less space, moreover it
-depends on count of torrents but not on count of data itself. To scale
-further, in future we might add something like database (for
-e.g. sqlite) for this kind of things.
+Solution with TorrentLoc is much better and takes much more less
+space, moreover it depends on count of torrents but not on count of
+data itself. To scale further, in future we might add something like
+database (for e.g. sqlite) for this kind of things.
 
-> -- | Local identification info location about
-> data TorrentLoc = TorrentLoc {
->     -- |
->     metafilePath :: FilePath
->   , dataPath     :: FilePath
->   }
+> -- | Used to find torrent info and data in order to accept connection.
+> type TorrentMap = HashMap InfoHash TorrentLoc
 
+While *registering* torrent we need to check if torrent metafile is
+correct, all the files are present in the filesystem and so
+forth. However content validation using hashes will take a long time,
+so we need to do this on demand: if a peer asks for a block, we
+validate corresponding piece and only after read and send the block
+back.
+
+> -- | Used to check torrent location before register torrent.
 > validateTorrent :: TorrentLoc -> IO ()
 > validateTorrent = error "validateTorrent: not implemented"
 
-
-> --
-> type TorrentMap = HashMap InfoHash TorrentLoc
-
-Client session
+    Client session
 ------------------------------------------------------------------------
 
-Basically, client session should contain options which user app store
-in configuration files. (related to the protocol) Moreover it should
-contain the all client identification info. (e.g. DHT)
+Basically, client session should contain options which user
+application store in configuration files and related to the
+protocol. Moreover it should contain the all client identification
+info, for e.g. DHT.
 
-> -- | Client session is the basic unit of bittorrent network, it has:
-> --
-> --     * The /peer ID/ used as unique identifier of the client in
-> --     network. Obviously, this value is not changed during client
-> --     session.
-> --
-> --     * The number of /protocol extensions/ it might use. This value
-> --     is static as well, but if you want to dynamically reconfigure
-> --     the client you might kill the end the current session and
-> --     create a new with the fresh required extensions.
-> --
-> --     * The number of /swarms/ to join, each swarm described by the
-> --     'SwarmSession'.
-> --
-> --  Normally, you would have one client session, however, if we need,
-> --  in one application we could have many clients with different peer
-> --  ID's and different enabled extensions at the same time.
-> --
+Client session is the basic unit of bittorrent network, it has:
+
+  * The /peer ID/ used as unique identifier of the client in
+network. Obviously, this value is not changed during client session.
+
+  * The number of /protocol extensions/ it might use. This value is
+static as well, but if you want to dynamically reconfigure the client
+you might kill the end the current session and create a new with the
+fresh required extensions.
+
+  * The number of /swarms/ to join, each swarm described by the
+'SwarmSession'.
+
+Normally, you would have one client session, however, if we need, in
+one application we could have many clients with different peer ID's
+and different enabled extensions at the same time.
+
+> -- |
 > data ClientSession = ClientSession {
 >     -- | Used in handshakes and discovery mechanism.
 >     clientPeerId      :: !PeerId
