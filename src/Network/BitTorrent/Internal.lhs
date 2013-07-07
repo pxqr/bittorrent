@@ -9,12 +9,9 @@
 > --   provides sessions needed by Network.BitTorrent and
 > --   Network.BitTorrent.Exchange and modules. To hide some internals
 > --   of this module we detach it from Exchange.
+> --   NOTE: Expose only static data in data field lists, all dynamic
+> --   data should be modified through standalone functions.
 > --
->
-
-**NOTE**: Expose only static data in data field lists, all dynamic
-data should be modified through standalone functions.
-
 >
 > {-# LANGUAGE OverloadedStrings     #-}
 > {-# LANGUAGE RecordWildCards       #-}
@@ -513,27 +510,26 @@ Peer session
 >     -- | Extensions such that both peer and client support.
 >   , enabledExtensions :: [Extension]
 
->     -- | To dissconnect from died peers appropriately we should check
->     -- if a peer do not sent the KA message within given interval. If
->     -- yes, we should throw an exception in 'TimeoutCallback' and
->     -- close session between peers.
->     --
->     -- We should update timeout if we /receive/ any message within
->     -- timeout interval to keep connection up.
+To dissconnect from died peers appropriately we should check if a peer
+do not sent the KA message within given interval. If yes, we should
+throw an exception in 'TimeoutCallback' and close session between
+peers.
+
+We should update timeout if we /receive/ any message within timeout
+interval to keep connection up.
+
 >   , incomingTimeout     :: !TimeoutKey
 
->     -- | To send KA message appropriately we should know when was last
->     -- time we sent a message to a peer. To do that we keep registered
->     -- timeout in event manager and if we do not sent any message to
->     -- the peer within given interval then we send KA message in
->     -- 'TimeoutCallback'.
->     --
->     -- We should update timeout if we /send/ any message within timeout
->     -- to avoid reduntant KA messages.
->     --
->   , outcomingTimeout   :: !TimeoutKey
+To send KA message appropriately we should know when was last time we
+sent a message to a peer. To do that we keep registered timeout in
+event manager and if we do not sent any message to the peer within
+given interval then we send KA message in 'TimeoutCallback'.
 
->     -- TODO use dupChan for broadcasting
+We should update timeout if we /send/ any message within timeout to
+avoid reduntant KA messages.
+
+>   , outcomingTimeout   :: !TimeoutKey
+>
 >     -- | Broadcast messages waiting to be sent to peer.
 >   , pendingMessages    :: !(TChan   Message)
 
@@ -623,19 +619,18 @@ Peer session
 Broadcasting: Have, Cancel, Bitfield, SuggestPiece
 ------------------------------------------------------------------------
 
-> -- here we should enqueue broadcast messages and keep in mind that:
-> --
-> --  * We should enqueue broadcast events as they are appear.
-> --  * We should yield broadcast messages as fast as we get them.
-> --
-> -- these 2 phases might differ in time significantly
+Here we should enqueue broadcast messages and keep in mind that:
+  * We should enqueue broadcast events as they are appear.
+  * We should yield broadcast messages as fast as we get them.
 
-> -- TODO do this; but only when it'll be clean which other broadcast
-> -- messages & events we should send
+these 2 phases might differ in time significantly
 
-> -- 1. Update client have bitfield --\____ in one transaction;
-> -- 2. Update downloaded stats     --/
-> -- 3. Signal to the all other peer about this.
+**TODO**: do this; but only when it'll be clean which other broadcast
+messages & events we should send.
+
+1. Update client have bitfield --\____ in one transaction;
+2. Update downloaded stats     --/
+3. Signal to the all other peer about this.
 
 > available :: Bitfield -> SwarmSession -> IO ()
 > available bf se @ SwarmSession {..} = {-# SCC available #-} do
@@ -646,16 +641,16 @@ Broadcasting: Have, Cancel, Bitfield, SuggestPiece
 >       atomically $ do
 >         modifyTVar' clientBitfield (BF.union bf)
 >         modifyTVar' (currentProgress clientSession) (downloadedProgress bytes)
-
+>
 >     broadcast = mapM_ (writeTChan broadcastMessages . Have) (BF.toList bf)
 
 
-> -- TODO compute size of messages: if it's faster to send Bitfield
-> -- instead many Have do that
-> --
-> -- also if there is single Have message in queue then the
-> -- corresponding piece is likely still in memory or disc cache,
-> -- when we can send SuggestPiece
+TODO compute size of messages: if it's faster to send Bitfield
+instead many Have do that
+
+also if there is single Have message in queue then the
+corresponding piece is likely still in memory or disc cache,
+when we can send SuggestPiece
 
 > -- | Get pending messages queue appeared in result of asynchronously
 > -- changed client state. Resulting queue should be sent to a peer

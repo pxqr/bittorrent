@@ -44,7 +44,8 @@ library
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Exchange
                      , System.Torrent.Storage
-  other-modules:       Network.BitTorrent.Internal
+                       Network.BitTorrent.Internal
+  other-modules:
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
