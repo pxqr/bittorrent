@@ -51,7 +51,7 @@ module Network.BitTorrent.Peer
          -- * Peer address
        , PeerAddr(..)
        , peerSockAddr
-       , connectToPeer, forkListener
+       , connectToPeer
        , ppPeer
 
          -- * Client version detection
@@ -539,28 +539,6 @@ connectToPeer p = do
   sock <- socket AF_INET Stream Network.Socket.defaultProtocol
   connect sock (peerSockAddr p)
   return sock
-
-
-forkListener :: ((PeerAddr, Socket) -> IO ()) -> IO PortNumber
-forkListener action = do
-    sock <- socket AF_INET Stream defaultProtocol
-    bindSocket sock (SockAddrInet 0 0)
-    listen sock 1
-    addr <- getSocketName sock
-    case addr of
-      SockAddrInet port _ -> do
-        forkIO (loop sock)
-        return port
-      _                   -> do
-        throwIO $ userError "listener: impossible happened"
-  where
-    loop sock = do
-      (conn, addr) <- accept sock
-      case addr of
-        SockAddrInet port host ->
-          action (PeerAddr Nothing host port, conn)
-        _                      -> return ()
-      loop sock
 
 -- | Pretty print peer address in human readable form.
 ppPeer :: PeerAddr -> Doc

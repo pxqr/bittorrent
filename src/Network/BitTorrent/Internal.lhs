@@ -257,25 +257,17 @@ so we need to do this on demand: if a peer asks for a block, we
 validate corresponding piece and only after read and send the block
 back.
 
-> -- | Used to check torrent location before register torrent.
-> validateTorrent :: TorrentLoc -> IO Torrent
-> validateTorrent TorrentLoc {..} = do
->   t <- fromFile metafilePath
->   exists <- doesDirectoryExist dataDirPath
->   unless exists $ do
->     throw undefined
->   return t
-
-> registerTorrent :: TVar TorrentMap -> TorrentLoc -> IO (Maybe Torrent)
-> registerTorrent ClientSession {..} tl = do
+> registerTorrent :: TVar TorrentMap -> InfoHash -> TorrentLoc -> IO ()
+> registerTorrent = error "registerTorrent"
+>   {-
 >   Torrent {..} <- validateTorrent tl
 >   atomically $ modifyTVar' torrentMap $ HM.insert tInfoHash tl
 >   return (Just t)
->
+>   -}
 
 > unregisterTorrent :: TVar TorrentMap -> InfoHash -> IO ()
-> unregisterTorrent ClientSession {..} ih = do
->   modifyTVar' torrentMap $ HM.delete ih
+> unregisterTorrent = error "unregisterTorrent"
+>   -- modifyTVar' torrentMap $ HM.delete ih
 
 Client session
 ------------------------------------------------------------------------
@@ -374,13 +366,19 @@ and different enabled extensions at the same time.
 >   ClientSession
 >     <$> newPeerId
 >     <*> pure exts
->     <*> forkListener (error "listener")
+>     <*> pure 10 -- forkListener (error "listener")
 >     <*> MSem.new n
 >     <*> pure n
 >     <*> newTVarIO S.empty
 >     <*> pure mgr
 >     <*> newTVarIO (startProgress 0)
 >     <*> newTVarIO HM.empty
+
+data TorrentStatus = Active     SwarmSession
+                   | Registered TorrentLoc
+                   | Unknown
+lookupTorrent :: ClientSession -> InfoHash -> IO TorrentStatus
+lookupTorrent ses ih =
 
 Swarm session
 ------------------------------------------------------------------------

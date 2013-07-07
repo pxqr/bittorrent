@@ -125,10 +125,23 @@ discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
     Torrent management
 -----------------------------------------------------------------------}
 
+-- | Used to check torrent location before register torrent.
+validateLocation :: TorrentLoc -> IO Torrent
+validateLocation TorrentLoc {..} = do
+  t <- fromFile metafilePath
+--  exists <- doesDirectoryExist dataDirPath
+--  unless exists $ do
+--    throw undefined
+  return t
+
+
 -- | Register torrent and start downloading.
 addTorrent :: ClientSession -> TorrentLoc -> IO ()
 addTorrent clientSession loc @ TorrentLoc {..} = do
-  torrent <- registerTorrent loc
+  torrent <- validateLocation loc
+--  registerTorrent loc tInfoHash
+--  when (bf is not full)
+
   swarm   <- newLeecher  clientSession torrent
   storage <- swarm `bindTo` dataDirPath
   forkIO $ discover swarm $ do
@@ -140,7 +153,7 @@ addTorrent clientSession loc @ TorrentLoc {..} = do
 
 -- | Unregister torrent and stop all running sessions.
 removeTorrent :: ClientSession -> InfoHash ->  IO ()
-removeTorrent ses loc = atomically $ unregisterTorrent ses loc
+removeTorrent ses loc = undefined -- atomically $ unregisterTorrent ses loc
 
 {-
 -- | The same as 'removeTorrrent' torrent, but delete all torrent
