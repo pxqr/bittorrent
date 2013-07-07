@@ -114,7 +114,7 @@
 > import Network.BitTorrent.Exchange.Protocol as BT
 > import Network.BitTorrent.Tracker.Protocol as BT
 
-    Progress
+Progress
 ------------------------------------------------------------------------
 
 > -- | 'Progress' contains upload/download/left stats about
@@ -133,9 +133,9 @@
 >
 > $(makeLenses ''Progress)
 
-TODO use Word64?
-TODO use atomic bits?
+**TODO:** Use Word64?
 
+**TODO:** Use atomic bits?
 
 Please note that tracker might penalize client some way if the do
 not accumulate progress. If possible and save 'Progress' between
@@ -169,7 +169,7 @@ client sessions to avoid that.
 > {-# INLINE dequeuedProgress #-}
 
 
-    Thread layout
+Thread layout
 ------------------------------------------------------------------------
 
 When client session created 2 new threads appear:
@@ -196,7 +196,7 @@ So for e.g., in order to obtain our first block we need to run at
 least 7 threads: main thread, 2 client session threads, 3 swarm session
 threads and PeerSession thread.
 
-    Thread throttling
+Thread throttling
 ------------------------------------------------------------------------
 
 If we will not restrict number of threads we could end up
@@ -217,7 +217,7 @@ than seeder threads.
 > defaultThreadCount :: ThreadCount
 > defaultThreadCount = 1000
 
-    Torrent Map
+Torrent Map
 ------------------------------------------------------------------------
 
 Keeping all seeding torrent metafiles in memory is a _bad_ idea: for
@@ -262,7 +262,7 @@ back.
 > validateTorrent :: TorrentLoc -> IO ()
 > validateTorrent = error "validateTorrent: not implemented"
 
-    Client session
+Client session
 ------------------------------------------------------------------------
 
 Basically, client session should contain options which user
@@ -375,9 +375,8 @@ and different enabled extensions at the same time.
 > unregisterTorrent ClientSession {..} ih = do
 >   modifyTVar' torrentMap $ HM.delete ih
 
-> {-----------------------------------------------------------------------
->     Swarm session
-> -----------------------------------------------------------------------}
+Swarm session
+------------------------------------------------------------------------
 
 > {- NOTE: If client is a leecher then there is NO particular reason to
 > set max sessions count more than the_number_of_unchoke_slots * k:
@@ -497,9 +496,8 @@ and different enabled extensions at the same time.
 > pieceLength = ciPieceLength . tInfo . torrentMeta
 > {-# INLINE pieceLength #-}
 
-> {-----------------------------------------------------------------------
->     Peer session
-> -----------------------------------------------------------------------}
+Peer session
+------------------------------------------------------------------------
 
 > -- | Peer session contain all data necessary for peer to peer
 > -- communication.
@@ -621,9 +619,8 @@ and different enabled extensions at the same time.
 > findPieceCount :: PeerSession -> PieceCount
 > findPieceCount = pieceCount . tInfo . torrentMeta . swarmSession
 
-> {-----------------------------------------------------------------------
->     Broadcasting: Have, Cancel, Bitfield, SuggestPiece
-> -----------------------------------------------------------------------}
+Broadcasting: Have, Cancel, Bitfield, SuggestPiece
+------------------------------------------------------------------------
 
 > -- here we should enqueue broadcast messages and keep in mind that:
 > --
@@ -673,9 +670,8 @@ and different enabled extensions at the same time.
 >     Just a  -> (:) <$> pure a <*> readAvail chan
 >     Nothing -> return []
 
-> {-----------------------------------------------------------------------
->     Timeouts
-> -----------------------------------------------------------------------}
+Timeouts
+-----------------------------------------------------------------------
 
 > -- for internal use only
 
