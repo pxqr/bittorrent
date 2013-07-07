@@ -24,6 +24,10 @@ module Network.BitTorrent
        , getPeerCount
        , getSwarmCount
 
+       , TorrentLoc(..)
+       , addTorrent
+       , removeTorrent
+
          -- ** Swarm
        , SwarmSession(torrentMeta)
 
@@ -76,6 +80,7 @@ module Network.BitTorrent
        ) where
 
 import Control.Concurrent
+import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
 import Control.Monad.Reader
@@ -119,21 +124,27 @@ discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
 {-----------------------------------------------------------------------
     Torrent management
 -----------------------------------------------------------------------}
-{-
+
+-- | Register torrent and start downloading.
 addTorrent :: ClientSession -> TorrentLoc -> IO ()
-addTorrent ClientSession {..} TorrentLoc {..} = do
-  torrent <- fromFile metafilePath
+addTorrent clientSession loc @ TorrentLoc {..} = do
+  torrent <- registerTorrent loc
   swarm   <- newLeecher  clientSession torrent
-  storage <- swarm `bindTo` dataDir
-  discover swarm $ do
+  storage <- swarm `bindTo` dataDirPath
+  forkIO $ discover swarm $ do
     liftIO $ putStrLn "connected to peer"
     forever $ do
       liftIO $ putStrLn "from mesage loop"
       exchange storage
+  return ()
 
-removeTorrent :: ClientSession -> TorrentLoc ->  IO ()
-removeTorrent ClientSession {..} TorrentLoc {..} = undefined
+-- | Unregister torrent and stop all running sessions.
+removeTorrent :: ClientSession -> InfoHash ->  IO ()
+removeTorrent ses loc = atomically $ unregisterTorrent ses loc
 
+{-
+-- | The same as 'removeTorrrent' torrent, but delete all torrent
+--   content files.
 deleteTorrent :: ClientSession -> TorrentLoc -> IO ()
 deleteTorrent ClientSession {..} TorrentLoc {..} = undefined
 -}

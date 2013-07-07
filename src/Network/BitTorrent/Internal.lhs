@@ -231,7 +231,7 @@ To avoid this we keep just *metainfo* about *metainfo*:
 >     metafilePath :: FilePath
 >     -- | Full path to directory contating content files associated
 >     -- with the metafile.
->   , dataPath     :: FilePath
+>   , dataDirPath  :: FilePath
 >   }
 
 TorrentMap is used to keep track all known torrents for the
@@ -258,8 +258,24 @@ validate corresponding piece and only after read and send the block
 back.
 
 > -- | Used to check torrent location before register torrent.
-> validateTorrent :: TorrentLoc -> IO ()
-> validateTorrent = error "validateTorrent: not implemented"
+> validateTorrent :: TorrentLoc -> IO Torrent
+> validateTorrent TorrentLoc {..} = do
+>   t <- fromFile metafilePath
+>   exists <- doesDirectoryExist dataDirPath
+>   unless exists $ do
+>     throw undefined
+>   return t
+
+> registerTorrent :: TVar TorrentMap -> TorrentLoc -> IO (Maybe Torrent)
+> registerTorrent ClientSession {..} tl = do
+>   Torrent {..} <- validateTorrent tl
+>   atomically $ modifyTVar' torrentMap $ HM.insert tInfoHash tl
+>   return (Just t)
+>
+
+> unregisterTorrent :: TVar TorrentMap -> InfoHash -> IO ()
+> unregisterTorrent ClientSession {..} ih = do
+>   modifyTVar' torrentMap $ HM.delete ih
 
 Client session
 ------------------------------------------------------------------------
@@ -365,14 +381,6 @@ and different enabled extensions at the same time.
 >     <*> pure mgr
 >     <*> newTVarIO (startProgress 0)
 >     <*> newTVarIO HM.empty
-
-> registerTorrent :: ClientSession -> InfoHash -> TorrentLoc -> STM ()
-> registerTorrent ClientSession {..} ih tl = do
->   modifyTVar' torrentMap $ HM.insert ih tl
-
-> unregisterTorrent :: ClientSession -> InfoHash -> STM ()
-> unregisterTorrent ClientSession {..} ih = do
->   modifyTVar' torrentMap $ HM.delete ih
 
 Swarm session
 ------------------------------------------------------------------------
