@@ -10,50 +10,54 @@
 > --   Network.BitTorrent.Exchange and modules. To hide some internals
 > --   of this module we detach it from Exchange.
 > --
-> --
-> --   NOTE: expose only static data in data field lists, all dynamic
-> --   data should be modified through standalone functions.
-> --
+>
+
+**NOTE**: Expose only static data in data field lists, all dynamic
+data should be modified through standalone functions.
+
+>
 > {-# LANGUAGE OverloadedStrings     #-}
 > {-# LANGUAGE RecordWildCards       #-}
 > {-# LANGUAGE ViewPatterns          #-}
 > {-# LANGUAGE TemplateHaskell       #-}
 > {-# LANGUAGE DeriveDataTypeable    #-}
+>
 > module Network.BitTorrent.Internal
->        ( Progress(..), startProgress
+>        ( -- * Progress
+>          Progress(..), startProgress
+>
 >          -- * Client
 >        , ClientSession (clientPeerId, allowedExtensions, listenerPort)
 >
 >        , ThreadCount
 >        , defaultThreadCount
 >
->         , TorrentLoc(..)
->         , registerTorrent
->         , unregisterTorrent
+>        , TorrentLoc(..)
+>        , registerTorrent
+>        , unregisterTorrent
+>
 >        , newClient
-
+>
 >        , getCurrentProgress
 >        , getSwarmCount
 >        , getPeerCount
-
-
-
+>
 >          -- * Swarm
 >        , SwarmSession( SwarmSession, torrentMeta, clientSession )
-
+>
 >        , SessionCount
 >        , getSessionCount
-
+>
 >        , newLeecher
 >        , newSeeder
 >        , getClientBitfield
-
+>
 >        , enterSwarm
 >        , leaveSwarm
 >        , waitVacancy
-
+>
 >        , pieceLength
-
+>
 >          -- * Peer
 >        , PeerSession( PeerSession, connectedPeerAddr
 >                     , swarmSession, enabledExtensions
@@ -61,20 +65,20 @@
 >                     )
 >        , SessionState
 >        , withPeerSession
-
+>
 >          -- ** Broadcasting
 >        , available
 >        , getPending
-
+>
 >          -- ** Exceptions
 >        , SessionException(..)
 >        , isSessionException
 >        , putSessionException
-
+>
 >          -- ** Properties
 >        , bitfield, status
 >        , findPieceCount
-
+>
 >          -- * Timeouts
 >        , updateIncoming, updateOutcoming
 >        ) where
@@ -117,14 +121,12 @@
 Progress
 ------------------------------------------------------------------------
 
+Progress data is considered as dynamic within one client session. This
+data also should be shared across client application sessions
+(e.g. files), otherwise use 'startProgress' to get initial 'Progress'.
+
 > -- | 'Progress' contains upload/download/left stats about
 > --   current client state and used to notify the tracker.
-> --
-> --   This data is considered as dynamic within one client
-> --   session. This data also should be shared across client
-> --   application sessions (e.g. files), otherwise use 'startProgress'
-> --   to get initial 'Progress'.
-> --
 > data Progress = Progress {
 >     _uploaded   :: !Integer -- ^ Total amount of bytes uploaded.
 >   , _downloaded :: !Integer -- ^ Total amount of bytes downloaded.
@@ -378,17 +380,16 @@ and different enabled extensions at the same time.
 Swarm session
 ------------------------------------------------------------------------
 
-> {- NOTE: If client is a leecher then there is NO particular reason to
-> set max sessions count more than the_number_of_unchoke_slots * k:
+NOTE: If client is a leecher then there is NO particular reason to
+set max sessions count more than the_number_of_unchoke_slots * k:
 
->   * thread slot(activeThread semaphore)
->   * will take but no
+  * thread slot(activeThread semaphore)
+  * will take but no
 
-> So if client is a leecher then max sessions count depends on the
-> number of unchoke slots.
+So if client is a leecher then max sessions count depends on the
+number of unchoke slots.
 
-> However if client is a seeder then the value depends on .
-> -}
+However if client is a seeder then the value depends on .
 
 > -- | Used to bound the number of simultaneous connections and, which
 > -- is the same, P2P sessions within the swarm session.
