@@ -20,6 +20,7 @@ module Network.BitTorrent
        , newClient
        , defaultClient
 
+       , Progress(..)
        , getCurrentProgress
        , getPeerCount
        , getSwarmCount
