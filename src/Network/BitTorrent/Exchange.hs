@@ -121,12 +121,12 @@ yieldMessage :: Message -> P2P ()
 yieldMessage msg =  P2P $ ReaderT $ const $ {-# SCC yieldMessage #-} C.yield msg
 {-# INLINE yieldMessage #-}
 
+-- TODO send vectored
 flushPending :: P2P ()
 flushPending = {-# SCC flushPending #-} do
-  se <- ask
-  q  <- liftIO (getPending se)
-  -- TODO send vectored
-  mapM_ yieldMessage q
+  session <- ask
+  queue   <- liftIO (getPending session)
+  mapM_ yieldMessage queue
 
 {-----------------------------------------------------------------------
     P2P monad
@@ -327,7 +327,9 @@ data Event
 --     forall (Fragment block). isPiece block == True
 --
 awaitEvent :: P2P Event
-awaitEvent = {-# SCC awaitEvent #-} awaitMessage >>= go
+awaitEvent = {-# SCC awaitEvent #-} do
+    flushPending
+    awaitMessage >>= go
   where
     go KeepAlive = awaitEvent
     go Choke     = do
@@ -445,7 +447,9 @@ awaitEvent = {-# SCC awaitEvent #-} awaitMessage >>= go
 --   most likely will be ignored without any network IO.
 --
 yieldEvent  :: Event -> P2P ()
-yieldEvent e = {-# SCC yieldEvent #-} go e
+yieldEvent e = {-# SCC yieldEvent #-} do
+    go e
+    flushPending
   where
     go (Available ixs) = asks swarmSession >>= liftIO . available ixs
     go (Want      bix) = do
@@ -480,7 +484,7 @@ handleEvent action = awaitEvent >>= action >>= yieldEvent
 
 -- | Default P2P action.
 exchange :: Storage -> P2P ()
-exchange storage = {-# SCC exchange #-} (awaitEvent >>= handler)
+exchange storage = {-# SCC exchange #-} awaitEvent >>= handler
   where
     handler (Available bf) = do
       liftIO (print (completeness bf))
