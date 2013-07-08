@@ -176,7 +176,7 @@ benchmark benchmarks
 
 
 executable example
-  main-is:             Main.lhs
+  main-is:             Main.hs
   hs-source-dirs:      examples
   build-depends:       base == 4.*
                      , bittorrent
