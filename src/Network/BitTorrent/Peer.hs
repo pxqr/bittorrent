@@ -43,7 +43,7 @@ module Network.BitTorrent.Peer
        , defaultClientId, defaultVersionNumber
 
          -- ** Generation
-       , newPeerId, timestampByteString
+       , genPeerId, timestampByteString
 
          -- ** Extra
        , byteStringPadded
@@ -199,8 +199,8 @@ timestampByteString = (BC.pack . format) <$> getCurrentTime
 --
 --      * UTC time day ++ day time for the random number.
 --
-newPeerId :: IO PeerId
-newPeerId = azureusStyle defaultClientId defaultVersionNumber
+genPeerId :: IO PeerId
+genPeerId = azureusStyle defaultClientId defaultVersionNumber
                                      <$> timestampByteString
 
 -- | Pad bytestring so it's becomes exactly request length. Conversion

@@ -364,7 +364,7 @@ and different enabled extensions at the same time.
 >   _   <- forkIO $ loop mgr
 
 >   ClientSession
->     <$> newPeerId
+>     <$> genPeerId
 >     <*> pure exts
 >     <*> pure 10 -- forkListener (error "listener")
 >     <*> MSem.new n
