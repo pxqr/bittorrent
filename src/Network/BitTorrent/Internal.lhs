@@ -307,7 +307,7 @@ and different enabled extensions at the same time.
 >     -- | Port where client listen for other peers
 >   , listenerPort      :: PortNumber
 >     -- TODO restart listener if it fail
-
+> --  , dhtListenerPort
 >     -- | Semaphor used to bound number of active P2P sessions.
 >   , activeThreads     :: !(MSem ThreadCount)
 
