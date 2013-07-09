@@ -317,7 +317,7 @@ fresh required extensions.
   * The number of /swarms/ to join, each swarm described by the
 'SwarmSession'.
 
-Normally, you would have one client session, however, if we need, in
+Normally, you would have one client session, however, if we needed, in
 one application we could have many clients with different peer ID's
 and different enabled extensions at the same time.
 
@@ -461,28 +461,60 @@ However if client is a seeder then the value depends on .
 > data SwarmSession = SwarmSession {
 >     torrentMeta       :: !Torrent
 
->     -- |
 >   , clientSession     :: !ClientSession
 
->     -- | Represent count of peers we _currently_ can connect to in the
->     -- swarm. Used to bound number of concurrent threads.
+TODO: lower "vacantPeers" when client becomes seeder according to
+throttling policy.
+
+Represent count of peers we _currently_ can connect to in the
+swarm. Used to bound number of concurrent threads. See also *Thread
+Throttling* section.
+
 >   , vacantPeers       :: !(MSem SessionCount)
 
->     -- | Modify this carefully updating global progress.
+Client bitfield is used to keep track "the client have" piece set.
+Modify this carefully always updating global progress.
+
 >   , clientBitfield    :: !(TVar  Bitfield)
+
+We keep set of the all connected peers for the each particular torrent
+to prevent duplicated and therefore reduntant TCP connections. For
+example consider the following very simle and realistic scenario:
+
+ * Peer A lookup tracker for peers.
+
+ * Peer B lookup tracker for peers.
+
+ * Finally, Peer A connect to B and Peer B connect to peer A
+simultaneously.
+
+There some other situation the problem may occur: duplicates in
+successive tracker responses, tracker and DHT returns.
+
+So without any protection we end up with two session between the same
+peers. That's bad because this could lead:
+
+  * Reduced throughput - multiple sessions between the same peers will
+mutiply control overhead (control messages, session state).
+
+  * Thread occupation - duplicated sessions will eat thread slots and
+discourage other, possible more useful, peers to establish connection.
+
+To avoid this we could check, into the one transaction, if a peer is
+already connected and add a connection only if it is not.
 
 >   , connectedPeers    :: !(TVar (Set PeerSession))
 
->     -- TODO use bounded broadcast chan with priority queue and drop old entries
->     -- | Channel used for replicate messages across all peers in
->     -- swarm. For exsample if we get some piece we should sent to all
->     -- connected (and interested in) peers HAVE message.
->     --
+TODO: use bounded broadcast chan with priority queue and drop old entries.
+
+Channel used for replicate messages across all peers in swarm. For
+exsample if we get some piece we should sent to all connected (and
+interested in) peers HAVE message.
+
 >   , broadcastMessages :: !(TChan Message)
 >   }
 
-> -- INVARIANT:
-> --   max_sessions_count - sizeof connectedPeers = value vacantPeers
+INVARIANT: max_sessions_count - sizeof connectedPeers = value vacantPeers
 
 > instance Eq SwarmSession where
 >   (==) = (==) `on` (tInfoHash . torrentMeta)
@@ -523,6 +555,10 @@ However if client is a seeder then the value depends on .
 > getClientBitfield :: SwarmSession -> IO Bitfield
 > getClientBitfield = readTVarIO . clientBitfield
 
+> pieceLength :: SwarmSession -> Int
+> pieceLength = ciPieceLength . tInfo . torrentMeta
+> {-# INLINE pieceLength #-}
+
 > {-
 > haveDone :: MonadIO m => PieceIx -> SwarmSession -> m ()
 > haveDone ix =
@@ -532,7 +568,8 @@ However if client is a seeder then the value depends on .
 >     currentProgress
 > -}
 
-> -- acquire/release mechanism: for internal use only
+Peer sessions throttling
+------------------------------------------------------------------------
 
 > enterSwarm :: SwarmSession -> IO ()
 > enterSwarm SwarmSession {..} = do
@@ -548,10 +585,6 @@ However if client is a seeder then the value depends on .
 > waitVacancy se =
 >   bracket (enterSwarm se) (const (leaveSwarm se))
 >                   . const
-
-> pieceLength :: SwarmSession -> Int
-> pieceLength = ciPieceLength . tInfo . torrentMeta
-> {-# INLINE pieceLength #-}
 
 Peer sessions
 ------------------------------------------------------------------------
@@ -611,6 +644,12 @@ avoid reduntant KA messages.
 > instance Ord PeerSession where
 >   compare = comparing connectedPeerAddr
 
+> findPieceCount :: PeerSession -> PieceCount
+> findPieceCount = pieceCount . tInfo . torrentMeta . swarmSession
+
+Peer session exceptions
+------------------------------------------------------------------------
+
 > -- | Exceptions used to interrupt the current P2P session. This
 > -- exceptions will NOT affect other P2P sessions, DHT, peer <->
 > -- tracker, or any other session.
@@ -630,6 +669,9 @@ avoid reduntant KA messages.
 > -- exception, for debugging purposes only.
 > putSessionException :: SessionException -> IO ()
 > putSessionException = print
+
+Peer session creation
+------------------------------------------------------------------------
 
 > -- TODO modify such that we can use this in listener loop
 > -- TODO check if it connected yet peer
@@ -672,8 +714,7 @@ avoid reduntant KA messages.
 >       atomically $ modifyTVar' connectedPeers (S.delete ps)
 >       close sock
 
-> findPieceCount :: PeerSession -> PieceCount
-> findPieceCount = pieceCount . tInfo . torrentMeta . swarmSession
+TODO: initiatePeerSession, acceptPeerSession
 
 Broadcasting: Have, Cancel, Bitfield, SuggestPiece
 ------------------------------------------------------------------------
