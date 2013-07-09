@@ -170,29 +170,30 @@ defaultReserved = 0
 defaultHandshake :: InfoHash -> PeerId -> Handshake
 defaultHandshake = Handshake defaultBTProtocol defaultReserved
 
--- | Handshaking with a peer specified by the second argument.
-handshake :: Socket -> Handshake -> IO Handshake
-handshake sock hs = do
-    sendAll sock (S.encode hs)
+sendHandshake :: Socket -> Handshake -> IO ()
+sendHandshake sock hs = sendAll sock (S.encode hs)
 
+recvHandshake :: Socket -> IO Handshake
+recvHandshake sock = do
     header <- recv sock 1
-    when (B.length header == 0) $
-      throw $ userError "Unable to receive handshake."
+    unless (B.length header == 1) $
+      throw $ userError "Unable to receive handshake header."
 
     let protocolLen = B.head header
     let restLen     = handshakeSize protocolLen - 1
 
     body <- recv sock restLen
     let resp = B.cons protocolLen body
+    either (throwIO . userError) return $ S.decode resp
 
-    case checkIH (S.decode resp) of
-      Right hs' -> return hs'
-      Left msg  -> throwIO $ userError $ msg ++ " in handshake body."
-  where
-    checkIH (Right hs')
-      | hsInfoHash hs /= hsInfoHash hs'
-      = Left "Handshake info hash do not match."
-    checkIH x = x
+-- | Handshaking with a peer specified by the second argument.
+handshake :: Socket -> Handshake -> IO Handshake
+handshake sock hs = do
+    sendHandshake sock hs
+    hs' <- recvHandshake sock
+    when (hsInfoHash hs /= hsInfoHash hs') $ do
+      throwIO $ userError  "Handshake info hash do not match."
+    return hs'
 
 {-----------------------------------------------------------------------
     Block Index
