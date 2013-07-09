@@ -42,7 +42,7 @@ module Data.Torrent
 #if defined (TESTING)
        , InfoHash(..)
 #else
-       , InfoHash
+       , InfoHash(..)
 #endif
        , ppInfoHash
        , addHashToURI

@@ -6,10 +6,14 @@ module Network.BitTorrent.DHT
 
 import Control.Applicative
 import Control.Concurrent.STM
+import Control.Monad
 import Data.ByteString
 import Data.Serialize as S
 import Data.Function
 import Data.Ord
+import Data.Maybe
+import Data.List as L
+import Data.Map as M
 import Data.HashMap.Strict as HM
 
 import Network
@@ -19,6 +23,7 @@ import Remote.KRPC
 import Data.BEncode
 import Data.Torrent
 import Data.Kademlia.Routing.Table
+import Network.BitTorrent.Peer
 
 {-----------------------------------------------------------------------
     Node
@@ -39,8 +44,8 @@ instance Serialize PortNumber where
 
 
 data NodeAddr = NodeAddr {
-    nodeIP   :: !HostAddress
-  , nodePort :: !PortNumber
+    nodeIP   :: {-# UNPACK #-} !HostAddress
+  , nodePort :: {-# UNPACK #-} !PortNumber
   } deriving (Show, Eq)
 
 instance Serialize NodeAddr where
@@ -61,40 +66,64 @@ instance Serialize NodeInfo where
 
 type CompactInfo = ByteString
 
-decodeCompact :: CompactInfo -> Either String [NodeInfo]
-decodeCompact = S.runGet (many get)
+decodeCompact :: CompactInfo -> [NodeInfo]
+decodeCompact = either (const []) id . S.runGet (many get)
 
 encodeCompact :: [NodeId] -> CompactInfo
 encodeCompact = S.runPut . mapM_ put
 
+decodePeerList :: [BEncode] -> [PeerAddr]
+decodePeerList = undefined
+
+encodePeerList :: [PeerAddr] -> [BEncode]
+encodePeerList = undefined
+
 type Distance = NodeId
 
---type DHT k v = StateT (Table k v) IO
 
---findNode :: NodeID -> DHT k v [NodeInfo]
---findNode = undefined
+{-----------------------------------------------------------------------
+    Tokens
+-----------------------------------------------------------------------}
+
+type Secret = Int
 
 genSecret :: IO Secret
 genSecret = undefined
 
-type Token = Int
-type Secret = Int
+-- | Instead of periodically loop over the all nodes in the routing
+--   table with some given interval (or some other tricky method
+--   e.g. using timeouts) we can just update tokens on demand - if no
+--   one asks for a token then the token _should_ not change at all.
+--
+type Token = ByteString
 
-token :: NodeAddr -> Secret -> Token
-token = return undefined
+genToken :: NodeAddr -> Secret -> Token
+genToken = return undefined
 
 defaultToken :: Token
-defaultToken = 0xdeadbeef
+defaultToken = "0xdeadbeef"
 
 {-----------------------------------------------------------------------
     Routing table
 -----------------------------------------------------------------------}
 
+type ContactInfo  = HashMap InfoHash [PeerAddr]
+
+insertPeer :: InfoHash -> PeerAddr -> ContactInfo -> ContactInfo
+insertPeer ih addr = HM.insertWith (++) ih [addr]
+
+lookupPeers :: InfoHash -> ContactInfo -> [PeerAddr]
+lookupPeers ih = fromMaybe [] . HM.lookup ih
+
 -- TODO use more compact routing table
 type RoutingTable = HashMap NodeId NodeAddr
 
+insertNode :: NodeId -> NodeAddr -> RoutingTable -> RoutingTable
+insertNode = HM.insert
+
 type Alpha = Int
 
+-- TODO
 kclosest :: Int -> NodeId -> RoutingTable -> [NodeId]
 kclosest = undefined
 
@@ -105,6 +134,7 @@ kclosest = undefined
 data NodeSession = NodeSession {
     nodeId       :: !NodeId
   , routingTable :: !(TVar RoutingTable)
+  , contactInfo  :: !(TVar ContactInfo)
   , alpha        :: !Alpha
   }
 
@@ -114,11 +144,16 @@ instance Eq NodeSession where
 instance Ord NodeSession where
   compare = comparing nodeId
 
+assignToken :: NodeSession -> NodeId -> IO Token
+assignToken _ _ = return ""
+
+-- TODO
+checkToken :: NodeId -> Token -> NodeSession -> IO Bool
+checkToken nid token _ = return True
+
 {-----------------------------------------------------------------------
     Queries
 -----------------------------------------------------------------------}
-
-instance BEncodable PortNumber where
 
 pingM :: Method NodeId NodeId
 pingM = method "ping" ["id"] ["id"]
@@ -126,29 +161,62 @@ pingM = method "ping" ["id"] ["id"]
 findNodeM :: Method (NodeId, NodeId) (NodeId, CompactInfo)
 findNodeM = method "find_node" ["id", "target"] ["id", "nodes"]
 
--- | Lookup peers by a torrent infohash.
-getPeersM :: Method (NodeId, InfoHash) (NodeId, Token, CompactInfo) -- use Map ByteString BEncode
-getPeersM = method "get_peers" ["id", "info_hash"] ["id", "token", "nodes"]
+-- | Lookup peers by a torrent infohash. This method might return
+-- different kind of responses depending on the routing table of
+-- queried node:
+--
+--   * If quieried node contains a peer list for the given infohash
+--   then the node should return the list in a "value" key. Note that
+--   list is encoded as compact peer address, not a compact node info.
+--   The result of 'get_peers' method have the following scheme:
+--
+--      > { "id"     : "dht_server_node_id"
+--      > , "token"  : "assigned_token"
+--      > , "values" : ["_IP_PO", "_ip_po"]
+--      > }
+--
+--   * If quieried node does not contain a list of peers associated
+--   with the given infohash, then node should return
+--
+--      > { "id"    : "dht_server_node_id"
+--      > , "token" : "assigned_token"
+--      > , "nodes" : "compact_nodes_info"
+--      > }
+--
+--   The resulting dictionaries might differ only in a values\/nodes
+--   keys.
+--
+getPeersM :: Method (NodeId, InfoHash) BEncode
+getPeersM = method "get_peers" ["id", "info_hash"] []
 
 -- | Used to announce that the peer, controlling the quering node is
 -- downloading a torrent on a port.
 announcePeerM :: Method (NodeId, InfoHash, PortNumber, Token) NodeId
 announcePeerM = method "announce_peer" ["id", "info_hash", "port", "token"] ["id"]
 
+{-----------------------------------------------------------------------
+    Tracker
+-----------------------------------------------------------------------}
+
 pingC :: NodeSession -> NodeAddr -> IO ()
 pingC NodeSession {..} addr @ NodeAddr {..}  = do
   nid <- call (nodeIP, nodePort) pingM nodeId
   atomically $ modifyTVar' routingTable $ HM.insert nid addr
 
---getPeerC :: NodeSession -> NodeAddr -> InfoHash -> IO (Either CompactInfo )
+getPeerC :: NodeSession -> NodeAddr -> InfoHash -> IO ()
 getPeerC NodeSession {..} addr @ NodeAddr {..} ih = do
-  call (nodeIP, nodePort) getPeersM
+  call (nodeIP, nodePort) getPeersM undefined
+  return ()
+
+{-----------------------------------------------------------------------
+    Server
+-----------------------------------------------------------------------}
 
 type ServerHandler a b = NodeSession -> NodeAddr -> a -> IO b
 
 pingS :: ServerHandler NodeId NodeId
 pingS NodeSession {..} addr nid = do
-  atomically $ modifyTVar' routingTable $ HM.insert nid addr
+  atomically $ modifyTVar' routingTable $ insertNode nid addr
   return nodeId
 
 findNodeS :: ServerHandler (NodeId, NodeId) (NodeId, CompactInfo)
@@ -156,14 +224,31 @@ findNodeS NodeSession {..} addr (nid, qnid) = do
   rt <- atomically $ readTVar routingTable
   return (nodeId, encodeCompact $ kclosest alpha qnid rt)
 
-getPeersS :: ServerHandler (NodeId, InfoHash) (NodeId, Token, CompactInfo)
-getPeersS NodeSession {..} addr (nid, ih) = do
+getPeersS :: ServerHandler (NodeId, InfoHash) BEncode
+getPeersS ses @ NodeSession {..} _ (nid, ih) = do
+    mkResp <$> assignToken ses nid <*> findPeers
+  where
+    findPeers = do
+      list <- lookupPeers ih <$> readTVarIO contactInfo
+      if not (L.null list)
+        then return $ Right list
+        else do
+          rt    <- readTVarIO routingTable
+          let nodes = kclosest alpha (getInfoHash ih) rt
+          return $ Left nodes
 
-  return (nodeId, defaultToken, error "compact info")
+    mkDict tok res = [("id",BString nodeId), ("token", BString tok), res]
+    mkResult (Left  nodes ) = ("nodes",  BString $ encodeCompact  nodes)
+    mkResult (Right values) = ("values", BList   $ encodePeerList values)
+    mkResp tok = BDict . M.fromList . mkDict tok . mkResult
 
 announcePeerS :: ServerHandler (NodeId, InfoHash, PortNumber, Token) NodeId
-announcePeerS NodeSession {..} addr (nid, ih, port, token) = do
-  let right = (error "checkToken")
+announcePeerS ses @ NodeSession {..} NodeAddr {..} (nid, ih, port, token) = do
+  registered <- checkToken nid token ses
+  when registered $ do
+    atomically $ do
+      let peerAddr = PeerAddr Nothing nodeIP port
+      modifyTVar contactInfo $ insertPeer ih peerAddr
   return nodeId
 
 dhtServer :: PortNumber -> NodeSession -> IO ()
