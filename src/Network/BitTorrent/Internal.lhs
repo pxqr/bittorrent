@@ -94,6 +94,7 @@
 > import Data.Default
 > import Data.Function
 > import Data.Foldable (mapM_)
+> import Data.Map as M
 > import Data.HashMap.Strict as HM
 > import Data.Ord
 > import Data.Set as S
@@ -219,6 +220,8 @@ than seeder threads.
 Torrent Map
 ------------------------------------------------------------------------
 
+TODO: keep track global peer have piece set.
+
 Keeping all seeding torrent metafiles in memory is a _bad_ idea: for
 1TB of data we need at least 100MB of metadata. (using 256KB piece
 size). This solution do not scale further.
@@ -269,7 +272,31 @@ back.
 > unregisterTorrent = error "unregisterTorrent"
 >   -- modifyTVar' torrentMap $ HM.delete ih
 
-Client session
+Client Services
+------------------------------------------------------------------------
+
+There are two servers started as client start:
+
+  * DHT node listener - needed by other peers to discover
+  * Peer listener - need by other peers to join this client.
+
+Thus any client (assuming DHT is enabled) provides at least 2 services
+so we can abstract out into ClientService:
+
+> data ClientService = ClientService {
+>     servPort   :: !PortNumber
+>   , servThread :: !ThreadId
+>   } deriving Show
+
+startService :: PortNumber -> IO a -> IO ClientService
+startService p m = forkIO $ handle $ m p
+  where
+    handle :: IOError -> IO ()
+
+> stopService :: ClientService -> IO ()
+> stopService ClientService {..} = killThread servThread
+
+Client Sessions
 ------------------------------------------------------------------------
 
 Basically, client session should contain options which user
@@ -304,10 +331,12 @@ and different enabled extensions at the same time.
 >     -- 'PeerSession'.
 >   , allowedExtensions :: [Extension]
 
->     -- | Port where client listen for other peers
+-- >   , peerListener      :: !ClientService
+-- >   , nodeListener      :: !ClientService
+
+>     -- | Port where client listen for the other peers.
 >   , listenerPort      :: PortNumber
->     -- TODO restart listener if it fail
-> --  , dhtListenerPort
+
 >     -- | Semaphor used to bound number of active P2P sessions.
 >   , activeThreads     :: !(MSem ThreadCount)
 
@@ -315,7 +344,7 @@ and different enabled extensions at the same time.
 >   , maxActive         :: !ThreadCount
 
 >     -- | Used to traverse the swarm session.
->   , swarmSessions     :: !(TVar (Set SwarmSession))
+>   , swarmSessions     :: !(TVar (Map InfoHash SwarmSession))
 
 >   , eventManager      :: !EventManager
 
@@ -326,15 +355,34 @@ and different enabled extensions at the same time.
 >   , torrentMap        :: !(TVar TorrentMap)
 >   }
 
-> -- currentProgress field is reduntant: progress depends on the all swarm bitfields
-> -- maybe we can remove the 'currentProgress' and compute it on demand?
-
+NOTE: currentProgress field is reduntant: progress depends on the all swarm
+bitfields maybe we can remove the 'currentProgress' and compute it on
+demand?
 
 > instance Eq ClientSession where
 >   (==) = (==) `on` clientPeerId
 
 > instance Ord ClientSession where
 >   compare = comparing clientPeerId
+
+Torrent presence
+------------------------------------------------------------------------
+
+> data TorrentPresence = Active     SwarmSession
+>                      | Registered TorrentLoc
+>                      | Unknown
+
+> torrentPresence :: ClientSession -> InfoHash -> IO TorrentPresence
+> torrentPresence ClientSession {..} ih = do
+>   sws <- readTVarIO swarmSessions
+>   case M.lookup ih sws of
+>     Just ss -> return $ Active ss
+>     Nothing -> do
+>       tm <- readTVarIO torrentMap
+>       return $ maybe Unknown Registered $ HM.lookup ih tm
+
+Retrieving client info
+------------------------------------------------------------------------
 
 > -- | Get current global progress of the client. This value is usually
 > -- shown to a user.
@@ -344,7 +392,7 @@ and different enabled extensions at the same time.
 > -- | Get number of swarms client aware of.
 > getSwarmCount :: MonadIO m => ClientSession -> m SessionCount
 > getSwarmCount ClientSession {..} = liftIO $
->   S.size <$> readTVarIO swarmSessions
+>   M.size <$> readTVarIO swarmSessions
 
 > -- | Get number of peers the client currently connected to.
 > getPeerCount :: MonadIO m => ClientSession -> m ThreadCount
@@ -369,18 +417,23 @@ and different enabled extensions at the same time.
 >     <*> pure 10 -- forkListener (error "listener")
 >     <*> MSem.new n
 >     <*> pure n
->     <*> newTVarIO S.empty
+>     <*> newTVarIO M.empty
 >     <*> pure mgr
 >     <*> newTVarIO (startProgress 0)
 >     <*> newTVarIO HM.empty
 
-data TorrentStatus = Active     SwarmSession
-                   | Registered TorrentLoc
-                   | Unknown
-lookupTorrent :: ClientSession -> InfoHash -> IO TorrentStatus
-lookupTorrent ses ih =
+> listenerHandler :: ClientSession -> Socket -> IO ()
+> listenerHandler ses sock = do
+>   Handshake {..} <- recvHandshake sock
+>   status <- torrentPresence ses hsInfoHash
+>   case status of
+>     Unknown -> return ()
+>     Active ses   -> error "listener handler"
+>       -- TODO here we need to lookup local torrent status: BF e.t.c>
+>     Registered _ -> return ()
+>   return ()
 
-Swarm session
+Swarm sessions
 ------------------------------------------------------------------------
 
 NOTE: If client is a leecher then there is NO particular reason to
@@ -500,7 +553,7 @@ However if client is a seeder then the value depends on .
 > pieceLength = ciPieceLength . tInfo . torrentMeta
 > {-# INLINE pieceLength #-}
 
-Peer session
+Peer sessions
 ------------------------------------------------------------------------
 
 > -- | Peer session contain all data necessary for peer to peer

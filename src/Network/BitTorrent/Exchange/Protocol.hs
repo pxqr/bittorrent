@@ -29,9 +29,10 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Network.BitTorrent.Exchange.Protocol
-       ( -- * Inital handshake
+       ( -- * Initial handshake
          Handshake(..), ppHandshake
-       , handshake , handshakeCaps
+       , handshake, handshakeCaps
+       , recvHandshake, sendHandshake
 
          -- ** Defaults
        , defaultHandshake, defaultBTProtocol, defaultReserved
