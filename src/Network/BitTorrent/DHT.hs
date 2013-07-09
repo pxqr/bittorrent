@@ -23,14 +23,13 @@ import Data.Maybe
 import Data.List as L
 import Data.Map as M
 import Data.HashMap.Strict as HM
-
 import Network
 import Network.Socket
-import Remote.KRPC
+import System.Entropy
 
+import Remote.KRPC
 import Data.BEncode
 import Data.Torrent
-import Data.Kademlia.Routing.Table
 import Network.BitTorrent.Peer
 
 {-----------------------------------------------------------------------
@@ -44,7 +43,7 @@ type NodeId = ByteString
 --   Distribution of ID's should be as uniform as possible.
 --
 genNodeID :: IO NodeId
-genNodeID = undefined -- randomIO
+genNodeID = getEntropy 20
 
 instance Serialize PortNumber where
   get = fromIntegral <$> getWord16be

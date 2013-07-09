@@ -43,7 +43,8 @@ module Network.BitTorrent.Peer
        , defaultClientId, defaultVersionNumber
 
          -- ** Generation
-       , genPeerId, timestampByteString
+       , genPeerId
+       , timestamp, entropy
 
          -- ** Extra
        , byteStringPadded
@@ -68,8 +69,6 @@ module Network.BitTorrent.Peer
 
 
 import Control.Applicative
-import Control.Concurrent
-import Control.Exception
 import Data.BEncode
 import Data.Bits
 import Data.Word
@@ -87,15 +86,16 @@ import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
 import Text.PrettyPrint (text, Doc, (<+>))
 import System.Locale    (defaultTimeLocale)
-
+import System.Entropy   (getEntropy)
 import Network hiding (accept)
 import Network.Socket
 
 
-
--- TODO we have linker error here, so manual hardcoded version for a
+-- TODO we have linker error here, so manually hardcoded version for a
 -- while.
+
 -- import Paths_network_bittorrent (version)
+
 version :: Version
 version = Version [0, 10, 0, 0] []
 
@@ -185,11 +185,16 @@ defaultVersionNumber = B.take 4 $ BC.pack $ foldMap show $
 --   format is used to make the ID's readable(for debugging) and more
 --   or less random.
 --
-timestampByteString :: IO ByteString
-timestampByteString = (BC.pack . format) <$> getCurrentTime
+timestamp :: IO ByteString
+timestamp = (BC.pack . format) <$> getCurrentTime
   where
     format t = take 6 (formatTime defaultTimeLocale "%q" t) ++ "." ++
                take 9 (reverse (formatTime defaultTimeLocale "%s" t))
+
+-- | Gives 15 character long random bytestring. This is more robust
+-- method for generation of random part of peer ID than timestamp.
+entropy :: IO ByteString
+entropy = getEntropy 15
 
 -- |  Here we use Azureus-style encoding with the following args:
 --
@@ -200,8 +205,7 @@ timestampByteString = (BC.pack . format) <$> getCurrentTime
 --      * UTC time day ++ day time for the random number.
 --
 genPeerId :: IO PeerId
-genPeerId = azureusStyle defaultClientId defaultVersionNumber
-                                     <$> timestampByteString
+genPeerId = azureusStyle defaultClientId defaultVersionNumber <$> entropy
 
 -- | Pad bytestring so it's becomes exactly request length. Conversion
 -- is done like so:

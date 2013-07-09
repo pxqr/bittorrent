@@ -43,6 +43,7 @@ library
                      , Network.BitTorrent.Peer
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Exchange
+                     , Network.BitTorrent.DHT
                      , System.Torrent.Storage
                        Network.BitTorrent.Internal
   other-modules:
@@ -108,6 +109,7 @@ library
                      , filepath    >= 1
                      , directory   >= 1
                      , mmap        >= 0.5.2
+                     , entropy
 
                        -- Hash
                      , cryptohash
