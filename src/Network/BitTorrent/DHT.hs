@@ -1,7 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 module Network.BitTorrent.DHT
-       ( dhtServer
+       (
+         -- * Tracker
+         ping
+       , findNode
+       , getPeers
+       , announcePeer
+
+         -- * Server
+       , dhtServer
        ) where
 
 import Control.Applicative
@@ -136,6 +144,7 @@ data NodeSession = NodeSession {
   , routingTable :: !(TVar RoutingTable)
   , contactInfo  :: !(TVar ContactInfo)
   , alpha        :: !Alpha
+  , listenerPort :: !PortNumber
   }
 
 instance Eq NodeSession where
@@ -152,7 +161,7 @@ checkToken :: NodeId -> Token -> NodeSession -> IO Bool
 checkToken nid token _ = return True
 
 {-----------------------------------------------------------------------
-    Queries
+    DHT Queries
 -----------------------------------------------------------------------}
 
 pingM :: Method NodeId NodeId
@@ -195,22 +204,46 @@ announcePeerM :: Method (NodeId, InfoHash, PortNumber, Token) NodeId
 announcePeerM = method "announce_peer" ["id", "info_hash", "port", "token"] ["id"]
 
 {-----------------------------------------------------------------------
-    Tracker
+    DHT Tracker
 -----------------------------------------------------------------------}
+-- TODO: update node timestamp on each successful call
 
-pingC :: NodeSession -> NodeAddr -> IO ()
-pingC NodeSession {..} addr @ NodeAddr {..}  = do
+type DHT a b  = NodeSession -> NodeAddr -> a -> IO b
+
+ping :: DHT () ()
+ping NodeSession {..} addr @ NodeAddr {..} () = do
   nid <- call (nodeIP, nodePort) pingM nodeId
   atomically $ modifyTVar' routingTable $ HM.insert nid addr
 
-getPeerC :: NodeSession -> NodeAddr -> InfoHash -> IO ()
-getPeerC NodeSession {..} addr @ NodeAddr {..} ih = do
-  call (nodeIP, nodePort) getPeersM undefined
-  return ()
+findNode :: DHT NodeId [NodeInfo]
+findNode NodeSession {..} NodeAddr {..} qnid = do
+  (_, info) <- call (nodeIP, nodePort) findNodeM (nodeId, qnid)
+  return (decodeCompact info)
+
+getPeers :: DHT InfoHash (Either [NodeInfo] [PeerAddr])
+getPeers NodeSession {..} NodeAddr {..} ih = do
+    extrResp <$> call (nodeIP, nodePort) getPeersM (nodeId, ih)
+  where
+    extrResp (BDict d)
+      | Just (BList   values) <- M.lookup "values" d
+      = Right $ decodePeerList values
+      | Just (BString nodes)  <- M.lookup "nodes"  d
+      = Left  $ decodeCompact  nodes
+    extrResp  _ = return undefined
+
+-- remove token from signature, handle the all token stuff by NodeSession
+
+-- | Note that before ever calling this method you should call the
+-- getPeerList.
+announcePeer :: DHT (InfoHash, Token) NodeId
+announcePeer NodeSession {..} NodeAddr {..} (ih, tok) = do
+  call (nodeIP, nodePort) announcePeerM (nodeId, ih, listenerPort, tok)
 
 {-----------------------------------------------------------------------
-    Server
+    DHT Server
 -----------------------------------------------------------------------}
+-- TODO: update node timestamp on each successful call
+-- NOTE: ensure all server operations should run in O(1)
 
 type ServerHandler a b = NodeSession -> NodeAddr -> a -> IO b
 
@@ -220,7 +253,7 @@ pingS NodeSession {..} addr nid = do
   return nodeId
 
 findNodeS :: ServerHandler (NodeId, NodeId) (NodeId, CompactInfo)
-findNodeS NodeSession {..} addr (nid, qnid) = do
+findNodeS NodeSession {..} _ (_, qnid) = do
   rt <- atomically $ readTVar routingTable
   return (nodeId, encodeCompact $ kclosest alpha qnid rt)
 
