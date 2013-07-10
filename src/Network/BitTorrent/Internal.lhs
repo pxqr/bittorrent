@@ -24,7 +24,8 @@
 >          Progress(..), startProgress
 >
 >          -- * Client
->        , ClientSession (clientPeerId, allowedExtensions, listenerPort)
+>        , ClientSession (clientPeerId, allowedExtensions)
+>        , listenerPort, dhtPort
 >
 >        , ThreadCount
 >        , defaultThreadCount
@@ -61,7 +62,8 @@
 >                     , sessionState
 >                     )
 >        , SessionState
->        , withPeerSession
+>        , initiatePeerSession
+>        , acceptPeerSession
 >
 >          -- ** Broadcasting
 >        , available
@@ -87,6 +89,7 @@
 > import Control.Concurrent.STM
 > import Control.Concurrent.MSem as MSem
 > import Control.Lens
+> import Control.Monad (when)
 > import Control.Exception
 > import Control.Monad.Trans
 
@@ -245,6 +248,11 @@ but nothing more. So to accept new 'PeerSession' we need to lookup
 torrent metainfo and content files (if there are some) by the
 'InfoHash' and only after that enter exchange loop.
 
+TODO: check content files location;
+
+> validateLocation :: TorrentLoc -> IO Torrent
+> validateLocation = fromFile . metafilePath
+
 Solution with TorrentLoc is much better and takes much more less
 space, moreover it depends on count of torrents but not on count of
 data itself. To scale further, in future we might add something like
@@ -331,11 +339,8 @@ and different enabled extensions at the same time.
 >     -- 'PeerSession'.
 >   , allowedExtensions :: [Extension]
 
--- >   , peerListener      :: !ClientService
--- >   , nodeListener      :: !ClientService
-
->     -- | Port where client listen for the other peers.
->   , listenerPort      :: PortNumber
+>   , peerListener      :: !ClientService
+>   , nodeListener      :: !ClientService
 
 >     -- | Semaphor used to bound number of active P2P sessions.
 >   , activeThreads     :: !(MSem ThreadCount)
@@ -414,7 +419,8 @@ Retrieving client info
 >   ClientSession
 >     <$> genPeerId
 >     <*> pure exts
->     <*> pure 10 -- forkListener (error "listener")
+>     <*> pure (ClientService 10 undefined) -- TODO
+>     <*> pure (ClientService 20 undefined) -- TODO
 >     <*> MSem.new n
 >     <*> pure n
 >     <*> newTVarIO M.empty
@@ -422,16 +428,11 @@ Retrieving client info
 >     <*> newTVarIO (startProgress 0)
 >     <*> newTVarIO HM.empty
 
-> listenerHandler :: ClientSession -> Socket -> IO ()
-> listenerHandler ses sock = do
->   Handshake {..} <- recvHandshake sock
->   status <- torrentPresence ses hsInfoHash
->   case status of
->     Unknown -> return ()
->     Active ses   -> error "listener handler"
->       -- TODO here we need to lookup local torrent status: BF e.t.c>
->     Registered _ -> return ()
->   return ()
+> listenerPort :: ClientSession -> PortNumber
+> listenerPort = servPort . peerListener
+
+> dhtPort :: ClientSession -> PortNumber
+> dhtPort = servPort . nodeListener
 
 Swarm sessions
 ------------------------------------------------------------------------
@@ -489,10 +490,9 @@ example consider the following very simle and realistic scenario:
 simultaneously.
 
 There some other situation the problem may occur: duplicates in
-successive tracker responses, tracker and DHT returns.
-
-So without any protection we end up with two session between the same
-peers. That's bad because this could lead:
+successive tracker responses, tracker and DHT returns. So without any
+protection we end up with two session between the same peers. That's
+bad because this could lead:
 
   * Reduced throughput - multiple sessions between the same peers will
 mutiply control overhead (control messages, session state).
@@ -558,6 +558,14 @@ INVARIANT: max_sessions_count - sizeof connectedPeers = value vacantPeers
 > pieceLength :: SwarmSession -> Int
 > pieceLength = ciPieceLength . tInfo . torrentMeta
 > {-# INLINE pieceLength #-}
+
+> swarmHandshake :: SwarmSession   ->   Handshake
+> swarmHandshake    SwarmSession {..} = Handshake {
+>     hsProtocol = defaultBTProtocol
+>   , hsReserved = encodeExts $ allowedExtensions $ clientSession
+>   , hsInfoHash = tInfoHash torrentMeta
+>   , hsPeerId   = clientPeerId $ clientSession
+>   }
 
 > {-
 > haveDone :: MonadIO m => PieceIx -> SwarmSession -> m ()
@@ -629,7 +637,14 @@ avoid reduntant KA messages.
 >   , sessionState       :: !(IORef  SessionState)
 >   }
 
-> -- TODO unpack some fields
+> instance Eq PeerSession where
+>   (==) = (==) `on` connectedPeerAddr
+
+> instance Ord PeerSession where
+>   compare = comparing connectedPeerAddr
+
+Peer session state
+------------------------------------------------------------------------
 
 > data SessionState = SessionState {
 >     _bitfield :: !Bitfield        -- ^ Other peer Have bitfield.
@@ -638,11 +653,8 @@ avoid reduntant KA messages.
 
 > $(makeLenses ''SessionState)
 
-> instance Eq PeerSession where
->   (==) = (==) `on` connectedPeerAddr
-
-> instance Ord PeerSession where
->   compare = comparing connectedPeerAddr
+> initialSessionState :: PieceCount -> SessionState
+> initialSessionState pc = SessionState (haveNone pc) def
 
 > findPieceCount :: PeerSession -> PieceCount
 > findPieceCount = pieceCount . tInfo . torrentMeta . swarmSession
@@ -655,7 +667,8 @@ Peer session exceptions
 > -- tracker, or any other session.
 > --
 > data SessionException = PeerDisconnected
->                       | ProtocolError Doc
+>                       | ProtocolError  Doc
+>                       | UnknownTorrent InfoHash
 >                         deriving (Show, Typeable)
 
 > instance Exception SessionException
@@ -670,51 +683,108 @@ Peer session exceptions
 > putSessionException :: SessionException -> IO ()
 > putSessionException = print
 
+> torrentSwarm :: ClientSession -> InfoHash -> TorrentPresence -> IO SwarmSession
+> torrentSwarm _  _  (Active     sws) = return sws
+> torrentSwarm cs _  (Registered loc) = newSeeder cs =<< validateLocation loc
+> torrentSwarm _  ih  Unknown         = throw $ UnknownTorrent ih
+
+> lookupSwarm :: ClientSession -> InfoHash -> IO SwarmSession
+> lookupSwarm cs ih = torrentSwarm cs ih =<< torrentPresence cs ih
+
 Peer session creation
 ------------------------------------------------------------------------
 
-> -- TODO modify such that we can use this in listener loop
-> -- TODO check if it connected yet peer
-> withPeerSession :: SwarmSession -> PeerAddr
->                 -> ((Socket, PeerSession) -> IO ())
->                 -> IO ()
+The peer session cycle looks like:
 
-> withPeerSession ss @ SwarmSession {..} addr
->     = handle isSessionException . bracket openSession closeSession
+  * acquire vacant session and vacant thread slot;
+  * (fork could be here, but not necessary)
+  *   establish peer connection;
+  *     register peer session;
+  *       ... exchange process ...
+  *     unregister peer session;
+  *   close peer connection;
+  * release acquired session and thread slot.
+
+TODO: explain why this order
+TODO: thread throttling
+TODO: check if it connected yet peer
+TODO: utilize peer Id.
+TODO: use STM semaphore
+
+> openSession :: SwarmSession -> PeerAddr -> Handshake -> IO PeerSession
+> openSession ss @ SwarmSession {..} addr Handshake {..} = do
+>   let clientCaps = encodeExts $ allowedExtensions $ clientSession
+>   let enabled    = decodeExts (enabledCaps clientCaps hsReserved)
+>   ps <- PeerSession addr ss enabled
+>     <$> registerTimeout (eventManager clientSession) maxIncomingTime (return ())
+>     <*> registerTimeout (eventManager clientSession) maxOutcomingTime (return ())
+>     <*> atomically (dupTChan broadcastMessages)
+>     <*> (newIORef . initialSessionState . totalCount =<< readTVarIO clientBitfield)
+>   -- TODO we could implement more interesting throtling scheme
+>   -- using connected peer information
+>   atomically $ modifyTVar' connectedPeers (S.insert ps)
+>   return ps
+
+> closeSession :: PeerSession -> IO ()
+> closeSession ps @ PeerSession {..} = do
+>   atomically $ modifyTVar' (connectedPeers swarmSession) (S.delete ps)
+
+> type PeerConn = (Socket, PeerSession)
+> type Exchange = PeerConn -> IO ()
+
+> sendClientStatus :: PeerConn -> IO ()
+> sendClientStatus (sock, PeerSession {..}) = do
+>   cbf <- readTVarIO $ clientBitfield $ swarmSession
+>   sendAll sock $ encode $ Bitfield cbf
+>   when (ExtDHT `elem` enabledExtensions) $ do
+>     sendAll sock $ encode $ Port $ dhtPort $ clientSession swarmSession
+
+Exchange action depends on session and socket, whereas session depends
+on socket:
+
+  socket------>-----exchange
+     |                 |
+     \-->--session-->--/
+
+To handle exceptions properly we double bracket socket and session
+then joining the resources and also ignoring session local exceptions.
+
+> runSession :: IO Socket -> (Socket -> IO PeerSession) -> Exchange -> IO ()
+> runSession connector opener action =
+>   handle isSessionException $
+>     bracket connector close $ \sock ->
+>       bracket (opener sock) closeSession $ \ses ->
+>         action (sock, ses)
+
+Used then the client want to connect to a peer.
+
+> initiatePeerSession :: SwarmSession -> PeerAddr -> Exchange -> IO ()
+> initiatePeerSession ss @ SwarmSession {..} addr
+>     = runSession (connectToPeer addr) initiated
 >   where
->     openSession = do
->       let caps  = encodeExts $ allowedExtensions $ clientSession
->       let ihash = tInfoHash torrentMeta
->       let pid   = clientPeerId $ clientSession
->       let chs   = Handshake defaultBTProtocol caps ihash pid
+>     initiated sock = do
+>       phs  <- handshake sock (swarmHandshake ss)
+>       ps   <- openSession ss addr phs
+>       sendClientStatus (sock, ps)
+>       return ps
 
->       sock <- connectToPeer addr
->       phs  <- handshake sock chs `onException` close sock
+Used the a peer want to connect to the client.
 
->       cbf <- readTVarIO clientBitfield
->       sendAll sock (encode (Bitfield cbf))
-
->       let enabled = decodeExts (enabledCaps caps (handshakeCaps phs))
->       ps <- PeerSession addr ss enabled
->          <$> registerTimeout (eventManager clientSession)
->                 maxIncomingTime (return ())
->          <*> registerTimeout (eventManager clientSession)
->                 maxOutcomingTime (sendKA sock)
->          <*> atomically (dupTChan broadcastMessages)
->          <*> do {
->            ; tc <- totalCount <$> readTVarIO clientBitfield
->            ; newIORef (SessionState (haveNone tc) def)
->            }
-
->       atomically $ modifyTVar' connectedPeers (S.insert ps)
-
->       return (sock, ps)
-
->     closeSession (sock, ps) = do
->       atomically $ modifyTVar' connectedPeers (S.delete ps)
->       close sock
-
-TODO: initiatePeerSession, acceptPeerSession
+> acceptPeerSession :: ClientSession -> PeerAddr -> Socket -> Exchange -> IO ()
+> acceptPeerSession cs@ClientSession {..} addr s = runSession (pure s) accepted
+>   where
+>     accepted sock = do
+>       phs   <- recvHandshake sock
+>       swarm <- lookupSwarm cs $ hsInfoHash phs
+>       ps    <- openSession swarm addr phs
+>       sendHandshake sock $ Handshake {
+>           hsProtocol = defaultBTProtocol
+>         , hsReserved = encodeExts $ enabledExtensions ps
+>         , hsInfoHash = hsInfoHash phs
+>         , hsPeerId   = clientPeerId
+>         }
+>       sendClientStatus (sock, ps)
+>       return ps
 
 Broadcasting: Have, Cancel, Bitfield, SuggestPiece
 ------------------------------------------------------------------------
@@ -748,13 +818,14 @@ messages & events we should send.
 TODO compute size of messages: if it's faster to send Bitfield
 instead many Have do that
 
-also if there is single Have message in queue then the
+Also if there is single Have message in queue then the
 corresponding piece is likely still in memory or disc cache,
-when we can send SuggestPiece
+when we can send SuggestPiece.
 
-> -- | Get pending messages queue appeared in result of asynchronously
-> -- changed client state. Resulting queue should be sent to a peer
-> -- immediately.
+Get pending messages queue appeared in result of asynchronously
+changed client state. Resulting queue should be sent to a peer
+immediately.
+
 > getPending :: PeerSession -> IO [Message]
 > getPending PeerSession {..} = {-# SCC getPending #-} do
 >   atomically (readAvail pendingMessages)
@@ -769,7 +840,7 @@ when we can send SuggestPiece
 Timeouts
 -----------------------------------------------------------------------
 
-> -- for internal use only
+for internal use only
 
 > sec :: Int
 > sec = 1000 * 1000

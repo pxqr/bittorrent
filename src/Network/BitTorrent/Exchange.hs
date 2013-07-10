@@ -156,7 +156,7 @@ instance MonadState SessionState P2P where
 runSession :: SwarmSession -> PeerAddr -> P2P () -> IO ()
 runSession  se addr p2p =
     handle isIOException $
-      withPeerSession se addr $ \(sock, pses) -> do
+      initiatePeerSession se addr $ \(sock, pses) -> do
         runPeerWire sock (runReaderT (unP2P p2p) pses)
   where
     isIOException :: IOException -> IO ()
