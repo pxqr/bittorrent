@@ -2,8 +2,10 @@
 {-# LANGUAGE RecordWildCards   #-}
 module Network.BitTorrent.DHT
        (
+         newNodeSession
+
          -- * Tracker
-         ping
+       , ping
        , findNode
        , getPeers
        , announcePeer
@@ -13,6 +15,7 @@ module Network.BitTorrent.DHT
        ) where
 
 import Control.Applicative
+import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad
 import Control.Exception
@@ -44,8 +47,8 @@ type NodeId = ByteString
 -- | Generate random NodeID used for the entire session.
 --   Distribution of ID's should be as uniform as possible.
 --
-genNodeID :: IO NodeId
-genNodeID = getEntropy 20
+genNodeId :: IO NodeId
+genNodeId = getEntropy 20
 
 instance Serialize PortNumber where
   get = fromIntegral <$> getWord16be
@@ -132,6 +135,9 @@ insertNode = HM.insert
 
 type Alpha = Int
 
+defaultAlpha :: Alpha
+defaultAlpha = 8
+
 -- TODO
 kclosest :: Int -> NodeId -> RoutingTable -> [NodeId]
 kclosest = undefined
@@ -153,6 +159,15 @@ instance Eq NodeSession where
 
 instance Ord NodeSession where
   compare = comparing nodeId
+
+newNodeSession :: PortNumber -> IO NodeSession
+newNodeSession lport
+  = NodeSession
+    <$> genNodeId
+    <*> newTVarIO HM.empty
+    <*> newTVarIO HM.empty
+    <*> pure defaultAlpha
+    <*> pure lport
 
 assignToken :: NodeSession -> NodeId -> IO Token
 assignToken _ _ = return ""
@@ -309,10 +324,15 @@ announcePeerS ses @ NodeSession {..} NodeAddr {..} (nid, ih, port, token) = do
       modifyTVar contactInfo $ insertPeer ih peerAddr
   return nodeId
 
-dhtServer :: PortNumber -> NodeSession -> IO ()
-dhtServer p s = server p
-  [ pingM         ==> pingS         s undefined
-  , findNodeM     ==> findNodeS     s undefined
-  , getPeersM     ==> getPeersS     s undefined
-  , announcePeerM ==> announcePeerS s undefined
-  ]
+dhtTracker :: NodeSession -> InfoHash -> Chan PeerAddr -> IO ()
+dhtTracker  = undefined
+
+dhtServer :: NodeSession -> PortNumber -> IO ()
+dhtServer s p = server p methods
+  where
+    methods =
+      [ pingM         ==> pingS         s undefined
+      , findNodeM     ==> findNodeS     s undefined
+      , getPeersM     ==> getPeersS     s undefined
+      , announcePeerM ==> announcePeerS s undefined
+      ]
