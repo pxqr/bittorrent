@@ -15,6 +15,7 @@ module Network.BitTorrent.DHT
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Monad
+import Control.Exception
 import Data.ByteString
 import Data.Serialize as S
 import Data.Function
@@ -28,6 +29,7 @@ import Network.Socket
 import System.Entropy
 
 import Remote.KRPC
+import Remote.KRPC.Protocol
 import Data.BEncode
 import Data.Torrent
 import Network.BitTorrent.Peer
@@ -159,6 +161,12 @@ assignToken _ _ = return ""
 checkToken :: NodeId -> Token -> NodeSession -> IO Bool
 checkToken nid token _ = return True
 
+updateTimestamp :: NodeSession -> NodeId -> IO ()
+updateTimestamp = error "updateTimestamp"
+
+updateToken :: NodeSession -> NodeId -> Token -> IO ()
+updateToken _ _ _ = error "updateToken"
+
 {-----------------------------------------------------------------------
     DHT Queries
 -----------------------------------------------------------------------}
@@ -207,6 +215,7 @@ announcePeerM = method "announce_peer" ["id", "info_hash", "port", "token"] ["id
 -----------------------------------------------------------------------}
 -- TODO: update node timestamp on each successful call
 
+-- | Note that tracker side query functions could throw RPCException.
 type DHT a b  = NodeSession -> NodeAddr -> a -> IO b
 
 ping :: DHT () ()
@@ -215,34 +224,48 @@ ping NodeSession {..} addr @ NodeAddr {..} () = do
   atomically $ modifyTVar' routingTable $ HM.insert nid addr
 
 findNode :: DHT NodeId [NodeInfo]
-findNode NodeSession {..} NodeAddr {..} qnid = do
-  (_, info) <- call (nodeIP, nodePort) findNodeM (nodeId, qnid)
+findNode ses @ NodeSession {..} NodeAddr {..} qnid = do
+  (nid, info) <- call (nodeIP, nodePort) findNodeM (nodeId, qnid)
+  updateTimestamp ses nid
   return (decodeCompact info)
 
 getPeers :: DHT InfoHash (Either [NodeInfo] [PeerAddr])
-getPeers NodeSession {..} NodeAddr {..} ih = do
-    extrResp <$> call (nodeIP, nodePort) getPeersM (nodeId, ih)
+getPeers ses @ NodeSession {..} NodeAddr {..} ih = do
+    resp <- call (nodeIP, nodePort) getPeersM (nodeId, ih)
+    (nid, tok, res) <- extrResp resp
+    updateTimestamp ses nid
+    updateToken ses nid tok
+    return res
   where
     extrResp (BDict d)
-      | Just (BList   values) <- M.lookup "values" d
-      = Right $ decodePeerList values
-      | Just (BString nodes)  <- M.lookup "nodes"  d
-      = Left  $ decodeCompact  nodes
-    extrResp  _ = return undefined
+      | Just (BString nid   ) <- M.lookup "id"     d
+      , Just (BString tok   ) <- M.lookup "token"  d
+      , Just (BList   values) <- M.lookup "values" d
+      = return $ (nid, tok, Right $ decodePeerList values)
+
+      | Just (BString nid   ) <- M.lookup "id"     d
+      , Just (BString tok   ) <- M.lookup "token"  d
+      , Just (BString nodes)  <- M.lookup "nodes"  d
+      = return (nid, tok, Left $ decodeCompact nodes)
+
+    extrResp  _ = throw $ RPCException msg
+      where msg = ProtocolError "unable to extract getPeers resp"
 
 -- remove token from signature, handle the all token stuff by NodeSession
 
 -- | Note that before ever calling this method you should call the
 -- getPeerList.
 announcePeer :: DHT (InfoHash, Token) NodeId
-announcePeer NodeSession {..} NodeAddr {..} (ih, tok) = do
-  call (nodeIP, nodePort) announcePeerM (nodeId, ih, listenerPort, tok)
+announcePeer ses @ NodeSession {..} NodeAddr {..} (ih, tok) = do
+  nid <- call (nodeIP, nodePort) announcePeerM (nodeId, ih, listenerPort, tok)
+  updateTimestamp ses nid
+  return nid
 
 {-----------------------------------------------------------------------
     DHT Server
 -----------------------------------------------------------------------}
 -- TODO: update node timestamp on each successful call
--- NOTE: ensure all server operations should run in O(1)
+-- NOTE: ensure all server operations run in O(1)
 
 type ServerHandler a b = NodeSession -> NodeAddr -> a -> IO b
 
@@ -252,12 +275,14 @@ pingS NodeSession {..} addr nid = do
   return nodeId
 
 findNodeS :: ServerHandler (NodeId, NodeId) (NodeId, CompactInfo)
-findNodeS NodeSession {..} _ (_, qnid) = do
+findNodeS ses @ NodeSession {..} _ (nid, qnid) = do
+  updateTimestamp ses nid
   rt <- atomically $ readTVar routingTable
   return (nodeId, encodeCompact $ kclosest alpha qnid rt)
 
 getPeersS :: ServerHandler (NodeId, InfoHash) BEncode
 getPeersS ses @ NodeSession {..} _ (nid, ih) = do
+    updateTimestamp ses nid
     mkResp <$> assignToken ses nid <*> findPeers
   where
     findPeers = do
@@ -276,6 +301,7 @@ getPeersS ses @ NodeSession {..} _ (nid, ih) = do
 
 announcePeerS :: ServerHandler (NodeId, InfoHash, PortNumber, Token) NodeId
 announcePeerS ses @ NodeSession {..} NodeAddr {..} (nid, ih, port, token) = do
+  updateTimestamp ses nid
   registered <- checkToken nid token ses
   when registered $ do
     atomically $ do
