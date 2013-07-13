@@ -36,12 +36,17 @@ discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
   withTracker progress conn $ \tses -> do
     forever $ do
       addr <- getPeerAddr tses
-      spawnP2P swarm addr $ do
-        action
+      forkThrottle swarm $ do
+        initiatePeerSession swarm addr $ \conn ->
+          runP2P conn action
+
 
 startListener :: ClientSession -> PortNumber -> IO ()
 startListener cs @ ClientSession {..} port =
-  startService peerListener port $ listener cs (error "listener")
+  startService peerListener port $ listener cs $ \conn @ (sock, PeerSession{..}) -> do
+      print "accepted"
+      let storage = error "storage"
+      runP2P conn (exchange storage)
 
 startDHT :: ClientSession -> PortNumber -> IO ()
 startDHT ClientSession {..} nodePort = withRunning peerListener failure start

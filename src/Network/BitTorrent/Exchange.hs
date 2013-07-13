@@ -47,7 +47,6 @@
 module Network.BitTorrent.Exchange
        ( P2P
        , runP2P
-       , spawnP2P
 
          -- * Query
        , getHaveCount
@@ -153,33 +152,14 @@ instance MonadState SessionState P2P where
   put !s = asks sessionState >>= \ref -> liftIO $ writeIORef ref s
   {-# INLINE put #-}
 
-runSession :: SwarmSession -> PeerAddr -> P2P () -> IO ()
-runSession  se addr p2p =
-    handle isIOException $
-      initiatePeerSession se addr $ \(sock, pses) -> do
-        runPeerWire sock (runReaderT (unP2P p2p) pses)
+runP2P :: (Socket, PeerSession) -> P2P () -> IO ()
+runP2P (sock, ses) p2p =
+  handle isIOException $
+    runPeerWire sock (runReaderT (unP2P p2p) ses)
   where
     isIOException :: IOException -> IO ()
     isIOException _ = return ()
 
--- | Run P2P session in the current thread. Normally you don't need this
--- function in client application, except for debugging.
-runP2P :: SwarmSession -> PeerAddr -> P2P () -> IO ()
-runP2P se addr p2p = waitVacancy se $ runSession se addr p2p
-
--- | Run P2P session in forked thread. Might be used in listener or
--- some other loop. Note that this function may block while waiting
--- for a vacant place: use forkIO and runP2P instead.
-spawnP2P :: SwarmSession -> PeerAddr -> P2P () -> IO ThreadId
-spawnP2P se addr p2p = forkThrottle se $ runSession se addr p2p
-
--- TODO unify this all using PeerConnection
-{-
-listenP2P :: SwarmSession -> P2P () -> IO PortNumber
-listenP2P _ _ = undefined
-
-chainP2P :: SwarmSession -> PeerConnection -> P2P () -> IO ()
--}
 {-----------------------------------------------------------------------
     Exceptions
 -----------------------------------------------------------------------}
