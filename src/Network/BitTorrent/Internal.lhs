@@ -59,8 +59,6 @@
 >        , waitVacancy
 >        , forkThrottle
 >
->        , pieceLength
->
 >          -- * Peer
 >        , PeerSession( PeerSession, connectedPeerAddr
 >                     , swarmSession, enabledExtensions
@@ -125,6 +123,7 @@
 > import Network.BitTorrent.Exchange.Protocol as BT
 > import Network.BitTorrent.Tracker.Protocol as BT
 > import Network.BitTorrent.DHT.Protocol as BT
+> import System.Torrent.Storage
 
 Progress
 ------------------------------------------------------------------------
@@ -499,6 +498,8 @@ Modify this carefully always updating global progress.
 
 >   , clientBitfield    :: !(TVar  Bitfield)
 
+-- >   , storage           :: Storage
+
 We keep set of the all connected peers for the each particular torrent
 to prevent duplicated and therefore reduntant TCP connections. For
 example consider the following very simle and realistic scenario:
@@ -575,10 +576,6 @@ INVARIANT: max_sessions_count - sizeof connectedPeers = value vacantPeers
 
 > getClientBitfield :: SwarmSession -> IO Bitfield
 > getClientBitfield = readTVarIO . clientBitfield
-
-> pieceLength :: SwarmSession -> Int
-> pieceLength = ciPieceLength . tInfo . torrentMeta
-> {-# INLINE pieceLength #-}
 
 > swarmHandshake :: SwarmSession   ->   Handshake
 > swarmHandshake    SwarmSession {..} = Handshake {
@@ -857,7 +854,8 @@ messages & events we should send.
 >     mark >> atomically broadcast
 >   where
 >     mark = do
->       let bytes = pieceLength se * BF.haveCount bf
+>       let piLen = ciPieceLength $ tInfo $ torrentMeta
+>       let bytes = piLen * BF.haveCount bf
 >       atomically $ do
 >         modifyTVar' clientBitfield (BF.union bf)
 >         modifyTVar' (currentProgress clientSession) (downloadedProgress bytes)

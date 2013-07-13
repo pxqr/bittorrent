@@ -37,13 +37,6 @@ module Network.BitTorrent
        , SessionCount
        , getSessionCount
 
-         -- * Storage
-       , Storage
-       , ppStorage
-
-       , bindTo
-       , unbind
-
          -- * Discovery
        , discover
        , exchange
@@ -132,7 +125,7 @@ addTorrent clientSession loc @ TorrentLoc {..} = do
 --  when (bf is not full)
 
   swarm   <- newLeecher  clientSession torrent
-  storage <- swarm `bindTo` dataDirPath
+  storage <- openStorage (torrentMeta swarm) dataDirPath
   forkIO $ discover swarm $ do
     liftIO $ putStrLn "connected to peer"
     forever $ do

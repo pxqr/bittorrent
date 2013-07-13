@@ -23,7 +23,7 @@ module System.Torrent.Storage
        , ppStorage
 
          -- * Construction
-       , bindTo, unbind, withStorage
+       , openStorage, closeStorage, withStorage
 
          -- * Modification
        , getBlk, putBlk, selBlk
@@ -45,13 +45,12 @@ import System.Directory
 import Data.Bitfield as BF
 import Data.Torrent
 import Network.BitTorrent.Exchange.Protocol
-import Network.BitTorrent.Internal
 import System.IO.MMap.Fixed as Fixed
 
 
 data Storage = Storage {
     -- |
-    session :: !SwarmSession
+    metainfo:: !Torrent
 
     -- |
   , blocks  :: !(TVar Bitfield)
@@ -76,18 +75,16 @@ ppStorage Storage {..} = pp <$> readTVarIO blocks
 -----------------------------------------------------------------------}
 
 -- TODO doc args
-bindTo :: SwarmSession -> FilePath -> IO Storage
-bindTo se @ SwarmSession {..} contentPath = do
-    let contentInfo   = tInfo torrentMeta
-    let content_paths = contentLayout contentPath contentInfo
-    mapM_ mkDir (L.map fst content_paths)
+openStorage :: Torrent -> FilePath -> IO Storage
+openStorage t @ Torrent {..} contentPath = do
+    let content_paths = contentLayout contentPath tInfo
+    mapM_ (mkDir . fst)  content_paths
 
-    let pieceLen  = pieceLength se
-    let blockSize = min defaultBlockSize pieceLen
-    print $ "content length " ++ show (contentLength contentInfo)
-    Storage se <$> newTVarIO (haveNone (blockCount blockSize contentInfo))
-               <*> pure blockSize
-               <*> coalesceFiles content_paths
+    let blockSize = defaultBlockSize `min` ciPieceLength tInfo
+    print $ "content length " ++ show (contentLength tInfo)
+    Storage t <$> newTVarIO (haveNone (blockCount blockSize tInfo))
+              <*> pure blockSize
+              <*> coalesceFiles content_paths
   where
     mkDir path = do
       let dirPath = fst (splitFileName path)
@@ -95,12 +92,12 @@ bindTo se @ SwarmSession {..} contentPath = do
       unless exist $ do
         createDirectoryIfMissing True dirPath
 
-unbind :: Storage -> IO ()
-unbind st = error "unmapStorage"
+closeStorage :: Storage -> IO ()
+closeStorage st = error "closeStorage"
 
 
-withStorage :: SwarmSession -> FilePath -> (Storage -> IO a) -> IO a
-withStorage se path = bracket (se `bindTo` path) unbind
+withStorage :: Torrent -> FilePath -> (Storage -> IO a) -> IO a
+withStorage se path = bracket (openStorage se path) closeStorage
 
 {-----------------------------------------------------------------------
     Modification
@@ -120,7 +117,7 @@ selBlk pix st @ Storage {..}
     mkBix ix  = BlockIx pix (blockSize * (ix - offset)) blockSize
 
     offset    = coeff * pix
-    coeff     = pieceLength session `div` blockSize
+    coeff     = ciPieceLength (tInfo metainfo)  `div` blockSize
 
 --
 -- TODO make global lock map -- otherwise we might get broken pieces
@@ -143,14 +140,14 @@ putBlk blk @ Block {..}  st @ Storage {..}
 --  let blkIx = undefined
 --  bm <- readTVarIO blocks
 --  unless (member blkIx bm) $ do
-    writeBytes (blkInterval (pieceLength session) blk)  blkData  payload
+    writeBytes (blkInterval (ciPieceLength (tInfo metainfo)) blk)  blkData  payload
 
     markBlock blk st
     validatePiece blkPiece st
 
 markBlock :: Block -> Storage -> IO ()
 markBlock Block {..} Storage {..} = {-# SCC markBlock #-} do
-  let piLen = pieceLength session
+  let piLen = ciPieceLength (tInfo metainfo)
   let glIx  = (piLen `div` blockSize) * blkPiece + (blkOffset `div` blockSize)
   atomically $ modifyTVar' blocks (have glIx)
 
@@ -163,14 +160,15 @@ getBlk :: MonadIO m => BlockIx -> Storage -> m Block
 getBlk ix @ BlockIx {..}  st @ Storage {..}
   = liftIO $ {-# SCC getBlk #-} do
   -- TODO check if __piece__ is available
-  bs <- readBytes (ixInterval (pieceLength session) ix) payload
+  let piLen = ciPieceLength (tInfo metainfo)
+  bs <- readBytes (ixInterval piLen ix) payload
   return $ Block ixPiece ixOffset bs
 
 getPiece :: PieceIx -> Storage -> IO ByteString
 getPiece pix st @ Storage {..} = {-# SCC getPiece #-} do
-  let pieceLen = pieceLength session
-  let bix      = BlockIx pix 0 (pieceLength session)
-  let bs       = viewBytes (ixInterval pieceLen bix) payload
+  let piLen = ciPieceLength (tInfo metainfo)
+  let bix   = BlockIx pix 0 piLen
+  let bs    = viewBytes (ixInterval piLen bix) payload
   return $! Lazy.toStrict bs
 
 resetPiece :: PieceIx -> Storage -> IO ()
@@ -186,7 +184,7 @@ validatePiece pix st @ Storage {..} = {-# SCC validatePiece #-} do
     else do
       print $ show pix ++ " downloaded"
       piece <- getPiece pix st
-      if checkPiece (tInfo (torrentMeta session)) pix piece
+      if checkPiece (tInfo metainfo) pix piece
         then return True
         else do
           print $ "----------------------------- invalid " ++ show pix
@@ -218,7 +216,7 @@ pieceMask pix Storage {..} =  do
     return $ BF.interval (totalCount bf) offset (offset + coeff - 1)
   where
     offset    = coeff * pix
-    coeff     = pieceLength session `div` blockSize
+    coeff     = ciPieceLength (tInfo metainfo) `div` blockSize
 
 
 ixInterval :: Int -> BlockIx -> FixedInterval
