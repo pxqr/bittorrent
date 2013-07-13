@@ -17,10 +17,8 @@ module Network.BitTorrent.Sessions
          -- * Client
        , ClientSession ( ClientSession
                        , clientPeerId, allowedExtensions
-                       , nodeListener, peerListener
                        )
        , withClientSession
-       , listenerPort, dhtPort
 
        , ThreadCount
        , defaultThreadCount
@@ -77,7 +75,6 @@ import Network.BitTorrent.Exchange.Protocol as BT
 import Network.BitTorrent.Tracker.Protocol as BT
 import Network.BitTorrent.Tracker as BT
 import Network.BitTorrent.Exchange as BT
-import Network.BitTorrent.DHT as BT
 import System.Torrent.Storage
 
 {-----------------------------------------------------------------------
@@ -126,16 +123,6 @@ startListener cs @ ClientSession {..} port =
       let storage = error "storage"
       runP2P conn (exchange storage)
 
-startDHT :: ClientSession -> PortNumber -> IO ()
-startDHT ClientSession {..} nodePort = withRunning peerListener failure start
-  where
-    start ClientService {..} = do
-      ses  <- newNodeSession servPort
-      startService nodeListener nodePort (dhtServer ses)
-
-    failure = throwIO $ userError msg
-    msg = "unable to start DHT server: peer listener is not running"
-
 -- | Create a new client session. The data passed to this function are
 -- usually loaded from configuration file.
 openClientSession :: SessionCount -> [Extension] -> PortNumber -> PortNumber -> IO ClientSession
@@ -143,7 +130,6 @@ openClientSession n exts listenerPort _ = do
   cs <- ClientSession
     <$> genPeerId
     <*> pure exts
-    <*> newEmptyMVar
     <*> newEmptyMVar
     <*> MSem.new n
     <*> pure n
@@ -156,7 +142,6 @@ openClientSession n exts listenerPort _ = do
 
 closeClientSession :: ClientSession -> IO ()
 closeClientSession ClientSession {..} = do
-  stopService nodeListener
   stopService peerListener
 
   sws <- readTVarIO swarmSessions
@@ -182,11 +167,8 @@ getPeerCount ClientSession {..} = liftIO $ do
   unused  <- peekAvail activeThreads
   return (maxActive - unused)
 
-listenerPort :: ClientSession -> IO PortNumber
-listenerPort ClientSession {..} = servPort <$> readMVar peerListener
-
-dhtPort :: ClientSession -> IO PortNumber
-dhtPort ClientSession {..} = servPort <$> readMVar nodeListener
+getListenerPort :: ClientSession -> IO PortNumber
+getListenerPort ClientSession {..} = servPort <$> readMVar peerListener
 
 {-----------------------------------------------------------------------
     Swarm session
@@ -203,7 +185,7 @@ defLeacherConns = defaultNumWant
 
 discover :: SwarmSession -> P2P () -> IO ()
 discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
-  port <- listenerPort clientSession
+  port <- getListenerPort clientSession
 
   let conn = TConnection {
         tconnAnnounce = tAnnounce torrentMeta
@@ -381,10 +363,6 @@ sendClientStatus :: PeerConn -> IO ()
 sendClientStatus (sock, PeerSession {..}) = do
   cbf <- readTVarIO $ clientBitfield $ swarmSession
   sendAll sock $ encode $ Bitfield cbf
-
-  port <- dhtPort $ clientSession swarmSession
-  when (ExtDHT `elem` enabledExtensions) $ do
-    sendAll sock $ encode $ Port port
 
 -- | Exchange action depends on session and socket, whereas session depends
 --   on socket:

@@ -259,7 +259,6 @@ and different enabled extensions at the same time.
 >   , allowedExtensions :: [Extension]
 
 >   , peerListener      :: !(MVar ClientService)
->   , nodeListener      :: !(MVar ClientService)
 
 >     -- | Semaphor used to bound number of active P2P sessions.
 >   , activeThreads     :: !(MSem ThreadCount)
