@@ -7,88 +7,36 @@
 --
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent
-       (
-         module Data.Torrent
+       ( module Data.Torrent
 
-         -- * Session
-       , ThreadCount
-       , defaultThreadCount
+       , TorrentLoc(..), Progress(..)
+       , ThreadCount, SessionCount
 
-         -- ** Client
        , ClientSession( clientPeerId, allowedExtensions )
-
-       , withDefaultClient
-
-       , Progress(..)
-       , getCurrentProgress
-       , getPeerCount
-       , getSwarmCount
-
-       , TorrentLoc(..)
+       , withDefaultClient, defaultThreadCount
        , addTorrent
        , removeTorrent
 
-         -- ** Swarm
-       , SwarmSession(torrentMeta)
-
-       , newLeecher
-       , newSeeder
-
-       , SessionCount
+       , getCurrentProgress
+       , getPeerCount
+       , getSwarmCount
        , getSessionCount
 
-         -- * Discovery
-       , discover
-       , exchange
-
-
-         -- * Peer to Peer
-       , P2P
-
-         -- ** Session
-       , PeerSession( PeerSession, connectedPeerAddr
-                    , swarmSession, enabledExtensions
-                    )
-
-       , getHaveCount
-       , getWantCount
-       , getPieceCount
-
-
-         -- ** Transfer
-       , Block(..), ppBlock
-       , BlockIx(..), ppBlockIx
-
-         -- ** Control
-       , SessionException
-       , disconnect
-       , protocolError
-
-         -- ** Events
-       , Event(..)
-       , awaitEvent, yieldEvent
-
          -- * Extensions
-       , Extension, defaultExtensions, ppExtension
+       , Extension
+       , defaultExtensions
+       , ppExtension
        ) where
 
 import Control.Concurrent
-import Control.Concurrent.STM
-import Control.Exception
 import Control.Monad
-import Control.Monad.Reader
-
+import Control.Monad.Trans
 import Network
-
-import Data.Bitfield as BF
 import Data.Torrent
 import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Sessions
-import Network.BitTorrent.Peer
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Exchange
-import Network.BitTorrent.Exchange.Protocol
-import Network.BitTorrent.Tracker
 
 import System.Torrent.Storage
 

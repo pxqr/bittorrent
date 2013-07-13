@@ -43,16 +43,6 @@ module Network.BitTorrent.Sessions
        , newSeeder
        , getClientBitfield
 
-         -- * Peer
-       , PeerSession( PeerSession, connectedPeerAddr
-                    , swarmSession, enabledExtensions
-                    , sessionState
-                    )
-       , SessionState
-       , initiatePeerSession
-       , acceptPeerSession
-       , listener
-
          -- * Timeouts
        , updateIncoming, updateOutcoming
        , discover
@@ -64,13 +54,11 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.MSem as MSem
-import Control.Lens
 import Control.Monad (when, forever, (>=>))
 import Control.Exception
 import Control.Monad.Trans
 
 import Data.IORef
-import Data.Foldable (mapM_)
 import Data.Map as M
 import Data.HashMap.Strict as HM
 import Data.Set as S
@@ -265,10 +253,10 @@ unregisterSwarmSession SwarmSession {..} =
 
 getSwarm :: ClientSession -> InfoHash -> IO SwarmSession
 getSwarm cs @ ClientSession {..} ih = do
-  ss <- readTVarIO $ swarmSessions
+  ss <- readTVarIO swarmSessions
   case M.lookup ih ss of
     Just sw -> return sw
-    Nothing -> undefined -- openSwarm cs
+    Nothing -> undefined -- openSwarmSession cs
 
 newSeeder :: ClientSession -> Torrent -> IO SwarmSession
 newSeeder cs t @ Torrent {..}
@@ -361,6 +349,14 @@ TODO: utilize peer Id.
 TODO: use STM semaphore
 -----------------------------------------------------------------------}
 
+registerPeerSession :: PeerSession -> IO ()
+registerPeerSession ps @ PeerSession {..}  =
+  atomically $ modifyTVar' (connectedPeers swarmSession) (S.insert ps)
+
+unregisterPeerSession :: PeerSession -> IO ()
+unregisterPeerSession ps @ PeerSession {..} =
+  atomically $ modifyTVar' (connectedPeers swarmSession) (S.delete ps)
+
 openSession :: SwarmSession -> PeerAddr -> Handshake -> IO PeerSession
 openSession ss @ SwarmSession {..} addr Handshake {..} = do
   let clientCaps = encodeExts $ allowedExtensions $ clientSession
@@ -372,12 +368,11 @@ openSession ss @ SwarmSession {..} addr Handshake {..} = do
     <*> (newIORef . initialSessionState . totalCount =<< readTVarIO clientBitfield)
     -- TODO we could implement more interesting throtling scheme
     -- using connected peer information
-  atomically $ modifyTVar' connectedPeers (S.insert ps)
+  registerPeerSession ps
   return ps
 
 closeSession :: PeerSession -> IO ()
-closeSession ps @ PeerSession {..} = do
-  atomically $ modifyTVar' (connectedPeers swarmSession) (S.delete ps)
+closeSession = unregisterPeerSession
 
 type PeerConn = (Socket, PeerSession)
 type Exchange = PeerConn -> IO ()

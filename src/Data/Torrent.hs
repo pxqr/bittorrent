@@ -71,7 +71,6 @@ import Data.Char
 import Data.Foldable
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import           Data.ByteString.Internal
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
@@ -87,8 +86,6 @@ import           Text.PrettyPrint
 import Network.URI
 import System.FilePath
 import Numeric
-
-import Debug.Trace
 
 {-----------------------------------------------------------------------
     Info hash
