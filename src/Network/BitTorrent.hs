@@ -82,7 +82,8 @@ import Network
 
 import Data.Bitfield as BF
 import Data.Torrent
-import Network.BitTorrent.Internal
+import Network.BitTorrent.Sessions.Types
+import Network.BitTorrent.Sessions
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Exchange

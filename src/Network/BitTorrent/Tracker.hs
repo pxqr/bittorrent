@@ -62,7 +62,7 @@ import Network.HTTP
 import Network.URI
 
 import Data.Torrent
-import Network.BitTorrent.Internal
+import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Tracker.Protocol
 

@@ -11,7 +11,7 @@ import Network.Socket
 
 import Data.Torrent
 import Network.BitTorrent.Peer
-import Network.BitTorrent.Internal
+import Network.BitTorrent.Sessions
 import Network.BitTorrent.Exchange
 import Network.BitTorrent.Tracker
 import Network.BitTorrent.DHT

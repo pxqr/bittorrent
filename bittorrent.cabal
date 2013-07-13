@@ -47,8 +47,8 @@ library
                      , Network.BitTorrent.Discovery
                      , System.Torrent.Storage
 
-  other-modules:       Network.BitTorrent.Internal
-                     , Network.BitTorrent.Sessions.Types
+  other-modules:       Network.BitTorrent.Sessions.Types
+                     , Network.BitTorrent.Sessions
 
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
