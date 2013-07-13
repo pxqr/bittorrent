@@ -44,7 +44,6 @@ library
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Exchange
                      , Network.BitTorrent.DHT
-                     , Network.BitTorrent.Discovery
                      , System.Torrent.Storage
 
   other-modules:       Network.BitTorrent.Sessions.Types

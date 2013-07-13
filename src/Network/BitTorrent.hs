@@ -89,7 +89,6 @@ import Network.BitTorrent.Extension
 import Network.BitTorrent.Exchange
 import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker
-import Network.BitTorrent.Discovery
 
 import System.Torrent.Storage
 
@@ -100,8 +99,6 @@ import System.Torrent.Storage
 withDefaultClient :: PortNumber -> PortNumber -> (ClientSession -> IO ()) -> IO ()
 withDefaultClient dhtPort listPort action = do
   withClientSession defaultThreadCount defaultExtensions $ \client -> do
-    startListener client listPort
-    startDHT      client dhtPort
     action client
 
 {-----------------------------------------------------------------------

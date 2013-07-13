@@ -19,47 +19,44 @@ module Network.BitTorrent.Sessions
                        , clientPeerId, allowedExtensions
                        , nodeListener, peerListener
                        )
-        , withClientSession
-        , listenerPort, dhtPort
+       , withClientSession
+       , listenerPort, dhtPort
 
-        , ThreadCount
-        , defaultThreadCount
+       , ThreadCount
+       , defaultThreadCount
 
-        , TorrentLoc(..)
-        , registerTorrent
-        , unregisterTorrent
+       , TorrentLoc(..)
+       , registerTorrent
+       , unregisterTorrent
 
-        , getCurrentProgress
-        , getSwarmCount
-        , getPeerCount
+       , getCurrentProgress
+       , getSwarmCount
+       , getPeerCount
 
-          -- * Swarm
-        , SwarmSession( SwarmSession, torrentMeta, clientSession )
+         -- * Swarm
+       , SwarmSession( SwarmSession, torrentMeta, clientSession )
 
-        , SessionCount
-        , getSessionCount
+       , SessionCount
+       , getSessionCount
 
-        , newLeecher
-        , newSeeder
-        , getClientBitfield
+       , newLeecher
+       , newSeeder
+       , getClientBitfield
 
-          -- TODO hide this
-        , waitVacancy
-        , forkThrottle
+         -- * Peer
+       , PeerSession( PeerSession, connectedPeerAddr
+                    , swarmSession, enabledExtensions
+                    , sessionState
+                    )
+       , SessionState
+       , initiatePeerSession
+       , acceptPeerSession
+       , listener
 
-          -- * Peer
-        , PeerSession( PeerSession, connectedPeerAddr
-                     , swarmSession, enabledExtensions
-                     , sessionState
-                     )
-        , SessionState
-        , initiatePeerSession
-        , acceptPeerSession
-        , listener
-
-          -- * Timeouts
-        , updateIncoming, updateOutcoming
-        ) where
+         -- * Timeouts
+       , updateIncoming, updateOutcoming
+       , discover
+       ) where
 
 import Prelude hiding (mapM_)
 
@@ -90,10 +87,13 @@ import Data.Bitfield as BF
 import Data.Torrent
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
+import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Exchange.Protocol as BT
 import Network.BitTorrent.Tracker.Protocol as BT
+import Network.BitTorrent.Tracker as BT
+import Network.BitTorrent.Exchange as BT
+import Network.BitTorrent.DHT as BT
 import System.Torrent.Storage
-import Network.BitTorrent.Sessions.Types
 
 {-----------------------------------------------------------------------
     Client Services
@@ -133,6 +133,23 @@ torrentPresence ClientSession {..} ih = do
 {-----------------------------------------------------------------------
     Client sessions
 -----------------------------------------------------------------------}
+
+startListener :: ClientSession -> PortNumber -> IO ()
+startListener cs @ ClientSession {..} port =
+  startService peerListener port $ listener cs $ \conn @ (sock, PeerSession{..}) -> do
+      print "accepted"
+      let storage = error "storage"
+      runP2P conn (exchange storage)
+
+startDHT :: ClientSession -> PortNumber -> IO ()
+startDHT ClientSession {..} nodePort = withRunning peerListener failure start
+  where
+    start ClientService {..} = do
+      ses  <- newNodeSession servPort
+      startService nodeListener nodePort (dhtServer ses)
+
+    failure = throwIO $ userError msg
+    msg = "unable to start DHT server: peer listener is not running"
 
 -- | Create a new client session. The data passed to this function are
 -- usually loaded from configuration file.
@@ -193,6 +210,29 @@ defSeederConns = defaultUnchokeSlots
 
 defLeacherConns :: SessionCount
 defLeacherConns = defaultNumWant
+
+-- discovery should hide tracker and DHT communication under the hood
+-- thus we can obtain an unified interface
+
+discover :: SwarmSession -> P2P () -> IO ()
+discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
+  port <- listenerPort clientSession
+
+  let conn = TConnection {
+        tconnAnnounce = tAnnounce torrentMeta
+      , tconnInfoHash = tInfoHash torrentMeta
+      , tconnPeerId   = clientPeerId clientSession
+      , tconnPort     = port
+      }
+
+  progress <- getCurrentProgress clientSession
+
+  withTracker progress conn $ \tses -> do
+    forever $ do
+      addr <- getPeerAddr tses
+      forkThrottle swarm $ do
+        initiatePeerSession swarm addr $ \conn ->
+          runP2P conn action
 
 newSwarmSession :: Int -> Bitfield -> ClientSession -> Torrent
                 -> IO SwarmSession
