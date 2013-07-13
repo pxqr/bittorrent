@@ -274,7 +274,7 @@ so we need to do this on demand: if a peer asks for a block, we
 validate corresponding piece and only after read and send the block
 back.
 
-> registerTorrent :: TVar TorrentMap -> InfoHash -> TorrentLoc -> IO ()
+> registerTorrent :: TVar TorrentMap -> TorrentLoc -> IO ()
 > registerTorrent = error "registerTorrent"
 >   {-
 >   Torrent {..} <- validateTorrent tl
@@ -498,7 +498,7 @@ Modify this carefully always updating global progress.
 
 >   , clientBitfield    :: !(TVar  Bitfield)
 
--- >   , storage           :: Storage
+>   , storage           :: !Storage
 
 We keep set of the all connected peers for the each particular torrent
 to prevent duplicated and therefore reduntant TCP connections. For
@@ -547,14 +547,41 @@ INVARIANT: max_sessions_count - sizeof connectedPeers = value vacantPeers
 > newSwarmSession :: Int -> Bitfield -> ClientSession -> Torrent
 >                 -> IO SwarmSession
 > newSwarmSession n bf cs @ ClientSession {..} t @ Torrent {..}
->   = SwarmSession <$> pure t
->                  <*> pure cs
->                  <*> MSem.new n
+>   = SwarmSession t cs
+>                  <$> MSem.new n
 >                  <*> newTVarIO bf
+>                  <*> undefined
 >                  <*> newTVarIO S.empty
 >                  <*> newBroadcastTChanIO
 
-> -- | New swarm session in which the client allowed to upload only.
+-- > openSwarmSession :: ClientSession -> InfoHash -> IO SwarmSession
+-- > openSwarmSession ClientSession {..} ih = do
+-- >   loc <- HM.lookup <$> readTVarIO torrentMap
+-- >   torrent <- validateLocation loc
+-- >   return undefined
+
+> closeSwarmSession :: SwarmSession -> IO ()
+> closeSwarmSession se @ SwarmSession {..} = do
+>   unregisterSwarmSession se
+>   -- TODO stop discovery
+>   -- TODO killall peer sessions
+>   -- TODO the order is important!
+>   closeStorage storage
+
+
+
+> unregisterSwarmSession :: SwarmSession -> IO ()
+> unregisterSwarmSession SwarmSession {..} =
+>   atomically $ modifyTVar (swarmSessions clientSession) $
+>     M.delete $ tInfoHash torrentMeta
+
+getSwarm :: ClientSession -> InfoHash -> IO SwarmSession
+getSwarm cs @ ClientSession {..} ih = do
+  ss <- readTVarIO $ swarmSessions
+  case HM.lookup ih ss of
+    Just sw -> return sw
+    Nothing -> openSwarm cs
+
 > newSeeder :: ClientSession -> Torrent -> IO SwarmSession
 > newSeeder cs t @ Torrent {..}
 >   = newSwarmSession defSeederConns (haveAll (pieceCount tInfo)) cs t
