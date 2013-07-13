@@ -171,10 +171,7 @@ runP2P se addr p2p = waitVacancy se $ runSession se addr p2p
 -- some other loop. Note that this function may block while waiting
 -- for a vacant place: use forkIO and runP2P instead.
 spawnP2P :: SwarmSession -> PeerAddr -> P2P () -> IO ThreadId
-spawnP2P se addr p2p = do
-  enterSwarm se
-  forkIO $ do
-    runSession se addr p2p `finally` leaveSwarm se
+spawnP2P se addr p2p = forkThrottle se $ runSession se addr p2p
 
 -- TODO unify this all using PeerConnection
 {-

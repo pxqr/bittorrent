@@ -56,9 +56,8 @@
 >        , newSeeder
 >        , getClientBitfield
 >
->        , enterSwarm
->        , leaveSwarm
 >        , waitVacancy
+>        , forkThrottle
 >
 >        , pieceLength
 >
@@ -615,6 +614,13 @@ Peer sessions throttling
 > waitVacancy se =
 >   bracket (enterSwarm se) (const (leaveSwarm se))
 >                   . const
+
+> forkThrottle :: SwarmSession -> IO () -> IO ThreadId
+> forkThrottle se action = do
+>   enterSwarm se
+>   (forkIO $ do
+>     action `finally` leaveSwarm se)
+>        `onException` leaveSwarm se
 
 Peer sessions
 ------------------------------------------------------------------------
