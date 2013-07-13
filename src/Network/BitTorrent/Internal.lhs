@@ -24,6 +24,8 @@
 >          Progress(..), startProgress
 >
 >        , ClientService(..)
+>        , startService
+>        , withRunning
 >
 >          -- * Client
 >        , ClientSession ( ClientSession
@@ -32,8 +34,6 @@
 >                        )
 >        , withClientSession
 >        , listenerPort, dhtPort
->
->        , startService
 >
 >        , ThreadCount
 >        , defaultThreadCount
@@ -96,7 +96,7 @@
 > import Control.Concurrent.STM
 > import Control.Concurrent.MSem as MSem
 > import Control.Lens
-> import Control.Monad (when, forever)
+> import Control.Monad (when, forever, (>=>))
 > import Control.Exception
 > import Control.Monad.Trans
 
@@ -304,11 +304,20 @@ so we can abstract out into ClientService:
 >   , servThread :: !ThreadId
 >   } deriving Show
 
-> startService :: PortNumber -> (PortNumber -> IO ()) -> IO ClientService
-> startService port m = ClientService port <$> forkIO (m port)
+> startService :: MVar ClientService -> PortNumber -> (PortNumber -> IO ()) -> IO ()
+> startService s port m = do
+>     stopService s
+>     putMVar s =<< spawn
+>   where
+>     spawn = ClientService port <$> forkIO (m port)
 
-> stopService :: ClientService -> IO ()
-> stopService ClientService {..} = killThread servThread
+> stopService :: MVar ClientService -> IO ()
+> stopService = tryTakeMVar >=> maybe (return ()) (killThread . servThread)
+
+Service A might depend on service B.
+
+> withRunning :: MVar ClientService -> IO () -> (ClientService -> IO ()) -> IO ()
+> withRunning dep failure action = tryTakeMVar dep >>= maybe failure action
 
 Client Sessions
 ------------------------------------------------------------------------
@@ -436,10 +445,7 @@ Retrieving client info
 
 > closeClientSession :: ClientSession -> IO ()
 > closeClientSession ClientSession {..} =
->     maybeStop (tryTakeMVar peerListener) `finally`
->     maybeStop (tryTakeMVar nodeListener)
->   where
->     maybeStop m = maybe (return ()) stopService =<< m
+>     stopService nodeListener `finally` stopService peerListener
 
 > withClientSession :: SessionCount -> [Extension] -> (ClientSession -> IO ()) -> IO ()
 > withClientSession c es = bracket (openClientSession c es) closeClientSession

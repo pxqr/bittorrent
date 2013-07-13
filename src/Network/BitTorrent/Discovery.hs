@@ -41,16 +41,14 @@ discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
 
 startListener :: ClientSession -> PortNumber -> IO ()
 startListener cs @ ClientSession {..} port =
-  putMVar peerListener =<< startService port (listener cs (error "listener"))
+  startService peerListener port $ listener cs (error "listener")
 
 startDHT :: ClientSession -> PortNumber -> IO ()
-startDHT ClientSession {..} nodePort = do
-    maybe failure start =<< tryTakeMVar peerListener
+startDHT ClientSession {..} nodePort = withRunning peerListener failure start
   where
     start ClientService {..} = do
       ses  <- newNodeSession servPort
-      serv <- startService nodePort (dhtServer ses)
-      putMVar nodeListener serv
+      startService nodeListener nodePort (dhtServer ses)
 
     failure = throwIO $ userError msg
     msg = "unable to start DHT server: peer listener is not running"
