@@ -17,8 +17,7 @@ module Network.BitTorrent
          -- ** Client
        , ClientSession( clientPeerId, allowedExtensions )
 
-       , newClient
-       , defaultClient
+       , withDefaultClient
 
        , Progress(..)
        , getCurrentProgress
@@ -91,36 +90,25 @@ import Network
 import Data.Bitfield as BF
 import Data.Torrent
 import Network.BitTorrent.Internal
+import Network.BitTorrent.Peer
+import Network.BitTorrent.Extension
 import Network.BitTorrent.Exchange
 import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker
-import Network.BitTorrent.Extension
-import Network.BitTorrent.Peer
+import Network.BitTorrent.Discovery
 
 import System.Torrent.Storage
 
+-- TODO remove fork from Network.BitTorrent.Exchange
+-- TODO make all forks in Internal.
 
 -- | Client session with default parameters. Use it for testing only.
-defaultClient :: IO ClientSession
-defaultClient = newClient defaultThreadCount defaultExtensions
-
--- discover should hide tracker and DHT communication under the hood
--- thus we can obtain an unified interface
-
-discover :: SwarmSession -> P2P () -> IO ()
-discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
-  let conn = TConnection (tAnnounce torrentMeta)
-                         (tInfoHash torrentMeta)
-                         (clientPeerId clientSession)
-                         (listenerPort clientSession)
-
-  progress <- getCurrentProgress clientSession
-
-  withTracker progress conn $ \tses -> do
-    forever $ do
-      addr <- getPeerAddr tses
-      spawnP2P swarm addr $ do
-        action
+withDefaultClient :: PortNumber -> PortNumber -> (ClientSession -> IO ()) -> IO ()
+withDefaultClient dhtPort listPort action = do
+  withClientSession defaultThreadCount defaultExtensions $ \client -> do
+    startListener client listPort
+    startDHT      client dhtPort
+    action client
 
 {-----------------------------------------------------------------------
     Torrent management

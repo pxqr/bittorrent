@@ -23,9 +23,17 @@
 >        ( -- * Progress
 >          Progress(..), startProgress
 >
+>        , ClientService(..)
+>
 >          -- * Client
->        , ClientSession (clientPeerId, allowedExtensions)
+>        , ClientSession ( ClientSession
+>                        , clientPeerId, allowedExtensions
+>                        , nodeListener, peerListener
+>                        )
+>        , withClientSession
 >        , listenerPort, dhtPort
+>
+>        , startService
 >
 >        , ThreadCount
 >        , defaultThreadCount
@@ -33,8 +41,6 @@
 >        , TorrentLoc(..)
 >        , registerTorrent
 >        , unregisterTorrent
->
->        , newClient
 >
 >        , getCurrentProgress
 >        , getSwarmCount
@@ -64,6 +70,7 @@
 >        , SessionState
 >        , initiatePeerSession
 >        , acceptPeerSession
+>        , listener
 >
 >          -- ** Broadcasting
 >        , available
@@ -89,7 +96,7 @@
 > import Control.Concurrent.STM
 > import Control.Concurrent.MSem as MSem
 > import Control.Lens
-> import Control.Monad (when)
+> import Control.Monad (when, forever)
 > import Control.Exception
 > import Control.Monad.Trans
 
@@ -106,7 +113,7 @@
 > import Data.Serialize hiding (get)
 > import Text.PrettyPrint
 
-> import Network
+> import Network hiding (accept)
 > import Network.Socket
 > import Network.Socket.ByteString
 
@@ -118,6 +125,7 @@
 > import Network.BitTorrent.Peer
 > import Network.BitTorrent.Exchange.Protocol as BT
 > import Network.BitTorrent.Tracker.Protocol as BT
+> import Network.BitTorrent.DHT.Protocol as BT
 
 Progress
 ------------------------------------------------------------------------
@@ -195,7 +203,7 @@ Peer session is one always forked thread.
 When client\/swarm\/peer session gets closed kill the corresponding
 threads, but flush data to disc. (for e.g. storage block map)
 
-So for e.g., in order to obtain our first block we need to run at
+So for e.g., in order to obtain our first block we need to spawn at
 least 7 threads: main thread, 2 client session threads, 3 swarm session
 threads and PeerSession thread.
 
@@ -296,10 +304,8 @@ so we can abstract out into ClientService:
 >   , servThread :: !ThreadId
 >   } deriving Show
 
-startService :: PortNumber -> IO a -> IO ClientService
-startService p m = forkIO $ handle $ m p
-  where
-    handle :: IOError -> IO ()
+> startService :: PortNumber -> (PortNumber -> IO ()) -> IO ClientService
+> startService port m = ClientService port <$> forkIO (m port)
 
 > stopService :: ClientService -> IO ()
 > stopService ClientService {..} = killThread servThread
@@ -339,8 +345,8 @@ and different enabled extensions at the same time.
 >     -- 'PeerSession'.
 >   , allowedExtensions :: [Extension]
 
->   , peerListener      :: !ClientService
->   , nodeListener      :: !ClientService
+>   , peerListener      :: !(MVar ClientService)
+>   , nodeListener      :: !(MVar ClientService)
 
 >     -- | Semaphor used to bound number of active P2P sessions.
 >   , activeThreads     :: !(MSem ThreadCount)
@@ -407,20 +413,20 @@ Retrieving client info
 
 > -- | Create a new client session. The data passed to this function are
 > -- usually loaded from configuration file.
-> newClient :: SessionCount     -- ^ Maximum count of active P2P Sessions.
+> openClientSession :: SessionCount     -- ^ Maximum count of active P2P Sessions.
 >           -> [Extension]      -- ^ Extensions allowed to use.
 >           -> IO ClientSession -- ^ Client with unique peer ID.
 
-> newClient n exts = do
+> openClientSession n exts = do
 >   mgr <- Ev.new
 >   -- TODO kill this thread when leave client
 >   _   <- forkIO $ loop mgr
-
+>
 >   ClientSession
 >     <$> genPeerId
 >     <*> pure exts
->     <*> pure (ClientService 10 undefined) -- TODO
->     <*> pure (ClientService 20 undefined) -- TODO
+>     <*> newEmptyMVar
+>     <*> newEmptyMVar
 >     <*> MSem.new n
 >     <*> pure n
 >     <*> newTVarIO M.empty
@@ -428,11 +434,21 @@ Retrieving client info
 >     <*> newTVarIO (startProgress 0)
 >     <*> newTVarIO HM.empty
 
-> listenerPort :: ClientSession -> PortNumber
-> listenerPort = servPort . peerListener
+> closeClientSession :: ClientSession -> IO ()
+> closeClientSession ClientSession {..} =
+>     maybeStop (tryTakeMVar peerListener) `finally`
+>     maybeStop (tryTakeMVar nodeListener)
+>   where
+>     maybeStop m = maybe (return ()) stopService =<< m
 
-> dhtPort :: ClientSession -> PortNumber
-> dhtPort = servPort . nodeListener
+> withClientSession :: SessionCount -> [Extension] -> (ClientSession -> IO ()) -> IO ()
+> withClientSession c es = bracket (openClientSession c es) closeClientSession
+
+> listenerPort :: ClientSession -> IO PortNumber
+> listenerPort ClientSession {..} = servPort <$> readMVar peerListener
+
+> dhtPort :: ClientSession -> IO PortNumber
+> dhtPort ClientSession {..} = servPort <$> readMVar nodeListener
 
 Swarm sessions
 ------------------------------------------------------------------------
@@ -736,8 +752,10 @@ TODO: use STM semaphore
 > sendClientStatus (sock, PeerSession {..}) = do
 >   cbf <- readTVarIO $ clientBitfield $ swarmSession
 >   sendAll sock $ encode $ Bitfield cbf
+>
+>   port <- dhtPort $ clientSession swarmSession
 >   when (ExtDHT `elem` enabledExtensions) $ do
->     sendAll sock $ encode $ Port $ dhtPort $ clientSession swarmSession
+>     sendAll sock $ encode $ Port port
 
 Exchange action depends on session and socket, whereas session depends
 on socket:
@@ -785,6 +803,26 @@ Used the a peer want to connect to the client.
 >         }
 >       sendClientStatus (sock, ps)
 >       return ps
+
+
+> listener :: ClientSession -> Exchange -> PortNumber -> IO ()
+> listener cs action serverPort = bracket openListener close loop
+>   where
+>    loop sock = forever $ handle isIOError $ do
+>      (conn, addr) <- accept sock
+>      case addr of
+>        SockAddrInet port host -> do
+>          acceptPeerSession cs (PeerAddr Nothing host port) conn action
+>        _                      -> return ()
+>
+>    isIOError :: IOError -> IO ()
+>    isIOError _ = return ()
+>
+>    openListener  = do
+>      sock <- socket AF_INET Stream defaultProtocol
+>      bindSocket sock (SockAddrInet serverPort 0)
+>      listen sock 1
+>      return sock
 
 Broadcasting: Have, Cancel, Bitfield, SuggestPiece
 ------------------------------------------------------------------------

@@ -44,9 +44,10 @@ library
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Exchange
                      , Network.BitTorrent.DHT
+                     , Network.BitTorrent.Discovery
                      , System.Torrent.Storage
-                       Network.BitTorrent.Internal
-  other-modules:
+
+  other-modules:       Network.BitTorrent.Internal
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
@@ -54,6 +55,7 @@ library
   if !flag(testing)
      other-modules:    Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
+                     , Network.BitTorrent.DHT.Protocol
                      , System.IO.MMap.Fixed
 
   build-depends:       base       == 4.*
