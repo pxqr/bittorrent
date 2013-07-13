@@ -46,8 +46,7 @@ import System.Torrent.Storage
 -- | Client session with default parameters. Use it for testing only.
 withDefaultClient :: PortNumber -> PortNumber -> (ClientSession -> IO ()) -> IO ()
 withDefaultClient dhtPort listPort action = do
-  withClientSession defaultThreadCount defaultExtensions $ \client -> do
-    action client
+  withClientSession defaultThreadCount defaultExtensions listPort dhtPort action
 
 {-----------------------------------------------------------------------
     Torrent management

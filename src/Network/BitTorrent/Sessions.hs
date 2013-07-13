@@ -48,7 +48,7 @@ module Network.BitTorrent.Sessions
        , discover
        ) where
 
-import Prelude hiding (mapM_)
+import Prelude hiding (mapM_, elem)
 
 import Control.Applicative
 import Control.Concurrent
@@ -61,6 +61,7 @@ import Control.Monad.Trans
 import Data.IORef
 import Data.Map as M
 import Data.HashMap.Strict as HM
+import Data.Foldable as F
 import Data.Set as S
 
 import Data.Serialize hiding (get)
@@ -141,14 +142,13 @@ startDHT ClientSession {..} nodePort = withRunning peerListener failure start
 
 -- | Create a new client session. The data passed to this function are
 -- usually loaded from configuration file.
-openClientSession :: SessionCount     -- ^ Maximum count of active P2P Sessions.
-                  -> [Extension]      -- ^ Extensions allowed to use.
-                  -> IO ClientSession -- ^ Client with unique peer ID.
-openClientSession n exts = do
+openClientSession :: SessionCount -> [Extension] -> PortNumber -> PortNumber -> IO ClientSession
+openClientSession n exts listenerPort _ = do
   mgr <- Ev.new
   -- TODO kill this thread when leave client
   _   <- forkIO $ loop mgr
-  ClientSession
+
+  cs <- ClientSession
     <$> genPeerId
     <*> pure exts
     <*> newEmptyMVar
@@ -160,13 +160,21 @@ openClientSession n exts = do
     <*> newTVarIO (startProgress 0)
     <*> newTVarIO HM.empty
 
-closeClientSession :: ClientSession -> IO ()
-closeClientSession ClientSession {..} =
-  stopService nodeListener `finally` stopService peerListener
--- TODO stop all swarm sessions
+  startListener cs listenerPort
+  return cs
 
-withClientSession :: SessionCount -> [Extension] -> (ClientSession -> IO ()) -> IO ()
-withClientSession c es = bracket (openClientSession c es) closeClientSession
+closeClientSession :: ClientSession -> IO ()
+closeClientSession ClientSession {..} = do
+  stopService nodeListener
+  stopService peerListener
+
+  sws <- readTVarIO swarmSessions
+  forM_ sws closeSwarmSession
+
+withClientSession :: SessionCount -> [Extension]
+                  -> PortNumber -> PortNumber
+                  -> (ClientSession -> IO ()) -> IO ()
+withClientSession c es l d = bracket (openClientSession c es l d) closeClientSession
 
 -- | Get current global progress of the client. This value is usually
 -- shown to a user.
@@ -222,6 +230,14 @@ discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
         initiatePeerSession swarm addr $ \conn ->
           runP2P conn action
 
+registerSwarmSession :: SwarmSession -> IO ()
+registerSwarmSession = undefined
+
+unregisterSwarmSession :: SwarmSession -> IO ()
+unregisterSwarmSession SwarmSession {..} =
+  atomically $ modifyTVar (swarmSessions clientSession) $
+    M.delete $ tInfoHash torrentMeta
+
 newSwarmSession :: Int -> Bitfield -> ClientSession -> Torrent
                 -> IO SwarmSession
 newSwarmSession n bf cs @ ClientSession {..} t @ Torrent {..}
@@ -245,11 +261,6 @@ closeSwarmSession se @ SwarmSession {..} = do
   -- TODO killall peer sessions
   -- TODO the order is important!
   closeStorage storage
-
-unregisterSwarmSession :: SwarmSession -> IO ()
-unregisterSwarmSession SwarmSession {..} =
-  atomically $ modifyTVar (swarmSessions clientSession) $
-  M.delete $ tInfoHash torrentMeta
 
 getSwarm :: ClientSession -> InfoHash -> IO SwarmSession
 getSwarm cs @ ClientSession {..} ih = do

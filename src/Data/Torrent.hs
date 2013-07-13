@@ -27,7 +27,7 @@
 module Data.Torrent
        ( -- * Torrent
          Torrent(..), ContentInfo(..), FileInfo(..)
-       , torrent, simpleTorrent
+       , mktorrent, simpleTorrent
        , torrentExt, isTorrentPath
        , fromFile
 
@@ -279,16 +279,16 @@ instance Hashable Torrent where
 -}
 
 -- | Smart constructor for 'Torrent' which compute info hash.
-torrent :: URI            -> ContentInfo
+mktorrent :: URI            -> ContentInfo
         -> Maybe [[URI]]  -> Maybe Text       -> Maybe ByteString
         -> Maybe Time     -> Maybe ByteString -> Maybe URI
         -> Maybe URI      -> Maybe ByteString
         -> Torrent
-torrent announce info = Torrent (hashlazy (BE.encoded info)) announce info
+mktorrent announce info = Torrent (hashlazy (BE.encoded info)) announce info
 
 -- | A simple torrent contains only required fields.
 simpleTorrent :: URI -> ContentInfo -> Torrent
-simpleTorrent announce info = torrent announce info
+simpleTorrent announce info = mktorrent announce info
                               Nothing Nothing Nothing
                               Nothing Nothing Nothing
                               Nothing Nothing

@@ -73,10 +73,12 @@ Thread layout
 
 When client session created 2 new threads appear:
 
-  * DHT listener - replies to DHT requests;
-
   * Peer listener - accept new P2P connection initiated by other
-peers.
+peers;
+
+  * Tracker announcer - announce that the peer have this torrent.
+
+  * OPTIONAL: DHT listener - replies to DHT requests;
 
 When swarn session created 3 new threads appear:
 

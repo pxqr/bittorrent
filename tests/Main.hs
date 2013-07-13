@@ -118,7 +118,7 @@ instance Arbitrary ContentInfo where
     ]
 
 instance Arbitrary Torrent where
-  arbitrary = torrent <$> arbitrary
+  arbitrary = mktorrent <$> arbitrary
                  <*> arbitrary <*> arbitrary <*> arbitrary
                  <*> arbitrary <*> arbitrary <*> arbitrary
                  <*> arbitrary <*> pure Nothing <*> arbitrary
