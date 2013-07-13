@@ -48,6 +48,8 @@ library
                      , System.Torrent.Storage
 
   other-modules:       Network.BitTorrent.Internal
+                     , Network.BitTorrent.Sessions.Types
+
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
