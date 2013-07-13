@@ -43,8 +43,6 @@ module Network.BitTorrent.Sessions
        , newSeeder
        , getClientBitfield
 
-         -- * Timeouts
-       , updateIncoming, updateOutcoming
        , discover
        ) where
 
@@ -69,8 +67,6 @@ import Data.Serialize hiding (get)
 import Network hiding (accept)
 import Network.Socket
 import Network.Socket.ByteString
-
-import GHC.Event as Ev
 
 import Data.Bitfield as BF
 import Data.Torrent
@@ -144,10 +140,6 @@ startDHT ClientSession {..} nodePort = withRunning peerListener failure start
 -- usually loaded from configuration file.
 openClientSession :: SessionCount -> [Extension] -> PortNumber -> PortNumber -> IO ClientSession
 openClientSession n exts listenerPort _ = do
-  mgr <- Ev.new
-  -- TODO kill this thread when leave client
-  _   <- forkIO $ loop mgr
-
   cs <- ClientSession
     <$> genPeerId
     <*> pure exts
@@ -156,7 +148,6 @@ openClientSession n exts listenerPort _ = do
     <*> MSem.new n
     <*> pure n
     <*> newTVarIO M.empty
-    <*> pure mgr
     <*> newTVarIO (startProgress 0)
     <*> newTVarIO HM.empty
 
@@ -373,9 +364,7 @@ openSession ss @ SwarmSession {..} addr Handshake {..} = do
   let clientCaps = encodeExts $ allowedExtensions $ clientSession
   let enabled    = decodeExts (enabledCaps clientCaps hsReserved)
   ps <- PeerSession addr ss enabled
-    <$> registerTimeout (eventManager clientSession) maxIncomingTime (return ())
-    <*> registerTimeout (eventManager clientSession) maxOutcomingTime (return ())
-    <*> atomically (dupTChan broadcastMessages)
+    <$> atomically (dupTChan broadcastMessages)
     <*> (newIORef . initialSessionState . totalCount =<< readTVarIO clientBitfield)
     -- TODO we could implement more interesting throtling scheme
     -- using connected peer information
@@ -460,34 +449,3 @@ listener cs action serverPort = bracket openListener close loop
       bindSocket sock (SockAddrInet serverPort 0)
       listen sock 1
       return sock
-
-
-{-----------------------------------------------------------------------
-  Keepalives
-------------------------------------------------------------------------
-TODO move to exchange
------------------------------------------------------------------------}
-
-sec :: Int
-sec = 1000 * 1000
-
-maxIncomingTime :: Int
-maxIncomingTime = 120 * sec
-
-maxOutcomingTime :: Int
-maxOutcomingTime = 1 * sec
-
--- | Should be called after we have received any message from a peer.
-updateIncoming :: PeerSession -> IO ()
-updateIncoming PeerSession {..} = do
-  updateTimeout (eventManager (clientSession swarmSession))
-    incomingTimeout maxIncomingTime
-
--- | Should be called before we have send any message to a peer.
-updateOutcoming :: PeerSession -> IO ()
-updateOutcoming PeerSession {..}  =
-  updateTimeout (eventManager (clientSession swarmSession))
-    outcomingTimeout maxOutcomingTime
-
-sendKA :: Socket -> IO ()
-sendKA sock = return ()

@@ -58,8 +58,6 @@
 
 > import Network
 
-> import GHC.Event as Ev
-
 > import Data.Bitfield as BF
 > import Data.Torrent
 > import Network.BitTorrent.Extension
@@ -272,8 +270,6 @@ and different enabled extensions at the same time.
 >     -- | Used to traverse the swarm session.
 >   , swarmSessions     :: !(TVar (Map InfoHash SwarmSession))
 
->   , eventManager      :: !EventManager
-
 >     -- | Used to keep track global client progress.
 >   , currentProgress   :: !(TVar  Progress)
 
@@ -394,26 +390,6 @@ Peer sessions
 >     -- | Extensions such that both peer and client support.
 >   , enabledExtensions :: [Extension]
 
-To dissconnect from died peers appropriately we should check if a peer
-do not sent the KA message within given interval. If yes, we should
-throw an exception in 'TimeoutCallback' and close session between
-peers.
-
-We should update timeout if we /receive/ any message within timeout
-interval to keep connection up.
-
->   , incomingTimeout     :: !TimeoutKey
-
-To send KA message appropriately we should know when was last time we
-sent a message to a peer. To do that we keep registered timeout in
-event manager and if we do not sent any message to the peer within
-given interval then we send KA message in 'TimeoutCallback'.
-
-We should update timeout if we /send/ any message within timeout to
-avoid reduntant KA messages.
-
->   , outcomingTimeout   :: !TimeoutKey
->
 >     -- | Broadcast messages waiting to be sent to peer.
 >   , pendingMessages    :: !(TChan   Message)
 
