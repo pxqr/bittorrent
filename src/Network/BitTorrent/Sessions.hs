@@ -121,7 +121,7 @@ startListener cs @ ClientSession {..} port =
   startService peerListener port $ listener cs $ \conn @ (sock, PeerSession{..}) -> do
       print "accepted"
       let storage = error "storage"
-      runP2P conn (exchange storage)
+      runP2P conn p2p
 
 -- | Create a new client session. The data passed to this function are
 -- usually loaded from configuration file.
@@ -204,7 +204,7 @@ discover swarm @ SwarmSession {..} = {-# SCC discover #-} do
         print addr
         initiatePeerSession swarm addr $ \conn -> do
           print addr
-          runP2P conn (exchange storage)
+          runP2P conn p2p
 
 registerSwarmSession :: SwarmSession -> STM ()
 registerSwarmSession ss @ SwarmSession {..} =
@@ -348,11 +348,6 @@ closeSession = unregisterPeerSession
 type PeerConn = (Socket, PeerSession)
 type Exchange = PeerConn -> IO ()
 
-sendClientStatus :: PeerConn -> IO ()
-sendClientStatus (sock, PeerSession {..}) = do
-  cbf <- readTVarIO $ clientBitfield $ swarmSession
-  sendAll sock $ encode $ Bitfield cbf
-
 -- | Exchange action depends on session and socket, whereas session depends
 --   on socket:
 --
@@ -379,7 +374,6 @@ initiatePeerSession ss @ SwarmSession {..} addr
       phs  <- handshake sock (swarmHandshake ss)
       putStrLn "handshaked"
       ps   <- openSession ss addr phs
-      sendClientStatus (sock, ps)
       return ps
 
 -- | Used the a peer want to connect to the client.
@@ -396,7 +390,6 @@ acceptPeerSession cs@ClientSession {..} addr s = runSession (pure s) accepted
         , hsInfoHash = hsInfoHash phs
         , hsPeerId   = clientPeerId
         }
-      sendClientStatus (sock, ps)
       return ps
 
 listener :: ClientSession -> Exchange -> PortNumber -> IO ()

@@ -60,6 +60,7 @@ module Network.BitTorrent.Exchange
        , yieldEvent
        , handleEvent
        , exchange
+       , p2p
 
          -- * Exceptions
        , disconnect
@@ -483,3 +484,13 @@ exchange storage = {-# SCC exchange #-} awaitEvent >>= handler
         if BF.null offer
           then return ()
           else handler (Available offer)
+
+yieldInit :: P2P ()
+yieldInit = yieldMessage . Bitfield =<< getClientBF
+
+p2p :: P2P ()
+p2p = do
+  yieldInit
+  storage <- asks (storage . swarmSession)
+  forever $ do
+    exchange storage
