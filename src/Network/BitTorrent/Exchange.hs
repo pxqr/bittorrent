@@ -71,7 +71,6 @@ module Network.BitTorrent.Exchange
 
 import Control.Applicative
 import Control.Exception
-import Control.Concurrent
 import Control.Lens
 import Control.Monad.Reader
 import Control.Monad.State
@@ -89,7 +88,6 @@ import Network
 
 import Data.Bitfield as BF
 import Network.BitTorrent.Extension
-import Network.BitTorrent.Peer
 import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Sessions.Types
 import System.Torrent.Storage
@@ -117,7 +115,8 @@ awaitMessage = P2P $ ReaderT $ const $ {-# SCC awaitMessage #-} go
 {-# INLINE awaitMessage #-}
 
 yieldMessage :: Message -> P2P ()
-yieldMessage msg =  P2P $ ReaderT $ const $ {-# SCC yieldMessage #-} C.yield msg
+yieldMessage msg = P2P $ ReaderT $ const $ {-# SCC yieldMessage #-} do
+  C.yield msg
 {-# INLINE yieldMessage #-}
 
 -- TODO send vectored
@@ -208,7 +207,6 @@ singletonBF i = liftM (BF.singleton i) getPieceCount
 
 adjustBF :: Bitfield -> P2P Bitfield
 adjustBF bf = (`adjustSize` bf) `liftM` getPieceCount
-
 
 peerWant   :: P2P Bitfield
 peerWant   = BF.difference <$> getClientBF  <*> use bitfield
@@ -306,7 +304,8 @@ data Event
 awaitEvent :: P2P Event
 awaitEvent = {-# SCC awaitEvent #-} do
     flushPending
-    awaitMessage >>= go
+    msg <- awaitMessage
+    go msg
   where
     go KeepAlive = awaitEvent
     go Choke     = do
@@ -464,7 +463,7 @@ exchange :: Storage -> P2P ()
 exchange storage = {-# SCC exchange #-} awaitEvent >>= handler
   where
     handler (Available bf) = do
-      liftIO (print (completeness bf))
+      liftIO $ print (completeness bf)
       ixs <- selBlk (findMin bf) storage
       mapM_ (yieldEvent . Want) ixs -- TODO yield vectored
 

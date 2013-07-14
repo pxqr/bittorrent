@@ -30,15 +30,14 @@ module Network.BitTorrent.Sessions
        , getCurrentProgress
        , getSwarmCount
        , getPeerCount
+       , getSwarm
+       , openSwarmSession
 
          -- * Swarm
        , SwarmSession( SwarmSession, torrentMeta, clientSession )
 
        , SessionCount
        , getSessionCount
-
-       , newLeecher
-       , newSeeder
        , getClientBitfield
 
        , discover
@@ -63,6 +62,7 @@ import Data.Set as S
 import Data.Serialize hiding (get)
 
 import Network hiding (accept)
+import Network.BSD
 import Network.Socket
 import Network.Socket.ByteString
 
@@ -177,14 +177,14 @@ getListenerPort ClientSession {..} = servPort <$> readMVar peerListener
 defSeederConns :: SessionCount
 defSeederConns = defaultUnchokeSlots
 
-defLeacherConns :: SessionCount
-defLeacherConns = defaultNumWant
+defLeecherConns :: SessionCount
+defLeecherConns = defaultNumWant
 
 -- discovery should hide tracker and DHT communication under the hood
 -- thus we can obtain an unified interface
 
-discover :: SwarmSession -> P2P () -> IO ()
-discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
+discover :: SwarmSession -> IO ()
+discover swarm @ SwarmSession {..} = {-# SCC discover #-} do
   port <- getListenerPort clientSession
 
   let conn = TConnection {
@@ -199,37 +199,46 @@ discover swarm @ SwarmSession {..} action = {-# SCC discover #-} do
   withTracker progress conn $ \tses -> do
     forever $ do
       addr <- getPeerAddr tses
+      print addr
       forkThrottle swarm $ do
-        initiatePeerSession swarm addr $ \conn ->
-          runP2P conn action
+        print addr
+        initiatePeerSession swarm addr $ \conn -> do
+          print addr
+          runP2P conn (exchange storage)
 
-registerSwarmSession :: SwarmSession -> IO ()
-registerSwarmSession = undefined
+registerSwarmSession :: SwarmSession -> STM ()
+registerSwarmSession ss @ SwarmSession {..} =
+  modifyTVar' (swarmSessions clientSession) $
+    M.insert (tInfoHash torrentMeta) ss
 
-unregisterSwarmSession :: SwarmSession -> IO ()
+unregisterSwarmSession :: SwarmSession -> STM ()
 unregisterSwarmSession SwarmSession {..} =
-  atomically $ modifyTVar (swarmSessions clientSession) $
+  modifyTVar' (swarmSessions clientSession) $
     M.delete $ tInfoHash torrentMeta
 
-newSwarmSession :: Int -> Bitfield -> ClientSession -> Torrent
-                -> IO SwarmSession
-newSwarmSession n bf cs @ ClientSession {..} t @ Torrent {..}
-  = SwarmSession t cs
-    <$> MSem.new n
+openSwarmSession :: ClientSession -> TorrentLoc -> IO SwarmSession
+openSwarmSession cs @ ClientSession {..} loc @ TorrentLoc {..} = do
+  t <- validateLocation loc
+  let bf = haveNone $ pieceCount $ tInfo t
+
+  ss <- SwarmSession t cs
+    <$> MSem.new defLeecherConns
     <*> newTVarIO bf
-    <*> undefined
+    <*> openStorage t dataDirPath
     <*> newTVarIO S.empty
     <*> newBroadcastTChanIO
 
--- > openSwarmSession :: ClientSession -> InfoHash -> IO SwarmSession
--- > openSwarmSession ClientSession {..} ih = do
--- >   loc <- HM.lookup <$> readTVarIO torrentMap
--- >   torrent <- validateLocation loc
--- >   return undefined
+  atomically $ do
+    modifyTVar' currentProgress $ enqueuedProgress $ contentLength $ tInfo t
+    registerSwarmSession ss
+
+  forkIO $ discover ss
+
+  return ss
 
 closeSwarmSession :: SwarmSession -> IO ()
 closeSwarmSession se @ SwarmSession {..} = do
-  unregisterSwarmSession se
+  atomically $ unregisterSwarmSession se
   -- TODO stop discovery
   -- TODO killall peer sessions
   -- TODO the order is important!
@@ -237,21 +246,11 @@ closeSwarmSession se @ SwarmSession {..} = do
 
 getSwarm :: ClientSession -> InfoHash -> IO SwarmSession
 getSwarm cs @ ClientSession {..} ih = do
-  ss <- readTVarIO swarmSessions
-  case M.lookup ih ss of
-    Just sw -> return sw
-    Nothing -> undefined -- openSwarmSession cs
-
-newSeeder :: ClientSession -> Torrent -> IO SwarmSession
-newSeeder cs t @ Torrent {..}
-  = newSwarmSession defSeederConns (haveAll (pieceCount tInfo)) cs t
-
--- | New swarm in which the client allowed both download and upload.
-newLeecher :: ClientSession -> Torrent -> IO SwarmSession
-newLeecher cs t @ Torrent {..} = do
-  se <- newSwarmSession defLeacherConns (haveNone (pieceCount tInfo)) cs t
-  atomically $ modifyTVar' (currentProgress cs) (enqueuedProgress (contentLength tInfo))
-  return se
+  status <- torrentPresence cs ih
+  case status of
+    Unknown        -> throw $ UnknownTorrent ih
+    Active sw      -> return sw
+    Registered loc -> openSwarmSession cs loc
 
 -- | Get the number of connected peers in the given swarm.
 getSessionCount :: SwarmSession -> IO SessionCount
@@ -284,9 +283,6 @@ leaveSwarm SwarmSession {..} = do
   MSem.signal vacantPeers
   MSem.signal (activeThreads clientSession)
 
-waitVacancy :: SwarmSession -> IO () -> IO ()
-waitVacancy se = bracket (enterSwarm se) (const (leaveSwarm se)) . const
-
 forkThrottle :: SwarmSession -> IO () -> IO ThreadId
 forkThrottle se action = do
    enterSwarm se
@@ -303,14 +299,6 @@ registerTorrent = error "registerTorrent"
 
 unregisterTorrent :: TVar TorrentMap -> InfoHash -> IO ()
 unregisterTorrent = error "unregisterTorrent"
-
-torrentSwarm :: ClientSession -> InfoHash -> TorrentPresence -> IO SwarmSession
-torrentSwarm _  _  (Active     sws) = return sws
-torrentSwarm cs _  (Registered loc) = newSeeder cs =<< validateLocation loc
-torrentSwarm _  ih  Unknown         = throw $ UnknownTorrent ih
-
-lookupSwarm :: ClientSession -> InfoHash -> IO SwarmSession
-lookupSwarm cs ih = torrentSwarm cs ih =<< torrentPresence cs ih
 
 {-----------------------------------------------------------------------
   Peer session creation
@@ -353,6 +341,7 @@ openSession ss @ SwarmSession {..} addr Handshake {..} = do
   registerPeerSession ps
   return ps
 
+-- TODO kill thread
 closeSession :: PeerSession -> IO ()
 closeSession = unregisterPeerSession
 
@@ -384,10 +373,11 @@ runSession connector opener action =
 -- | Used then the client want to connect to a peer.
 initiatePeerSession :: SwarmSession -> PeerAddr -> Exchange -> IO ()
 initiatePeerSession ss @ SwarmSession {..} addr
-    = runSession (connectToPeer addr) initiated
+    = runSession (putStrLn ("trying to connect" ++ show addr) *> connectToPeer addr <* putStrLn "connected") initiated
   where
     initiated sock = do
       phs  <- handshake sock (swarmHandshake ss)
+      putStrLn "handshaked"
       ps   <- openSession ss addr phs
       sendClientStatus (sock, ps)
       return ps
@@ -398,7 +388,7 @@ acceptPeerSession cs@ClientSession {..} addr s = runSession (pure s) accepted
   where
     accepted sock = do
       phs   <- recvHandshake sock
-      swarm <- lookupSwarm cs $ hsInfoHash phs
+      swarm <- getSwarm cs $ hsInfoHash phs
       ps    <- openSession swarm addr phs
       sendHandshake sock $ Handshake {
           hsProtocol = defaultBTProtocol
@@ -413,17 +403,22 @@ listener :: ClientSession -> Exchange -> PortNumber -> IO ()
 listener cs action serverPort = bracket openListener close loop
   where
     loop sock = forever $ handle isIOError $ do
+      putStrLn "listen"
+      print =<< getSocketName sock
       (conn, addr) <- accept sock
+      putStrLn "accepted"
       case addr of
         SockAddrInet port host -> do
-          acceptPeerSession cs (PeerAddr Nothing host port) conn action
+          forkIO $ do
+            acceptPeerSession cs (PeerAddr Nothing host port) conn action
+          return ()
         _                      -> return ()
 
     isIOError :: IOError -> IO ()
     isIOError _ = return ()
 
     openListener  = do
-      sock <- socket AF_INET Stream defaultProtocol
-      bindSocket sock (SockAddrInet serverPort 0)
+      sock <- socket AF_INET Stream =<< getProtocolNumber "tcp"
+      bindSocket sock (SockAddrInet serverPort iNADDR_ANY)
       listen sock 1
       return sock

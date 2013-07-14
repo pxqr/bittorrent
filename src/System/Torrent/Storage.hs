@@ -92,8 +92,9 @@ openStorage t @ Torrent {..} contentPath = do
       unless exist $ do
         createDirectoryIfMissing True dirPath
 
+-- TODO
 closeStorage :: Storage -> IO ()
-closeStorage st = error "closeStorage"
+closeStorage st = return ()
 
 
 withStorage :: Torrent -> FilePath -> (Storage -> IO a) -> IO a

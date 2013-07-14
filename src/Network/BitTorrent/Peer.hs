@@ -196,6 +196,8 @@ timestamp = (BC.pack . format) <$> getCurrentTime
 entropy :: IO ByteString
 entropy = getEntropy 15
 
+-- NOTE: entropy generates incorrrect peer id
+
 -- |  Here we use Azureus-style encoding with the following args:
 --
 --      * 'HS' for the client id.
@@ -205,7 +207,7 @@ entropy = getEntropy 15
 --      * UTC time day ++ day time for the random number.
 --
 genPeerId :: IO PeerId
-genPeerId = azureusStyle defaultClientId defaultVersionNumber <$> entropy
+genPeerId = azureusStyle defaultClientId defaultVersionNumber <$> timestamp
 
 -- | Pad bytestring so it's becomes exactly request length. Conversion
 -- is done like so:

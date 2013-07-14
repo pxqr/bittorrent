@@ -241,9 +241,7 @@ withTracker initProgress conn action = bracket start end (action . fst)
             -- commutative: this implements the heuristic "old peers
             -- in head"
             old <- BC.getChanContents sePeers
-            let new = respPeers
-            let combined = L.union old new
-
+            let combined = L.union old respPeers
             BC.writeList2Chan sePeers combined
 
           _ -> return ()

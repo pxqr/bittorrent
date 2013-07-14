@@ -28,25 +28,19 @@ module Network.BitTorrent
        , ppExtension
        ) where
 
-import Control.Concurrent
-import Control.Monad
-import Control.Monad.Trans
 import Network
 import Data.Torrent
 import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Sessions
 import Network.BitTorrent.Extension
-import Network.BitTorrent.Exchange
-
-import System.Torrent.Storage
 
 -- TODO remove fork from Network.BitTorrent.Exchange
 -- TODO make all forks in Internal.
 
 -- | Client session with default parameters. Use it for testing only.
 withDefaultClient :: PortNumber -> PortNumber -> (ClientSession -> IO ()) -> IO ()
-withDefaultClient dhtPort listPort action = do
-  withClientSession defaultThreadCount defaultExtensions listPort dhtPort action
+withDefaultClient listPort dhtPort action = do
+  withClientSession defaultThreadCount [] listPort dhtPort action
 
 {-----------------------------------------------------------------------
     Torrent management
@@ -68,14 +62,6 @@ addTorrent clientSession loc @ TorrentLoc {..} = do
   torrent <- validateLocation loc
 --  registerTorrent loc tInfoHash
 --  when (bf is not full)
-
-  swarm   <- newLeecher  clientSession torrent
-  storage <- openStorage (torrentMeta swarm) dataDirPath
-  forkIO $ discover swarm $ do
-    liftIO $ putStrLn "connected to peer"
-    forever $ do
-      liftIO $ putStrLn "from mesage loop"
-      exchange storage
   return ()
 
 -- | Unregister torrent and stop all running sessions.
