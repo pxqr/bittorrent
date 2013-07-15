@@ -62,6 +62,7 @@ import Prelude hiding (sum)
 import Control.Applicative
 import Control.Arrow
 import Control.Exception
+import Control.Monad
 
 import qualified Crypto.Hash.SHA1 as C
 
@@ -69,8 +70,6 @@ import Data.Aeson.TH
 import Data.BEncode as BE
 import Data.Char
 import Data.Foldable
-import           Data.Map (Map)
-import qualified Data.Map as M
 import qualified Data.ByteString as B
 import           Data.ByteString.Internal
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
@@ -78,10 +77,15 @@ import qualified Data.ByteString.Lazy as Lazy
 import qualified Data.ByteString.Lazy.Builder as B
 import qualified Data.ByteString.Lazy.Builder.ASCII as B
 import qualified Data.List as L
+import           Data.Maybe
+import           Data.Map (Map)
+import qualified Data.Map as M
 import           Data.Hashable as Hashable
 import           Data.Text (Text)
 import           Data.Serialize as S hiding (Result)
 import           Text.PrettyPrint
+import           Text.ParserCombinators.ReadP as P
+import           Text.Read
 
 import Network.URI
 import System.FilePath
@@ -97,6 +101,17 @@ newtype InfoHash = InfoHash { getInfoHash :: ByteString }
 
 instance Show InfoHash where
   show = render . ppInfoHash
+
+instance Read InfoHash where
+  readsPrec _ = readP_to_S $ do
+      str <- replicateM 40 (satisfy isHexDigit)
+      return $ InfoHash $ decodeIH str
+    where
+      decodeIH       = B.pack . map fromHex . pair
+      fromHex (a, b) = read $ '0' : 'x' : a : b : []
+
+      pair (a : b : xs) = (a, b) : pair xs
+      pair _            = []
 
 instance Hashable InfoHash where
   hash = Hashable.hash . getInfoHash
