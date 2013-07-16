@@ -46,6 +46,7 @@
 --   > http://hackage.haskell.org/package/mmap
 --   > man mmap
 --
+{-# LANGUAGE RecordWildCards #-}
 module System.IO.MMap.Fixed
        ( -- * Intervals
          FixedOffset, FileOffset, FixedInterval, FileInterval
@@ -58,6 +59,7 @@ module System.IO.MMap.Fixed
 
          -- ** Specialized 'insertTo'
        , mmapTo, mallocTo
+       , lookupRegion
 
          -- * Query
        , upperAddr
@@ -145,6 +147,13 @@ mallocTo fi s = do
   let bsize = intervalSize fi
   fptr <- mallocForeignPtrBytes bsize
   return (insertTo fi (fptr, 0) s)
+
+lookupRegion :: FixedOffset -> Fixed -> Maybe B.ByteString
+lookupRegion offset Fixed {..} =
+  case intersecting imap $ IntervalCO offset (succ offset) of
+    [(i, (fptr, off))] -> let s = max 0 $ upperBound i - lowerBound i
+                          in  Just $ fromForeignPtr fptr off s
+    _         -> Nothing
 
 -- | Note: this is unsafe operation.
 viewBytes :: FixedInterval -> Fixed -> Lazy.ByteString

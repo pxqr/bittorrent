@@ -27,6 +27,9 @@ module System.Torrent.Storage
 
          -- * Modification
        , getBlk, putBlk, selBlk
+
+         -- * File interface
+       , FD, openFD, closeFD, readFD, readFDAll
        ) where
 
 import Control.Applicative
@@ -36,16 +39,19 @@ import Control.Monad
 import Control.Monad.Trans
 
 import Data.ByteString as B
+import qualified Data.ByteString.Internal as B
 import qualified Data.ByteString.Lazy as Lazy
 import Data.List as L
 import Text.PrettyPrint
 import System.FilePath
 import System.Directory
+import Foreign.C.Error
 
 import Data.Bitfield as BF
 import Data.Torrent
 import Network.BitTorrent.Exchange.Protocol
 import System.IO.MMap.Fixed as Fixed
+import Debug.Trace
 
 
 data Storage = Storage {
@@ -183,7 +189,6 @@ validatePiece pix st @ Storage {..} = {-# SCC validatePiece #-} do
   downloaded <- atomically $ isDownloaded pix st
   if not downloaded then return False
     else do
-      print $ show pix ++ " downloaded"
       piece <- getPiece pix st
       if checkPiece (tInfo metainfo) pix piece
         then return True
@@ -200,6 +205,55 @@ validatePiece pix st @ Storage {..} = {-# SCC validatePiece #-} do
 --
 validateStorage :: Storage -> IO ()
 validateStorage st = undefined -- (`validatePiece` st) [0..pieceCount st]
+
+{-----------------------------------------------------------------------
+  POSIX-like file interface
+------------------------------------------------------------------------
+This is useful for virtual filesystem writers and just for per file
+interface.
+-----------------------------------------------------------------------}
+-- TODO reference counting: storage might be closed before all FDs
+-- gets closed!
+-- or we can forbid to close storage and use finalizers only?
+
+type Offset = Int
+type Size   = Int
+
+newtype FD = FD { fdData :: ByteString }
+
+-- TODO implement blocking and non blocking modes?
+
+-- | This call correspond to open(2) with the following parameters:
+--
+--     * OpenMode = ReadOnly;
+--
+--     * OpenFileFlags = O_NONBLOCK.
+--
+openFD :: FilePath -> Storage -> IO (Either Errno FD)
+openFD path Storage {..}
+  | Just offset <- fileOffset path (tInfo metainfo)
+  , Just bs     <- lookupRegion (fromIntegral offset) payload
+  = return $ Right $ FD bs
+  | otherwise = return $ Left $ eNOENT
+
+-- | This call correspond to close(2).
+closeFD :: FD -> IO ()
+closeFD _ = return ()
+
+-- TODO return "is dir" error
+-- TODO check if region is not out of bound
+-- TODO check if region completely downloaded
+-- TODO if not we could return EAGAIN
+-- TODO enqueue read to piece manager
+-- WARN use BS.copy?
+-- | This call correspond to pread(2).
+readFD :: FD -> Offset -> Size -> IO (Either Errno ByteString)
+readFD FD {..} offset len = do
+  let res =  B.take len $ B.drop offset fdData
+  return $ Right res
+
+readFDAll :: FD -> IO ByteString
+readFDAll FD {..} = return fdData
 
 {-----------------------------------------------------------------------
     Internal

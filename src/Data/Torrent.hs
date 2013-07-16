@@ -33,7 +33,8 @@ module Data.Torrent
 
          -- * Files layout
        , Layout, contentLayout
-       , contentLength, pieceCount, blockCount
+       , contentLength, fileOffset
+       , pieceCount, blockCount
        , isSingleFile, isMultiFile
 
        , checkPiece
@@ -54,6 +55,7 @@ module Data.Torrent
          -- * Internal
        , Data.Torrent.hash
        , Data.Torrent.hashlazy
+       , layoutOffsets
 #endif
        ) where
 
@@ -448,6 +450,17 @@ contentLayout rootPath = filesLayout
         mkPath = ((rootPath </> BC.unpack dir) </>) . joinPath . map BC.unpack
 
     fl (FileInfo { fiPath = p, fiLength = len }) = (p, fromIntegral len)
+
+layoutOffsets :: Layout -> Layout
+layoutOffsets = go 0
+  where
+    go !_ [] = []
+    go !offset ((n, s) : xs) = (n, offset) : go (offset + s) xs
+
+-- | Gives global offset of a content file for a given full path.
+fileOffset :: FilePath -> ContentInfo -> Maybe Integer
+fileOffset fullPath
+  = fmap fromIntegral . lookup fullPath . layoutOffsets . contentLayout ""
 
 -- | Test if this is single file torrent.
 isSingleFile :: ContentInfo -> Bool
