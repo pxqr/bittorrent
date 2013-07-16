@@ -13,8 +13,6 @@
 --     * As ordinary mmaped file storage - when we need to store
 --       data in the filesystem.
 --
---
---
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE NamedFieldPuns  #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -29,8 +27,9 @@ module System.Torrent.Storage
          -- * Modification
        , getBlk, putBlk, selBlk
 
+         -- * TODO expose only File interface!
          -- * File interface
-       , FD, openFD, closeFD, readFD, readFDAll
+       , FD, openFD, closeFD, readFD, writeFD
        ) where
 
 import Control.Applicative
@@ -40,9 +39,7 @@ import Control.Monad
 import Control.Monad.Trans
 
 import Data.ByteString as B
-import qualified Data.ByteString.Internal as B
 import qualified Data.ByteString.Lazy as Lazy
-import Data.List as L
 import Text.PrettyPrint
 import System.FilePath
 import System.Directory
@@ -227,41 +224,77 @@ interface.
 type Offset = Int
 type Size   = Int
 
-newtype FD = FD { fdData :: ByteString }
+data FD = FD {
+    fdData    :: ByteString
+  , fdNoBlock :: Bool
+  }
 
--- TODO implement blocking and non blocking modes?
 
+-- TODO return "is dir" error
 -- | This call correspond to open(2) with the following parameters:
 --
 --     * OpenMode = ReadOnly;
 --
---     * OpenFileFlags = O_NONBLOCK.
+--     * OpenFileFlags = O_NONBLOCK. (not true yet)
 --
-openFD :: FilePath -> Storage -> IO (Either Errno FD)
-openFD path Storage {..}
+openFD :: FilePath -> Bool -> Storage -> IO (Either Errno FD)
+openFD path nonblock Storage {..}
   | Just offset <- fileOffset path (tInfo metainfo)
   , Just bs     <- lookupRegion (fromIntegral offset) payload
-  = return $ Right $ FD bs
+  = return $ Right $ FD bs nonblock
   | otherwise = return $ Left $ eNOENT
 
 -- | This call correspond to close(2).
 closeFD :: FD -> IO ()
 closeFD _ = return ()
 
--- TODO return "is dir" error
--- TODO check if region is not out of bound
+-- TODO
+maskRegion :: FD -> Offset -> Size -> Maybe Size
+maskRegion FD {..} offset siz = return siz
+
+-- TODO
+isComplete :: FD -> Offset -> Size -> IO Size
+isComplete _ _ siz = return siz
+
+-- TODO
+enqueueRead :: FD -> Offset -> Size -> IO ()
+enqueueRead _ _ _ = return ()
+
+-- TODO
+readAhead :: FD -> Offset -> Size -> IO ()
+readAhead _ _ _ = return ()
+
+-- TODO
+waitRegion :: FD -> Offset -> Size -> IO ByteString
+waitRegion _ _ _ = return B.empty
+
+-- TODO implement blocking and non blocking modes?
 -- TODO check if region completely downloaded
 -- TODO if not we could return EAGAIN
 -- TODO enqueue read to piece manager
--- WARN use BS.copy?
 -- | This call correspond to pread(2).
 readFD :: FD -> Offset -> Size -> IO (Either Errno ByteString)
-readFD FD {..} offset len = do
-  let res =  B.take len $ B.drop offset fdData
-  return $ Right res
+readFD fd @ FD {..} offset reqSize =
+  case maskRegion fd offset reqSize of
+    Nothing      -> return $ Right B.empty
+    Just expSize -> do
+      availSize <- isComplete fd offset expSize
+      if availSize == expSize then haveAllReg expSize else haveSomeReg expSize
+  where
+    haveAllReg expSize = do
+      readAhead fd offset expSize
+      return $ Right $ slice offset expSize fdData
 
-readFDAll :: FD -> IO ByteString
-readFDAll FD {..} = return fdData
+    haveSomeReg expSize
+      | fdNoBlock = return $ Left $ eAGAIN
+      | otherwise = do
+        bs <- waitRegion fd offset expSize
+        readAhead fd offset expSize
+        return $ Right bs
+
+-- TODO
+writeFD :: FD -> ByteString -> Offset -> IO ()
+writeFD FD {..} bs offset = return ()
 
 {-----------------------------------------------------------------------
     Internal

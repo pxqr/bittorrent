@@ -56,6 +56,7 @@ module Data.Torrent
        , Data.Torrent.hash
        , Data.Torrent.hashlazy
        , layoutOffsets
+       , slice
 -- #endif
        ) where
 
@@ -464,14 +465,17 @@ fileOffset fullPath
 isSingleFile :: ContentInfo -> Bool
 isSingleFile SingleFile {} = True
 isSingleFile _             = False
+{-# INLINE isSingleFile #-}
 
 -- | Test if this is multifile torrent.
 isMultiFile :: ContentInfo -> Bool
 isMultiFile MultiFile {} = True
 isMultiFile _            = False
+{-# INLINE isMultiFile #-}
 
 slice :: Int -> Int -> ByteString -> ByteString
-slice from to = B.take to . B.drop from
+slice from siz = B.take siz . B.drop from
+{-# INLINE slice #-}
 
 -- | Extract validation hash by specified piece index.
 pieceHash :: ContentInfo -> Int -> ByteString
