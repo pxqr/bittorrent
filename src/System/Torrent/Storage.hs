@@ -24,6 +24,7 @@ module System.Torrent.Storage
 
          -- * Construction
        , openStorage, closeStorage, withStorage
+       , getCompleteBitfield
 
          -- * Modification
        , getBlk, putBlk, selBlk
@@ -51,18 +52,19 @@ import Data.Bitfield as BF
 import Data.Torrent
 import Network.BitTorrent.Exchange.Protocol
 import System.IO.MMap.Fixed as Fixed
-import Debug.Trace
 
-
+-- TODO merge piece validation and Sessions.available into one transaction.
 data Storage = Storage {
     -- |
-    metainfo:: !Torrent
+    metainfo  :: !Torrent
 
-    -- |
-  , blocks  :: !(TVar Bitfield)
+    -- | Bitmask of complete and verified _pieces_.
+  , complete  :: !(TVar  Bitfield)
+
+    -- | Bitmask of complete _blocks_.
+  , blocks    :: !(TVar Bitfield)
     -- TODO use bytestring for fast serialization
     -- because we need to write this bitmap to disc periodically
-
 
   , blockSize :: !Int
 
@@ -76,19 +78,23 @@ ppStorage Storage {..} = pp <$> readTVarIO blocks
   where
     pp bf = int blockSize
 
+getCompleteBitfield :: Storage -> STM Bitfield
+getCompleteBitfield Storage {..} = readTVar complete
+
 {-----------------------------------------------------------------------
     Construction
 -----------------------------------------------------------------------}
 
 -- TODO doc args
-openStorage :: Torrent -> FilePath -> IO Storage
-openStorage t @ Torrent {..} contentPath = do
+openStorage :: Torrent -> FilePath -> Bitfield -> IO Storage
+openStorage t @ Torrent {..} contentPath bf = do
     let content_paths = contentLayout contentPath tInfo
     mapM_ (mkDir . fst)  content_paths
 
     let blockSize = defaultBlockSize `min` ciPieceLength tInfo
     print $ "content length " ++ show (contentLength tInfo)
-    Storage t <$> newTVarIO (haveNone (blockCount blockSize tInfo))
+    Storage t <$> newTVarIO bf
+              <*> newTVarIO (haveNone (blockCount blockSize tInfo))
               <*> pure blockSize
               <*> coalesceFiles content_paths
   where
@@ -103,8 +109,8 @@ closeStorage :: Storage -> IO ()
 closeStorage st = return ()
 
 
-withStorage :: Torrent -> FilePath -> (Storage -> IO a) -> IO a
-withStorage se path = bracket (openStorage se path) closeStorage
+withStorage :: Torrent -> FilePath -> Bitfield -> (Storage -> IO a) -> IO a
+withStorage se path bf = bracket (openStorage se path bf) closeStorage
 
 {-----------------------------------------------------------------------
     Modification
@@ -191,7 +197,9 @@ validatePiece pix st @ Storage {..} = {-# SCC validatePiece #-} do
     else do
       piece <- getPiece pix st
       if checkPiece (tInfo metainfo) pix piece
-        then return True
+        then do
+          atomically $ modifyTVar' complete (BF.have pix)
+          return True
         else do
           print $ "----------------------------- invalid " ++ show pix
 --          resetPiece pix st

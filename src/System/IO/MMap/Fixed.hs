@@ -151,8 +151,8 @@ mallocTo fi s = do
 lookupRegion :: FixedOffset -> Fixed -> Maybe B.ByteString
 lookupRegion offset Fixed {..} =
   case intersecting imap $ IntervalCO offset (succ offset) of
-    [(i, (fptr, off))] -> let s = max 0 $ upperBound i - lowerBound i
-                          in  Just $ fromForeignPtr fptr off s
+    [(i, (fptr, off))] -> let s = upperBound i - lowerBound i
+                          in  Just $ fromForeignPtr fptr off (max 0 s)
     _         -> Nothing
 
 -- | Note: this is unsafe operation.

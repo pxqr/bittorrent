@@ -299,7 +299,7 @@ So if client is a leecher then max sessions count depends on the
 number of unchoke slots.
 
 > -- | Used to bound the number of simultaneous connections and, which
-> -- is the same, P2P sessions within the swarm session.
+> --   is the same, P2P sessions within the swarm session.
 > type SessionCount = Int
 
 However if client is a seeder then the value depends on .
@@ -321,8 +321,6 @@ Throttling* section.
 
 Client bitfield is used to keep track "the client have" piece set.
 Modify this carefully always updating global progress.
-
->   , clientBitfield    :: !(TVar  Bitfield)
 
 >   , storage           :: !Storage
 
@@ -371,7 +369,7 @@ INVARIANT: max_sessions_count - sizeof connectedPeers = value vacantPeers
 >   compare = comparing (tInfoHash . torrentMeta)
 
 > getClientBitfield :: SwarmSession -> IO Bitfield
-> getClientBitfield = readTVarIO . clientBitfield
+> getClientBitfield SwarmSession {..} = atomically $ getCompleteBitfield storage
 
 Peer sessions
 ------------------------------------------------------------------------
@@ -458,16 +456,14 @@ messages & events we should send.
 2. Update downloaded stats     --/
 3. Signal to the all other peer about this.
 
-> available :: Bitfield -> SwarmSession -> IO ()
-> available bf se @ SwarmSession {..} = {-# SCC available #-} do
->     mark >> atomically broadcast
+> available :: Bitfield -> SwarmSession -> STM ()
+> available bf SwarmSession {..} = {-# SCC available #-} do
+>     updateProgress >> broadcast
 >   where
->     mark = do
+>     updateProgress = do
 >       let piLen = ciPieceLength $ tInfo $ torrentMeta
 >       let bytes = piLen * BF.haveCount bf
->       atomically $ do
->         modifyTVar' clientBitfield (BF.union bf)
->         modifyTVar' (currentProgress clientSession) (downloadedProgress bytes)
+>       modifyTVar' (currentProgress clientSession) (downloadedProgress bytes)
 >
 >     broadcast = mapM_ (writeTChan broadcastMessages . Have) (BF.toList bf)
 

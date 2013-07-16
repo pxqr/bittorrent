@@ -71,6 +71,7 @@ module Network.BitTorrent.Exchange
        ) where
 
 import Control.Applicative
+import Control.Concurrent.STM
 import Control.Exception
 import Control.Lens
 import Control.Monad.Reader
@@ -80,7 +81,7 @@ import Control.Monad.Trans.Resource
 import Data.IORef
 import Data.Conduit as C
 import Data.Conduit.Cereal as S
-import Data.Conduit.Serialization.Binary as B
+--import Data.Conduit.Serialization.Binary as B
 import Data.Conduit.Network
 import Data.Serialize as S
 import Text.PrettyPrint as PP hiding (($$))
@@ -100,11 +101,11 @@ import System.Torrent.Storage
 type PeerWire = ConduitM Message Message IO
 
 runPeerWire :: Socket -> PeerWire () -> IO ()
-runPeerWire sock p2p =
+runPeerWire sock action =
   sourceSocket sock     $=
     S.conduitGet S.get  $=
 --    B.conduitDecode     $=
-      p2p               $=
+      action            $=
     S.conduitPut S.put  $$
 --    B.conduitEncode     $$
   sinkSocket sock
@@ -153,9 +154,9 @@ instance MonadState SessionState P2P where
   {-# INLINE put #-}
 
 runP2P :: (Socket, PeerSession) -> P2P () -> IO ()
-runP2P (sock, ses) p2p =
+runP2P (sock, ses) action =
   handle isIOException $
-    runPeerWire sock (runReaderT (unP2P p2p) ses)
+    runPeerWire sock (runReaderT (unP2P action) ses)
   where
     isIOException :: IOException -> IO ()
     isIOException _ = return ()
@@ -428,7 +429,10 @@ yieldEvent e = {-# SCC yieldEvent #-} do
     go e
     flushPending
   where
-    go (Available ixs) = asks swarmSession >>= liftIO . available ixs
+    go (Available ixs) = do
+      ses <- asks swarmSession
+      liftIO $ atomically $ available ixs ses
+
     go (Want      bix) = do
       offer <- peerOffer
       if ixPiece bix `BF.member` offer

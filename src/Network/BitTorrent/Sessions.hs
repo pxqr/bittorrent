@@ -202,9 +202,9 @@ discover swarm @ SwarmSession {..} = {-# SCC discover #-} do
     forever $ do
       addr <- getPeerAddr tses
       forkThrottle swarm $ do
-        initiatePeerSession swarm addr $ \conn -> do
+        initiatePeerSession swarm addr $ \pconn -> do
           print addr
-          runP2P conn p2p
+          runP2P pconn p2p
 
 registerSwarmSession :: SwarmSession -> STM ()
 registerSwarmSession ss @ SwarmSession {..} =
@@ -223,8 +223,7 @@ openSwarmSession cs @ ClientSession {..} loc @ TorrentLoc {..} = do
 
   ss <- SwarmSession t cs
     <$> MSem.new defLeecherConns
-    <*> newTVarIO bf
-    <*> openStorage t dataDirPath
+    <*> openStorage t dataDirPath bf
     <*> newTVarIO S.empty
     <*> newBroadcastTChanIO
 
@@ -232,7 +231,7 @@ openSwarmSession cs @ ClientSession {..} loc @ TorrentLoc {..} = do
     modifyTVar' currentProgress $ enqueuedProgress $ contentLength $ tInfo t
     registerSwarmSession ss
 
-  forkIO $ discover ss
+  _ <- forkIO $ discover ss
 
   return ss
 
@@ -246,8 +245,8 @@ closeSwarmSession se @ SwarmSession {..} = do
 
 getSwarm :: ClientSession -> InfoHash -> IO SwarmSession
 getSwarm cs @ ClientSession {..} ih = do
-  status <- torrentPresence cs ih
-  case status of
+  tstatus <- torrentPresence cs ih
+  case tstatus of
     Unknown        -> throw $ UnknownTorrent ih
     Active sw      -> return sw
     Registered loc -> openSwarmSession cs loc
@@ -342,9 +341,11 @@ openSession :: SwarmSession -> PeerAddr -> Handshake -> IO PeerSession
 openSession ss @ SwarmSession {..} addr Handshake {..} = do
   let clientCaps = encodeExts $ allowedExtensions $ clientSession
   let enabled    = decodeExts (enabledCaps clientCaps hsReserved)
+
+  bf <- getClientBitfield ss
   ps <- PeerSession addr ss enabled
     <$> atomically (dupTChan broadcastMessages)
-    <*> (newIORef . initialSessionState . totalCount =<< readTVarIO clientBitfield)
+    <*> newIORef (initialSessionState (totalCount bf))
     -- TODO we could implement more interesting throtling scheme
     -- using connected peer information
   registerPeerSession ps
@@ -408,7 +409,7 @@ listener cs action serverPort = bracket openListener close loop
       putStrLn "accepted"
       case addr of
         SockAddrInet port host -> do
-          forkIO $ do
+          _ <- forkIO $ do
             acceptPeerSession cs (PeerAddr Nothing host port) conn action
           return ()
         _                      -> return ()
