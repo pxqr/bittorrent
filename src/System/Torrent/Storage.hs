@@ -29,7 +29,9 @@ module System.Torrent.Storage
 
          -- * TODO expose only File interface!
          -- * File interface
-       , FD, openFD, closeFD, readFD, writeFD
+       , FD
+       , openFD, flushFD, closeFD
+       , readFD, writeFD
        ) where
 
 import Control.Applicative
@@ -243,6 +245,11 @@ openFD path nonblock Storage {..}
   , Just bs     <- lookupRegion (fromIntegral offset) payload
   = return $ Right $ FD bs nonblock
   | otherwise = return $ Left $ eNOENT
+
+-- | Cancel all enqueued read operations and report any delayed
+-- errors.
+flushFD :: FD -> IO Errno
+flushFD _ = return eOK
 
 -- | This call correspond to close(2).
 closeFD :: FD -> IO ()
