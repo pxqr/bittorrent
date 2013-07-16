@@ -51,12 +51,12 @@ module Data.Torrent
          -- * Extra
        , sizeInBase
 
-#if defined (TESTING)
+-- #if defined (TESTING)
          -- * Internal
        , Data.Torrent.hash
        , Data.Torrent.hashlazy
        , layoutOffsets
-#endif
+-- #endif
        ) where
 
 import Prelude hiding (sum)
@@ -79,7 +79,6 @@ import qualified Data.ByteString.Lazy as Lazy
 import qualified Data.ByteString.Lazy.Builder as B
 import qualified Data.ByteString.Lazy.Builder.ASCII as B
 import qualified Data.List as L
-import           Data.Maybe
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Hashable as Hashable
@@ -87,7 +86,6 @@ import           Data.Text (Text)
 import           Data.Serialize as S hiding (Result)
 import           Text.PrettyPrint
 import           Text.ParserCombinators.ReadP as P
-import           Text.Read
 
 import Network.URI
 import System.FilePath

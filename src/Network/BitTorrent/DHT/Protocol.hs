@@ -36,6 +36,7 @@ import Remote.KRPC.Protocol
 import Data.BEncode
 import Data.Torrent
 import Network.BitTorrent.Peer
+import Network.BitTorrent.Exchange.Protocol ()
 
 {-----------------------------------------------------------------------
     Node
@@ -50,11 +51,6 @@ type NodeId = ByteString
 genNodeId :: IO NodeId
 genNodeId = getEntropy 20
 
-instance Serialize PortNumber where
-  get = fromIntegral <$> getWord16be
-  put = putWord16be . fromIntegral
-
-
 data NodeAddr = NodeAddr {
     nodeIP   :: {-# UNPACK #-} !HostAddress
   , nodePort :: {-# UNPACK #-} !PortNumber
@@ -65,7 +61,6 @@ instance Serialize NodeAddr where
   put NodeAddr {..} = do
     putWord32be nodeIP
     put         nodePort
-
 
 data NodeInfo = NodeInfo {
     nodeID   :: !NodeId
@@ -175,7 +170,7 @@ assignToken _ _ = return ""
 
 -- TODO
 checkToken :: NodeId -> Token -> NodeSession -> IO Bool
-checkToken nid token _ = return True
+checkToken _ _ _ = return True
 
 updateTimestamp :: NodeSession -> NodeId -> IO ()
 updateTimestamp = error "updateTimestamp"

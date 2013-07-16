@@ -28,6 +28,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# OPTIONS  -fno-warn-orphans #-}
 module Network.BitTorrent.Exchange.Protocol
        ( -- * Initial handshake
          Handshake(..), ppHandshake
@@ -76,7 +77,6 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as Lazy
 import Data.Char
 import Data.Default
-import Data.Int
 import Data.List as L
 import Data.Word
 
@@ -309,7 +309,6 @@ blockRange pieceSize blk = (offset, offset + len)
            + fromIntegral (blkOffset blk)
     len    = fromIntegral (Lazy.length (blkData blk))
 {-# INLINE blockRange #-}
-{-# SPECIALIZE blockRange :: Int -> Block -> (Int64, Int64) #-}
 
 ixRange :: (Num a, Integral a) => Int -> BlockIx -> (a, a)
 ixRange pieceSize i = (offset, offset + len)
@@ -318,8 +317,6 @@ ixRange pieceSize i = (offset, offset + len)
            + fromIntegral (ixOffset i)
     len    = fromIntegral (ixLength i)
 {-# INLINE ixRange #-}
-{-# SPECIALIZE ixRange :: Int -> BlockIx -> (Int64, Int64) #-}
-
 
 {-----------------------------------------------------------------------
     Regular messages
@@ -386,6 +383,11 @@ data Message = KeepAlive
              | AllowedFast !PieceIx
                deriving (Show, Eq)
 
+instance Serialize PortNumber where
+  get = fromIntegral <$> S.getWord16be
+  {-# INLINE get #-}
+  put = S.putWord16be . fromIntegral
+  {-# INLINE put #-}
 
 instance Serialize Message where
   get = do
@@ -404,7 +406,7 @@ instance Serialize Message where
           0x06 -> Request  <$> S.get
           0x07 -> Piece    <$> getBlock (len - 9)
           0x08 -> Cancel   <$> S.get
-          0x09 -> (Port . fromIntegral) <$> S.getWord16be
+          0x09 -> Port <$> S.get
           0x0E -> return HaveAll
           0x0F -> return HaveNone
           0x0D -> SuggestPiece  <$> getInt
@@ -441,7 +443,7 @@ instance Serialize Message where
           {-# INLINE putBlock #-}
 
   put (Cancel  blk)      = putInt 13 >> S.putWord8 0x08 >> S.put blk
-  put (Port    p  )      = putInt 3  >> S.putWord8 0x09 >> S.putWord16be (fromIntegral p)
+  put (Port    p  )      = putInt 3  >> S.putWord8 0x09 >> S.put p
   put  HaveAll           = putInt 1  >> S.putWord8 0x0E
   put  HaveNone          = putInt 1  >> S.putWord8 0x0F
   put (SuggestPiece pix) = putInt 5  >> S.putWord8 0x0D >> putInt pix
@@ -471,11 +473,7 @@ instance Binary Message where
           0x0D -> SuggestPiece  <$> getIntB
           0x10 -> RejectRequest <$> B.get
           0x11 -> AllowedFast   <$> getIntB
-          _    -> do
-            rm <- B.remaining >>= B.getBytes . fromIntegral
-            fail $ "unknown message ID: " ++ show mid ++ "\n"
-                ++ "remaining available bytes: " ++ show rm
-
+          _    -> fail $ "unknown message ID: " ++ show mid
     where
       getBlock :: Int -> B.Get Block
       getBlock len = Block <$> getIntB <*> getIntB

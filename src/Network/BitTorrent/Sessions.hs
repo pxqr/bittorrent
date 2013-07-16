@@ -51,7 +51,7 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.MSem as MSem
-import Control.Monad (when, forever, (>=>))
+import Control.Monad (forever, (>=>))
 import Control.Exception
 import Control.Monad.Trans
 
@@ -61,12 +61,9 @@ import Data.HashMap.Strict as HM
 import Data.Foldable as F
 import Data.Set as S
 
-import Data.Serialize hiding (get)
-
 import Network hiding (accept)
 import Network.BSD
 import Network.Socket
-import Network.Socket.ByteString
 
 import Data.Bitfield as BF
 import Data.Torrent
@@ -120,9 +117,7 @@ torrentPresence ClientSession {..} ih = do
 
 startListener :: ClientSession -> PortNumber -> IO ()
 startListener cs @ ClientSession {..} port =
-  startService peerListener port $ listener cs $ \conn @ (sock, PeerSession{..}) -> do
-      print "accepted"
-      let storage = error "storage"
+  startService peerListener port $ listener cs $ \conn @ (_, PeerSession{..}) -> do
       runP2P conn p2p
 
 -- | Create a new client session. The data passed to this function are
