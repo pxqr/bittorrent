@@ -146,7 +146,7 @@ To avoid this we keep just *metainfo* about *metainfo*:
 >     -- | Full path to directory contating content files associated
 >     -- with the metafile.
 >   , dataDirPath  :: FilePath
->   }
+>   } deriving Show
 
 TorrentMap is used to keep track all known torrents for the
 client. When some peer trying to connect to us it's necessary to

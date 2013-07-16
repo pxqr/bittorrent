@@ -12,7 +12,7 @@ main = do
   print (contentLayout "./" (tInfo torrent))
   let loc = TorrentLoc path "/tmp"
 
-  withDefaultClient 51413 3000 $ \ client -> do
+  withDefaultClient (head defaultPorts) 3000 $ \ client -> do
     openSwarmSession client loc
     threadDelay 1000000000000
     return ()

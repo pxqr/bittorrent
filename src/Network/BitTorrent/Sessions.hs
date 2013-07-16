@@ -26,11 +26,13 @@ module Network.BitTorrent.Sessions
        , TorrentLoc(..)
        , registerTorrent
        , unregisterTorrent
+       , getRegistered
 
        , getCurrentProgress
        , getSwarmCount
        , getPeerCount
        , getSwarm
+       , getStorage
        , openSwarmSession
 
          -- * Swarm
@@ -199,9 +201,7 @@ discover swarm @ SwarmSession {..} = {-# SCC discover #-} do
   withTracker progress conn $ \tses -> do
     forever $ do
       addr <- getPeerAddr tses
-      print addr
       forkThrottle swarm $ do
-        print addr
         initiatePeerSession swarm addr $ \conn -> do
           print addr
           runP2P conn p2p
@@ -252,6 +252,10 @@ getSwarm cs @ ClientSession {..} ih = do
     Active sw      -> return sw
     Registered loc -> openSwarmSession cs loc
 
+-- TODO do not spawn session!
+getStorage :: ClientSession -> InfoHash -> IO Storage
+getStorage cs ih = storage <$> getSwarm cs ih
+
 -- | Get the number of connected peers in the given swarm.
 getSessionCount :: SwarmSession -> IO SessionCount
 getSessionCount SwarmSession {..} = do
@@ -294,11 +298,16 @@ forkThrottle se action = do
 validateLocation :: TorrentLoc -> IO Torrent
 validateLocation = fromFile . metafilePath
 
-registerTorrent :: TVar TorrentMap -> TorrentLoc -> IO ()
-registerTorrent = error "registerTorrent"
+registerTorrent :: ClientSession -> TorrentLoc -> IO ()
+registerTorrent ClientSession {..} loc @ TorrentLoc {..} = do
+  torrent <- fromFile metafilePath
+  atomically $ modifyTVar' torrentMap $ HM.insert (tInfoHash torrent) loc
 
 unregisterTorrent :: TVar TorrentMap -> InfoHash -> IO ()
 unregisterTorrent = error "unregisterTorrent"
+
+getRegistered :: ClientSession -> IO TorrentMap
+getRegistered ClientSession {..} = readTVarIO torrentMap
 
 {-----------------------------------------------------------------------
   Peer session creation
@@ -368,11 +377,10 @@ runSession connector opener action =
 -- | Used then the client want to connect to a peer.
 initiatePeerSession :: SwarmSession -> PeerAddr -> Exchange -> IO ()
 initiatePeerSession ss @ SwarmSession {..} addr
-    = runSession (putStrLn ("trying to connect" ++ show addr) *> connectToPeer addr <* putStrLn "connected") initiated
+    = runSession (connectToPeer addr) initiated
   where
     initiated sock = do
       phs  <- handshake sock (swarmHandshake ss)
-      putStrLn "handshaked"
       ps   <- openSession ss addr phs
       return ps
 
@@ -396,8 +404,6 @@ listener :: ClientSession -> Exchange -> PortNumber -> IO ()
 listener cs action serverPort = bracket openListener close loop
   where
     loop sock = forever $ handle isIOError $ do
-      putStrLn "listen"
-      print =<< getSocketName sock
       (conn, addr) <- accept sock
       putStrLn "accepted"
       case addr of
@@ -413,5 +419,5 @@ listener cs action serverPort = bracket openListener close loop
     openListener  = do
       sock <- socket AF_INET Stream =<< getProtocolNumber "tcp"
       bindSocket sock (SockAddrInet serverPort iNADDR_ANY)
-      listen sock 1
+      listen sock maxListenQueue
       return sock

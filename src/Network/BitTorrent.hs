@@ -9,11 +9,11 @@
 module Network.BitTorrent
        ( module Data.Torrent
 
-       , TorrentLoc(..), Progress(..)
+       , TorrentLoc(..), TorrentMap, Progress(..)
        , ThreadCount, SessionCount
 
        , ClientSession( clientPeerId, allowedExtensions )
-       , withDefaultClient, defaultThreadCount
+       , withDefaultClient, defaultThreadCount, defaultPorts
        , addTorrent
        , removeTorrent
 
@@ -21,6 +21,8 @@ module Network.BitTorrent
        , getPeerCount
        , getSwarmCount
        , getSessionCount
+       , getSwarm
+       , getStorage
 
          -- * Extensions
        , Extension
@@ -33,6 +35,7 @@ import Data.Torrent
 import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Sessions
 import Network.BitTorrent.Extension
+import Network.BitTorrent.Tracker
 
 -- TODO remove fork from Network.BitTorrent.Exchange
 -- TODO make all forks in Internal.
@@ -46,22 +49,11 @@ withDefaultClient listPort dhtPort action = do
     Torrent management
 -----------------------------------------------------------------------}
 
--- | Used to check torrent location before register torrent.
-validateLocation :: TorrentLoc -> IO Torrent
-validateLocation TorrentLoc {..} = do
-  t <- fromFile metafilePath
---  exists <- doesDirectoryExist dataDirPath
---  unless exists $ do
---    throw undefined
-  return t
-
-
 -- | Register torrent and start downloading.
 addTorrent :: ClientSession -> TorrentLoc -> IO ()
-addTorrent clientSession loc @ TorrentLoc {..} = do
-  torrent <- validateLocation loc
---  registerTorrent loc tInfoHash
---  when (bf is not full)
+addTorrent cs loc @ TorrentLoc {..} = do
+  registerTorrent  cs loc
+  openSwarmSession cs loc
   return ()
 
 -- | Unregister torrent and stop all running sessions.

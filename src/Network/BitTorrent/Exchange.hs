@@ -464,16 +464,15 @@ exchange :: Storage -> P2P ()
 exchange storage = {-# SCC exchange #-} awaitEvent >>= handler
   where
     handler (Available bf) = do
-      liftIO $ print (completeness bf)
       ixs <- selBlk (findMin bf) storage
       mapM_ (yieldEvent . Want) ixs -- TODO yield vectored
 
     handler (Want     bix) = do
+      liftIO $ print bix
       blk <- liftIO $ getBlk bix storage
       yieldEvent (Fragment blk)
 
     handler (Fragment blk @ Block {..}) = do
-      liftIO $ print (ppBlock blk)
       done <- liftIO $ putBlk blk storage
       when done $ do
         yieldEvent $ Available $ singleton blkPiece (succ blkPiece)
