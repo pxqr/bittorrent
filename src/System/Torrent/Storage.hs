@@ -299,7 +299,7 @@ readFD fd @ FD {..} offset reqSize =
         readAhead fd offset expSize
         return $ Right bs
 
--- TODO
+-- TODO implement COW; needed for applications which want to change files.
 writeFD :: FD -> ByteString -> Offset -> IO ()
 writeFD FD {..} bs offset = return ()
 

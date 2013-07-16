@@ -23,6 +23,7 @@ module Network.BitTorrent
        , getSessionCount
        , getSwarm
        , getStorage
+       , getTorrentInfo
 
          -- * Extensions
        , Extension

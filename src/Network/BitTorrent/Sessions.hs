@@ -33,6 +33,7 @@ module Network.BitTorrent.Sessions
        , getPeerCount
        , getSwarm
        , getStorage
+       , getTorrentInfo
        , openSwarmSession
 
          -- * Swarm
@@ -249,6 +250,14 @@ getSwarm cs @ ClientSession {..} ih = do
 -- TODO do not spawn session!
 getStorage :: ClientSession -> InfoHash -> IO Storage
 getStorage cs ih = storage <$> getSwarm cs ih
+
+getTorrentInfo :: ClientSession -> InfoHash -> IO (Maybe Torrent)
+getTorrentInfo cs ih = do
+  tstatus <- torrentPresence cs ih
+  case tstatus of
+    Unknown                        -> return   Nothing
+    Active     (SwarmSession {..}) -> return $ Just torrentMeta
+    Registered (TorrentLoc   {..}) -> Just <$> fromFile metafilePath
 
 -- | Get the number of connected peers in the given swarm.
 getSessionCount :: SwarmSession -> IO SessionCount
