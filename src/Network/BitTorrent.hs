@@ -24,6 +24,7 @@ module Network.BitTorrent
        , getSwarm
        , getStorage
        , getTorrentInfo
+       , getTorrentInfoStr
 
          -- * Extensions
        , Extension
@@ -37,6 +38,7 @@ import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Sessions
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Tracker
+import Text.Read
 
 -- TODO remove fork from Network.BitTorrent.Exchange
 -- TODO make all forks in Internal.
@@ -60,6 +62,11 @@ addTorrent cs loc @ TorrentLoc {..} = do
 -- | Unregister torrent and stop all running sessions.
 removeTorrent :: ClientSession -> InfoHash ->  IO ()
 removeTorrent ses loc = undefined -- atomically $ unregisterTorrent ses loc
+
+getTorrentInfoStr :: ClientSession -> String -> IO (Maybe Torrent)
+getTorrentInfoStr cs str
+  | Just infohash <- readMaybe str = getTorrentInfo cs infohash
+  |            otherwise           = return Nothing
 
 {-
 -- | The same as 'removeTorrrent' torrent, but delete all torrent

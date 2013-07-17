@@ -33,7 +33,7 @@ module Data.Torrent
 
          -- * Files layout
        , Layout, contentLayout
-       , contentLength, fileOffset
+       , contentLength, fileCount, fileOffset
        , pieceCount, blockCount
        , isSingleFile, isMultiFile
 
@@ -414,6 +414,11 @@ sizeInBase n b = fromIntegral (n `div` fromIntegral b) + align
 contentLength :: ContentInfo -> Integer
 contentLength SingleFile { ciLength = len } = len
 contentLength MultiFile  { ciFiles  = tfs } = sum (map fiLength tfs)
+
+-- | Get count of all files in torrent.
+fileCount :: ContentInfo -> Int
+fileCount SingleFile {..} = 1
+fileCount MultiFile  {..} = length ciFiles
 
 -- | Find count of pieces in the torrent. If torrent size is not a
 -- multiple of piece size then the count is rounded up.
