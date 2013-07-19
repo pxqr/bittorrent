@@ -306,8 +306,10 @@ registerTorrent ClientSession {..} loc @ TorrentLoc {..} = do
   torrent <- fromFile metafilePath
   atomically $ modifyTVar' torrentMap $ HM.insert (tInfoHash torrent) loc
 
-unregisterTorrent :: TVar TorrentMap -> InfoHash -> IO ()
-unregisterTorrent = error "unregisterTorrent"
+-- TODO kill sessions
+unregisterTorrent :: ClientSession -> InfoHash -> IO ()
+unregisterTorrent ClientSession {..} ih = do
+  atomically $ modifyTVar' torrentMap $ HM.delete ih
 
 getRegistered :: ClientSession -> IO TorrentMap
 getRegistered ClientSession {..} = readTVarIO torrentMap
