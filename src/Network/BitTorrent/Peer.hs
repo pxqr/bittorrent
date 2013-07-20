@@ -51,6 +51,7 @@ module Network.BitTorrent.Peer
 
          -- * Peer address
        , PeerAddr(..)
+       , getCompactPeerList
        , peerSockAddr
        , connectToPeer
        , ppPeer
@@ -496,8 +497,8 @@ nameMap =
 -- compact list encoding.
 data PeerAddr = PeerAddr {
       peerID   :: Maybe PeerId
-    , peerIP   :: HostAddress
-    , peerPort :: PortNumber
+    , peerIP   :: {-# UNPACK #-} !HostAddress
+    , peerPort :: {-# UNPACK #-} !PortNumber
     } deriving (Show, Eq, Ord)
 
 -- TODO check semantic of ord and eq instances
@@ -520,6 +521,20 @@ instance BEncodable PeerAddr where
 
   fromBEncode _ = decodingError "PeerAddr"
 
+instance Serialize PortNumber where
+  get = fromIntegral <$> getWord16be
+  {-# INLINE get #-}
+  put = putWord16be . fromIntegral
+  {-# INLINE put #-}
+
+instance Serialize PeerAddr where
+  put PeerAddr {..} = put peerID >> put peerPort
+  {-# INLINE put #-}
+  get = PeerAddr Nothing <$> get <*> get
+  {-# INLINE get #-}
+
+getCompactPeerList :: Get [PeerAddr]
+getCompactPeerList = many get
 
 -- TODO make platform independent, clarify htonl
 

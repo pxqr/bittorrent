@@ -383,12 +383,6 @@ data Message = KeepAlive
              | AllowedFast !PieceIx
                deriving (Show, Eq)
 
-instance Serialize PortNumber where
-  get = fromIntegral <$> S.getWord16be
-  {-# INLINE get #-}
-  put = S.putWord16be . fromIntegral
-  {-# INLINE put #-}
-
 instance Serialize Message where
   get = do
     len <- getInt

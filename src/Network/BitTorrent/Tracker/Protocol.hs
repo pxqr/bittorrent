@@ -17,8 +17,11 @@
 --   For more information see:
 --   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
 --
-{-# OPTIONS -fno-warn-orphans #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS -fno-warn-orphans           #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
 -- TODO: add "compact" field to TRequest
 module Network.BitTorrent.Tracker.Protocol
        ( Event(..), TRequest(..), TResponse(..)
@@ -34,11 +37,13 @@ import Control.Monad
 import Data.Char as Char
 import Data.Word (Word32)
 import Data.Map  as M
+import Data.Maybe
+import Data.Word
 import Data.Monoid
 import Data.BEncode
 import Data.ByteString as B
 import           Data.Text as T
-import Data.Serialize.Get hiding (Result)
+import Data.Serialize hiding (Result)
 import Data.URLEncoded as URL
 import Data.Torrent
 
@@ -48,7 +53,7 @@ import Network.HTTP
 import Network.URI
 
 import Network.BitTorrent.Peer
-
+import Network.BitTorrent.Exchange.Protocol hiding (Request)
 
 
 -- | Events used to specify which kind of tracker request is performed.
@@ -110,7 +115,7 @@ data TRequest = TRequest { -- TODO peer here -- TODO detach announce
 --
 data TResponse =
      Failure Text -- ^ Failure reason in human readable form.
-   | OK {
+   | OK { -- TODO rename to anounce
        respWarning     ::  Maybe Text
        -- ^ Human readable warning.
 
@@ -156,21 +161,10 @@ instance BEncodable TResponse where
       where
         getPeers :: Maybe BEncode -> Result [PeerAddr]
         getPeers (Just (BList l))     = fromBEncode (BList l)
-        getPeers (Just (BString s))
-            | B.length s `mod` 6 == 0 =
-              let cnt = B.length s `div` 6 in
-              runGet (replicateM cnt peerG) s
-            | otherwise = decodingError "peers length not a multiple of 6"
-          where
-            peerG = do
-              pip   <- getWord32be
-              pport <- getWord16be
-              return $ PeerAddr Nothing (fromIntegral pip)
-                                        (fromIntegral pport)
-        getPeers _ = decodingError "Peers"
+        getPeers (Just (BString s))   = runGet getCompactPeerList s
+        getPeers  _                   = decodingError "Peers"
 
   fromBEncode _ = decodingError "TResponse"
-
 
 instance URLShow PortNumber where
   urlShow = urlShow . fromEnum
@@ -205,7 +199,7 @@ encodeRequest req = URL.urlEncode req
 
 -- | Ports typically reserved for bittorrent P2P communication.
 defaultPorts :: [PortNumber]
-defaultPorts = [6881..6889]
+defaultPorts =  [6881..6889]
 
 -- | Above 25, new peers are highly unlikely to increase download
 --   speed.  Even 30 peers is /plenty/, the official client version 3
