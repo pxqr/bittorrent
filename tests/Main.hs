@@ -43,6 +43,8 @@ import Data.Torrent
 import Network.BitTorrent as BT
 import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Tracker
+import Network.BitTorrent.Tracker.Protocol
+import Network.BitTorrent.Tracker.HTTP
 import Network.BitTorrent.Peer
 import System.IO.MMap.Fixed hiding (empty, interval)
 import qualified System.IO.MMap.Fixed as Fixed

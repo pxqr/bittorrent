@@ -30,11 +30,7 @@ module Network.BitTorrent.Tracker
 
          -- * Re-export
        , defaultPorts
-
-         -- * Scrape
-       , ScrapeInfo(..), Scrape
-       , scrapeURL
-       , scrape, scrapeOne
+       , ScrapeInfo
        ) where
 
 import Control.Applicative
@@ -61,9 +57,10 @@ import Network.HTTP
 import Network.URI
 
 import Data.Torrent
-import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Peer
+import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Tracker.Protocol
+import Network.BitTorrent.Tracker.HTTP
 
 {-----------------------------------------------------------------------
     Tracker connection
@@ -82,9 +79,9 @@ data TConnection = TConnection {
   , tconnPort     :: PortNumber -- ^ The port number the client is listenning on.
   } deriving Show
 
+-- TODO tconnection :: SwarmSession -> TConnection
 tconnection :: Torrent -> PeerId -> PortNumber -> TConnection
 tconnection t = TConnection (tAnnounce t) (tInfoHash t)
-
 
 -- | used to avoid boilerplate; do NOT export me
 genericReq :: TConnection -> Progress -> AnnounceQuery
@@ -101,7 +98,6 @@ genericReq ses pr =   AnnounceQuery {
   , reqNumWant    = Nothing
   , reqEvent      = Nothing
   }
-
 
 -- | The first request to the tracker that should be created is
 --   'startedReq'. It includes necessary 'Started' event field.
@@ -251,59 +247,3 @@ withTracker initProgress conn action = bracket start end (action . fst)
       killThread tid
       pr <- getProgress se
       leaveTracker (tconnAnnounce conn) (stoppedReq conn pr)
-
-{-----------------------------------------------------------------------
-    Scrape
------------------------------------------------------------------------}
-
--- | Scrape info about a set of torrents.
-type Scrape = Map InfoHash ScrapeInfo
-
--- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'
---   gives 'Nothing' then tracker do not support scraping. The info hash
---   list is used to restrict the tracker's report to that particular
---   torrents. Note that scrapping of multiple torrents may not be
---   supported. (Even if scrapping convention is supported)
---
-scrapeURL :: URI -> [InfoHash] -> Maybe URI
-scrapeURL uri ihs = do
-  newPath <- replace (BC.pack (uriPath uri))
-  let newURI = uri { uriPath = BC.unpack newPath }
-  return (foldl addHashToURI newURI ihs)
- where
-    replace :: ByteString -> Maybe ByteString
-    replace p
-      | ps <- BC.splitWith (== '/') p
-      , "announce" `B.isPrefixOf` last ps
-      = let newSuff = "scrape" <> B.drop (B.length "announce") (last ps)
-        in Just (B.intercalate "/" (init ps ++ [newSuff]))
-      | otherwise = Nothing
-
-
--- | For each 'InfoHash' of torrents request scrape info from the tracker.
---   However if the info hash list is 'null', the tracker should list
---   all available torrents.
---   Note that the 'URI' should be /announce/ URI, not /scrape/ URI.
---
-scrape :: URI                -- ^ Announce 'URI'.
-       -> [InfoHash]         -- ^ Torrents to be scrapped.
-       -> IO (Result Scrape) -- ^ 'ScrapeInfo' for each torrent.
-scrape announce ihs
-  | Just uri<- scrapeURL announce ihs = do
-    rawResp  <- simpleHTTP (Request uri GET [] "")
-    respBody <- getResponseBody rawResp
-    return (decoded (BC.pack respBody))
-
-  | otherwise = return (Left "Tracker do not support scraping")
-
--- | More particular version of 'scrape', just for one torrent.
---
-scrapeOne :: URI                     -- ^ Announce 'URI'
-          -> InfoHash                -- ^ Hash of the torrent info.
-          -> IO (Result ScrapeInfo)  -- ^ 'ScrapeInfo' for the torrent.
-scrapeOne uri ih = extract <$> scrape uri [ih]
-  where
-    extract (Right m)
-      | Just s <- M.lookup ih m = Right s
-      | otherwise = Left "unable to find info hash in response dict"
-    extract (Left e) = Left e

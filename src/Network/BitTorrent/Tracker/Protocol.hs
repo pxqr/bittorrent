@@ -25,11 +25,8 @@
 {-# LANGUAGE TemplateHaskell            #-}
 module Network.BitTorrent.Tracker.Protocol
        ( Event(..), AnnounceQuery(..), AnnounceInfo(..)
+       , defaultNumWant , defaultPorts
        , ScrapeQuery, ScrapeInfo(..)
-       , askTracker, leaveTracker
-
-         -- * Defaults
-       , defaultPorts, defaultNumWant
        )
        where
 
@@ -44,7 +41,6 @@ import Data.List as L
 import Data.Word
 import Data.Monoid
 import Data.BEncode
-import Data.ByteString as B
 import Data.Text (Text)
 import Data.Text.Encoding
 import Data.Serialize hiding (Result)
@@ -53,7 +49,6 @@ import Data.Torrent
 
 import Network
 import Network.Socket
-import Network.HTTP
 import Network.URI
 
 import Network.BitTorrent.Peer
@@ -216,11 +211,6 @@ instance URLEncode AnnounceQuery where
       ]
     where s :: String -> String;  s = id; {-# INLINE s #-}
 
-encodeRequest :: URI -> AnnounceQuery -> URI
-encodeRequest announce req = URL.urlEncode req
-                    `addToURI`      announce
-                    `addHashToURI`  reqInfoHash req
-
 {-----------------------------------------------------------------------
   Binary announce encoding
 -----------------------------------------------------------------------}
@@ -369,36 +359,3 @@ instance Serialize ScrapeInfo where
       , siIncomplete = fromIntegral leechers
       , siName       = Nothing
       }
-
-{-----------------------------------------------------------------------
-  Tracker
------------------------------------------------------------------------}
-
-mkHTTPRequest :: URI -> Request ByteString
-mkHTTPRequest uri = Request uri GET [] ""
-
--- | Send request and receive response from the tracker specified in
--- announce list. This function throws 'IOException' if it couldn't
--- send request or receive response or decode response.
---
-askTracker :: URI -> AnnounceQuery -> IO AnnounceInfo
-askTracker announce req = do
-    let r = mkHTTPRequest (encodeRequest announce req)
-
-    rawResp  <- simpleHTTP r
-    respBody <- getResponseBody rawResp
-    checkResult $ decoded respBody
-  where
-
-    checkResult (Left err)
-      = ioError $ userError $ err ++ " in tracker response"
-    checkResult (Right (Failure err))
-      = ioError $ userError $ show err ++ " in tracker response"
-    checkResult (Right resp)          = return resp
-
--- | The same as the 'askTracker' but ignore response. Used in
--- conjunction with 'Stopped'.
-leaveTracker :: URI -> AnnounceQuery -> IO ()
-leaveTracker announce req = do
-  let r = mkHTTPRequest (encodeRequest announce req)
-  void $ simpleHTTP r >>= getResponseBody

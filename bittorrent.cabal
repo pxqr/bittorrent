@@ -53,11 +53,15 @@ library
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
+                     , Network.BitTorrent.Tracker.HTTP
+                     , Network.BitTorrent.Tracker.UDP
                      , Network.BitTorrent.DHT.Protocol
                      , System.IO.MMap.Fixed
   if !flag(testing)
      other-modules:    Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
+                     , Network.BitTorrent.Tracker.HTTP
+                     , Network.BitTorrent.Tracker.UDP
                      , Network.BitTorrent.DHT.Protocol
                      , System.IO.MMap.Fixed
 
