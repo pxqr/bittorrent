@@ -146,12 +146,12 @@ data TResponse =
 
 instance BEncodable TResponse where
   toBEncode (Failure t)  = fromAssocs ["failure reason" --> t]
-  toBEncode resp@(OK {}) = fromAssocs
-    [ "interval"     -->  respInterval resp
-    , "min interval" -->? respMinInterval resp
-    , "complete"     -->? respComplete resp
-    , "incomplete"   -->? respIncomplete resp
-    , "peers"        -->  respPeers resp
+  toBEncode (OK {..})    = fromAssocs
+    [ "interval"     -->  respInterval
+    , "min interval" -->? respMinInterval
+    , "complete"     -->? respComplete
+    , "incomplete"   -->? respIncomplete
+    , "peers"        -->  respPeers
     ]
 
   fromBEncode (BDict d)
@@ -184,15 +184,15 @@ instance URLShow Event where
       (x : xs) = show e
 
 instance URLEncode TRequest where
-  urlEncode req = mconcat
-      [ s "peer_id"    %=  reqPeerId req
-      , s "port"       %=  reqPort req
-      , s "uploaded"   %=  reqUploaded req
-      , s "downloaded" %=  reqDownloaded req
-      , s "left"       %=  reqLeft req
-      , s "ip"         %=? reqIP req
-      , s "numwant"    %=? reqNumWant req
-      , s "event"      %=? reqEvent req
+  urlEncode TRequest {..} = mconcat
+      [ s "peer_id"    %=  reqPeerId
+      , s "port"       %=  reqPort
+      , s "uploaded"   %=  reqUploaded
+      , s "downloaded" %=  reqDownloaded
+      , s "left"       %=  reqLeft
+      , s "ip"         %=? reqIP
+      , s "numwant"    %=? reqNumWant
+      , s "event"      %=? reqEvent
       ]
     where s :: String -> String;  s = id; {-# INLINE s #-}
 
@@ -342,7 +342,4 @@ askTracker req = do
 leaveTracker :: TRequest -> IO ()
 leaveTracker req = do
   let r = mkHTTPRequest (encodeRequest req)
-
-  rawResp  <- simpleHTTP r
-  _ <- getResponseBody rawResp
-  return ()
+  void $ simpleHTTP r >>= getResponseBody
