@@ -35,14 +35,14 @@ module Network.BitTorrent.Tracker.Protocol
 import Control.Applicative
 import Control.Monad
 import Data.Char as Char
-import Data.Word (Word32)
 import Data.Map  as M
 import Data.Maybe
 import Data.Word
 import Data.Monoid
 import Data.BEncode
 import Data.ByteString as B
-import           Data.Text as T
+import Data.Text as T
+import Data.Text.Encoding as T
 import Data.Serialize hiding (Result)
 import Data.URLEncoded as URL
 import Data.Torrent
@@ -53,8 +53,10 @@ import Network.HTTP
 import Network.URI
 
 import Network.BitTorrent.Peer
-import Network.BitTorrent.Exchange.Protocol hiding (Request)
 
+{-----------------------------------------------------------------------
+  Tracker messages
+-----------------------------------------------------------------------}
 
 -- | Events used to specify which kind of tracker request is performed.
 data Event = Started
@@ -138,6 +140,9 @@ data TResponse =
        -- ^ Peers that must be contacted.
      } deriving Show
 
+{-----------------------------------------------------------------------
+  HTTP Tracker encoding
+-----------------------------------------------------------------------}
 
 instance BEncodable TResponse where
   toBEncode (Failure t)  = fromAssocs ["failure reason" --> t]
@@ -196,8 +201,106 @@ encodeRequest req = URL.urlEncode req
                     `addToURI`      reqAnnounce req
                     `addHashToURI`  reqInfoHash req
 
+{-----------------------------------------------------------------------
+  UDP tracker encoding
+-----------------------------------------------------------------------}
 
--- | Ports typically reserved for bittorrent P2P communication.
+type EventId = Word32
+
+eventId :: Event -> EventId
+eventId Completed = 1
+eventId Started   = 2
+eventId Stopped   = 3
+
+-- TODO add Regular event
+putEvent :: Putter (Maybe Event)
+putEvent Nothing  = putWord32be 0
+putEvent (Just e) = putWord32be (eventId e)
+
+getEvent :: Get (Maybe Event)
+getEvent = do
+  eid <- getWord32be
+  case eid of
+    0 -> return Nothing
+    1 -> return $ Just Completed
+    2 -> return $ Just Started
+    3 -> return $ Just Stopped
+    _ -> fail "unknown event id"
+
+instance Serialize TRequest where
+  put TRequest {..} = do
+    put           reqInfoHash
+    put           reqPeerId
+
+    putWord64be $ fromIntegral reqDownloaded
+    putWord64be $ fromIntegral reqLeft
+    putWord64be $ fromIntegral reqUploaded
+
+    putEvent      reqEvent
+    putWord32be $ fromMaybe 0 reqIP
+    putWord32be $ 0 -- TODO what the fuck is "key"?
+    putWord32be $ fromIntegral $ fromMaybe (-1) reqNumWant
+
+    put           reqPort
+
+  get = do
+    ih   <- get
+    pid  <- get
+
+    down <- getWord64be
+    left <- getWord64be
+    up   <- getWord64be
+
+    ev   <- getEvent
+    ip   <- getWord32be
+    key  <- getWord32be
+    want <- getWord32be
+
+    port <- get
+
+    return $ TRequest {
+        -- TODO remove reqAnnounce field from TRequest
+        reqAnnounce   = error "tracker request decode"
+      , reqInfoHash   = ih
+      , reqPeerId     = pid
+      , reqPort       = port
+      , reqUploaded   = fromIntegral up
+      , reqDownloaded = fromIntegral down
+      , reqLeft       = fromIntegral left
+      , reqIP         = if ip == 0 then Nothing else Just ip
+      , reqNumWant    = if want == -1 then Nothing else Just (fromIntegral want)
+      , reqEvent      = ev
+      }
+
+instance Serialize TResponse where
+  put (Failure msg) = put $ encodeUtf8 msg
+  put OK {..} = do
+    putWord32be $ fromIntegral respInterval
+    putWord32be $ fromIntegral $ fromMaybe 0 respIncomplete
+    putWord32be $ fromIntegral $ fromMaybe 0 respComplete
+    forM_ respPeers put
+
+  get = do
+    interval <- getWord32be
+    leechers <- getWord32be
+    seeders  <- getWord32be
+    peers    <- many get
+
+    return $ OK {
+        respWarning     = Nothing
+      , respInterval    = fromIntegral interval
+      , respMinInterval = Nothing
+      , respIncomplete  = Just $ fromIntegral leechers
+      , respComplete    = Just $ fromIntegral seeders
+      , respPeers       = peers
+      }
+
+
+{-----------------------------------------------------------------------
+  Tracker
+-----------------------------------------------------------------------}
+
+-- | Ports typically reserved for bittorrent P2P listener.
 defaultPorts :: [PortNumber]
 defaultPorts =  [6881..6889]
 
