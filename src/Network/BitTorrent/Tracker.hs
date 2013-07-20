@@ -44,7 +44,6 @@ import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
 
-import Data.Aeson.TH
 import Data.BEncode
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -257,42 +256,8 @@ withTracker initProgress conn action = bracket start end (action . fst)
     Scrape
 -----------------------------------------------------------------------}
 
-
--- | Information about particular torrent.
-data ScrapeInfo = ScrapeInfo {
-    -- | Number of seeders - peers with the entire file.
-    siComplete   :: !Int
-
-    -- | Total number of times the tracker has registered a completion.
-  , siDownloaded :: !Int
-
-    -- | Number of leechers.
-  , siIncomplete :: !Int
-
-    -- | Name of the torrent file, as specified by the "name"
-    --   file in the info section of the .torrent file.
-  , siName       :: !(Maybe Text)
-  } deriving (Show, Eq)
-
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
-
 -- | Scrape info about a set of torrents.
 type Scrape = Map InfoHash ScrapeInfo
-
-instance BEncodable ScrapeInfo where
-  toBEncode ScrapeInfo {..} = fromAssocs
-    [ "complete"   -->  siComplete
-    , "downloaded" -->  siDownloaded
-    , "incomplete" -->  siIncomplete
-    , "name"       -->? siName
-    ]
-
-  fromBEncode (BDict d) =
-    ScrapeInfo <$> d >--  "complete"
-               <*> d >--  "downloaded"
-               <*> d >--  "incomplete"
-               <*> d >--? "name"
-  fromBEncode _ = decodingError "ScrapeInfo"
 
 -- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'
 --   gives 'Nothing' then tracker do not support scraping. The info hash

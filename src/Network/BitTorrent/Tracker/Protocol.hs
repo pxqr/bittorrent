@@ -21,9 +21,11 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE TemplateHaskell            #-}
 module Network.BitTorrent.Tracker.Protocol
        ( Event(..), AnnounceQuery(..), AnnounceInfo(..)
+       , ScrapeQuery, ScrapeInfo(..)
        , askTracker, leaveTracker
 
          -- * Defaults
@@ -33,15 +35,18 @@ module Network.BitTorrent.Tracker.Protocol
 
 import Control.Applicative
 import Control.Monad
+
+import Data.Aeson.TH
 import Data.Char as Char
 import Data.Map  as M
 import Data.Maybe
+import Data.List as L
 import Data.Word
 import Data.Monoid
 import Data.BEncode
 import Data.ByteString as B
-import Data.Text as T
-import Data.Text.Encoding as T
+import Data.Text (Text)
+import Data.Text.Encoding
 import Data.Serialize hiding (Result)
 import Data.URLEncoded as URL
 import Data.Torrent
@@ -54,7 +59,7 @@ import Network.URI
 import Network.BitTorrent.Peer
 
 {-----------------------------------------------------------------------
-  Tracker Announce
+  Announce messages
 -----------------------------------------------------------------------}
 
 -- | Events used to specify which kind of tracker request is performed.
@@ -136,8 +141,24 @@ data AnnounceInfo =
        -- ^ Peers that must be contacted.
      } deriving Show
 
+
+-- | Ports typically reserved for bittorrent P2P listener.
+defaultPorts :: [PortNumber]
+defaultPorts =  [6881..6889]
+
+-- | Above 25, new peers are highly unlikely to increase download
+--   speed.  Even 30 peers is /plenty/, the official client version 3
+--   in fact only actively forms new connections if it has less than
+--   30 peers and will refuse connections if it has 55.
+--
+--   So the default value is set to 50 because usually 30-50% of peers
+--   are not responding.
+--
+defaultNumWant :: Int
+defaultNumWant = 50
+
 {-----------------------------------------------------------------------
-  HTTP Announce
+  Bencode announce encoding
 -----------------------------------------------------------------------}
 
 instance BEncodable AnnounceInfo where
@@ -198,7 +219,7 @@ encodeRequest announce req = URL.urlEncode req
                     `addHashToURI`  reqInfoHash req
 
 {-----------------------------------------------------------------------
-  UDP announce
+  Binary announce encoding
 -----------------------------------------------------------------------}
 
 type EventId = Word32
@@ -249,7 +270,7 @@ instance Serialize AnnounceQuery where
 
     ev   <- getEvent
     ip   <- getWord32be
-    key  <- getWord32be
+    key  <- getWord32be -- TODO
     want <- getWord32be
 
     port <- get
@@ -290,23 +311,47 @@ instance Serialize AnnounceInfo where
       }
 
 {-----------------------------------------------------------------------
-  Tracker
+  Scrape messages
 -----------------------------------------------------------------------}
 
--- | Ports typically reserved for bittorrent P2P listener.
-defaultPorts :: [PortNumber]
-defaultPorts =  [6881..6889]
+type ScrapeQuery = [InfoHash]
 
--- | Above 25, new peers are highly unlikely to increase download
---   speed.  Even 30 peers is /plenty/, the official client version 3
---   in fact only actively forms new connections if it has less than
---   30 peers and will refuse connections if it has 55.
---
---   So the default value is set to 50 because usually 30-50% of peers
---   are not responding.
---
-defaultNumWant :: Int
-defaultNumWant = 50
+-- | Overall information about particular torrent.
+data ScrapeInfo = ScrapeInfo {
+    -- | Number of seeders - peers with the entire file.
+    siComplete   :: !Int
+
+    -- | Total number of times the tracker has registered a completion.
+  , siDownloaded :: !Int
+
+    -- | Number of leechers.
+  , siIncomplete :: !Int
+
+    -- | Name of the torrent file, as specified by the "name"
+    --   file in the info section of the .torrent file.
+  , siName       :: !(Maybe Text)
+  } deriving (Show, Eq)
+
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
+
+instance BEncodable ScrapeInfo where
+  toBEncode ScrapeInfo {..} = fromAssocs
+    [ "complete"   -->  siComplete
+    , "downloaded" -->  siDownloaded
+    , "incomplete" -->  siIncomplete
+    , "name"       -->? siName
+    ]
+
+  fromBEncode (BDict d) =
+    ScrapeInfo <$> d >--  "complete"
+               <*> d >--  "downloaded"
+               <*> d >--  "incomplete"
+               <*> d >--? "name"
+  fromBEncode _ = decodingError "ScrapeInfo"
+
+{-----------------------------------------------------------------------
+  Tracker
+-----------------------------------------------------------------------}
 
 mkHTTPRequest :: URI -> Request ByteString
 mkHTTPRequest uri = Request uri GET [] ""
