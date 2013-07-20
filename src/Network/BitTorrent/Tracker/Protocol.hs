@@ -73,11 +73,8 @@ data Event = Started
 --   the torrent. The most important, requests are used by the tracker
 --   to keep track lists of active peer for a particular torrent.
 --
-data TRequest = TRequest { -- TODO peer here -- TODO detach announce
-     reqAnnounce   :: !URI
-     -- ^ Announce url of the torrent usually obtained from 'Torrent'.
-
-   , reqInfoHash   :: !InfoHash
+data TRequest = TRequest { -- TODO peer here
+     reqInfoHash   :: !InfoHash
      -- ^ Hash of info part of the torrent usually obtained from
      -- 'Torrent'.
 
@@ -162,7 +159,6 @@ instance BEncodable TResponse where
                      <*> d >--? "complete"
                      <*> d >--? "incomplete"
                      <*> getPeers (M.lookup "peers" d)
-
       where
         getPeers :: Maybe BEncode -> Result [PeerAddr]
         getPeers (Just (BList l))     = fromBEncode (BList l)
@@ -196,9 +192,9 @@ instance URLEncode TRequest where
       ]
     where s :: String -> String;  s = id; {-# INLINE s #-}
 
-encodeRequest :: TRequest -> URI
-encodeRequest req = URL.urlEncode req
-                    `addToURI`      reqAnnounce req
+encodeRequest :: URI -> TRequest -> URI
+encodeRequest announce req = URL.urlEncode req
+                    `addToURI`      announce
                     `addHashToURI`  reqInfoHash req
 
 {-----------------------------------------------------------------------
@@ -259,9 +255,7 @@ instance Serialize TRequest where
     port <- get
 
     return $ TRequest {
-        -- TODO remove reqAnnounce field from TRequest
-        reqAnnounce   = error "tracker request decode"
-      , reqInfoHash   = ih
+        reqInfoHash   = ih
       , reqPeerId     = pid
       , reqPort       = port
       , reqUploaded   = fromIntegral up
@@ -322,9 +316,9 @@ mkHTTPRequest uri = Request uri GET [] ""
 -- announce list. This function throws 'IOException' if it couldn't
 -- send request or receive response or decode response.
 --
-askTracker :: TRequest -> IO TResponse
-askTracker req = do
-    let r = mkHTTPRequest (encodeRequest req)
+askTracker :: URI -> TRequest -> IO TResponse
+askTracker announce req = do
+    let r = mkHTTPRequest (encodeRequest announce req)
 
     rawResp  <- simpleHTTP r
     respBody <- getResponseBody rawResp
@@ -339,7 +333,7 @@ askTracker req = do
 
 -- | The same as the 'askTracker' but ignore response. Used in
 -- conjunction with 'Stopped'.
-leaveTracker :: TRequest -> IO ()
-leaveTracker req = do
-  let r = mkHTTPRequest (encodeRequest req)
+leaveTracker :: URI -> TRequest -> IO ()
+leaveTracker announce req = do
+  let r = mkHTTPRequest (encodeRequest announce req)
   void $ simpleHTTP r >>= getResponseBody

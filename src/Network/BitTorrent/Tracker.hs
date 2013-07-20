@@ -90,8 +90,7 @@ tconnection t = TConnection (tAnnounce t) (tInfoHash t)
 -- | used to avoid boilerplate; do NOT export me
 genericReq :: TConnection -> Progress -> TRequest
 genericReq ses pr =   TRequest {
-    reqAnnounce   = tconnAnnounce ses
-  , reqInfoHash   = tconnInfoHash ses
+    reqInfoHash   = tconnInfoHash ses
   , reqPeerId     = tconnPeerId   ses
   , reqPort       = tconnPort     ses
 
@@ -221,7 +220,7 @@ withTracker :: Progress -> TConnection -> (TSession -> IO a) -> IO a
 withTracker initProgress conn action = bracket start end (action . fst)
   where
     start = do
-      resp <- askTracker (startedReq conn initProgress)
+      resp <- askTracker (tconnAnnounce conn) (startedReq conn initProgress)
       se   <- newSession defaultChanSize initProgress
                          (respInterval resp) (respPeers resp)
 
@@ -232,7 +231,7 @@ withTracker initProgress conn action = bracket start end (action . fst)
         waitInterval se
         pr   <- getProgress se
         resp <- tryJust isIOException $ do
-                    askTracker (regularReq defaultNumWant conn pr)
+                    askTracker (tconnAnnounce conn) (regularReq defaultNumWant conn pr)
         case resp of
           Right (OK {..}) -> do
             writeIORef seInterval respInterval
@@ -252,7 +251,7 @@ withTracker initProgress conn action = bracket start end (action . fst)
     end (se, tid) = do
       killThread tid
       pr <- getProgress se
-      leaveTracker $ stoppedReq conn pr
+      leaveTracker (tconnAnnounce conn) (stoppedReq conn pr)
 
 {-----------------------------------------------------------------------
     Scrape
