@@ -319,13 +319,13 @@ type ScrapeQuery = [InfoHash]
 -- | Overall information about particular torrent.
 data ScrapeInfo = ScrapeInfo {
     -- | Number of seeders - peers with the entire file.
-    siComplete   :: !Int
+    siComplete   :: {-# UNPACK #-} !Int
 
     -- | Total number of times the tracker has registered a completion.
-  , siDownloaded :: !Int
+  , siDownloaded :: {-# UNPACK #-} !Int
 
     -- | Number of leechers.
-  , siIncomplete :: !Int
+  , siIncomplete :: {-# UNPACK #-} !Int
 
     -- | Name of the torrent file, as specified by the "name"
     --   file in the info section of the .torrent file.
@@ -348,6 +348,24 @@ instance BEncodable ScrapeInfo where
                <*> d >--  "incomplete"
                <*> d >--? "name"
   fromBEncode _ = decodingError "ScrapeInfo"
+
+instance Serialize ScrapeInfo where
+  put ScrapeInfo {..} = do
+    putWord32be $ fromIntegral siComplete
+    putWord32be $ fromIntegral siDownloaded
+    putWord32be $ fromIntegral siIncomplete
+
+  get = do
+    seeders   <- getWord32be
+    downTimes <- getWord32be
+    leechers  <- getWord32be
+
+    return $ ScrapeInfo {
+        siComplete   = fromIntegral seeders
+      , siDownloaded = fromIntegral downTimes
+      , siIncomplete = fromIntegral leechers
+      , siName       = Nothing
+      }
 
 {-----------------------------------------------------------------------
   Tracker
