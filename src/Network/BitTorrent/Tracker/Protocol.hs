@@ -22,9 +22,8 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
--- TODO: add "compact" field to TRequest
 module Network.BitTorrent.Tracker.Protocol
-       ( Event(..), TRequest(..), TResponse(..)
+       ( Event(..), AnnounceQuery(..), AnnounceInfo(..)
        , askTracker, leaveTracker
 
          -- * Defaults
@@ -55,7 +54,7 @@ import Network.URI
 import Network.BitTorrent.Peer
 
 {-----------------------------------------------------------------------
-  Tracker messages
+  Tracker Announce
 -----------------------------------------------------------------------}
 
 -- | Events used to specify which kind of tracker request is performed.
@@ -73,7 +72,7 @@ data Event = Started
 --   the torrent. The most important, requests are used by the tracker
 --   to keep track lists of active peer for a particular torrent.
 --
-data TRequest = TRequest { -- TODO peer here
+data AnnounceQuery = AnnounceQuery {
      reqInfoHash   :: !InfoHash
      -- ^ Hash of info part of the torrent usually obtained from
      -- 'Torrent'.
@@ -112,9 +111,9 @@ data TRequest = TRequest { -- TODO peer here
 --   participate in the torrent. The most important is 'respPeer' list
 --   used to join the swarm.
 --
-data TResponse =
+data AnnounceInfo =
      Failure Text -- ^ Failure reason in human readable form.
-   | OK { -- TODO rename to anounce
+   | AnnounceInfo {
        respWarning     ::  Maybe Text
        -- ^ Human readable warning.
 
@@ -138,12 +137,12 @@ data TResponse =
      } deriving Show
 
 {-----------------------------------------------------------------------
-  HTTP Tracker encoding
+  HTTP Announce
 -----------------------------------------------------------------------}
 
-instance BEncodable TResponse where
-  toBEncode (Failure t)  = fromAssocs ["failure reason" --> t]
-  toBEncode (OK {..})    = fromAssocs
+instance BEncodable AnnounceInfo where
+  toBEncode (Failure t)        = fromAssocs ["failure reason" --> t]
+  toBEncode  AnnounceInfo {..} = fromAssocs
     [ "interval"     -->  respInterval
     , "min interval" -->? respMinInterval
     , "complete"     -->? respComplete
@@ -153,7 +152,8 @@ instance BEncodable TResponse where
 
   fromBEncode (BDict d)
     | Just t <- M.lookup "failure reason" d = Failure <$> fromBEncode t
-    | otherwise = OK <$> d >--? "warning message"
+    | otherwise = AnnounceInfo
+                     <$> d >--? "warning message"
                      <*> d >--  "interval"
                      <*> d >--? "min interval"
                      <*> d >--? "complete"
@@ -165,7 +165,7 @@ instance BEncodable TResponse where
         getPeers (Just (BString s))   = runGet getCompactPeerList s
         getPeers  _                   = decodingError "Peers"
 
-  fromBEncode _ = decodingError "TResponse"
+  fromBEncode _ = decodingError "AnnounceInfo"
 
 instance URLShow PortNumber where
   urlShow = urlShow . fromEnum
@@ -179,8 +179,8 @@ instance URLShow Event where
       -- INVARIANT: this is always nonempty list
       (x : xs) = show e
 
-instance URLEncode TRequest where
-  urlEncode TRequest {..} = mconcat
+instance URLEncode AnnounceQuery where
+  urlEncode AnnounceQuery {..} = mconcat
       [ s "peer_id"    %=  reqPeerId
       , s "port"       %=  reqPort
       , s "uploaded"   %=  reqUploaded
@@ -192,13 +192,13 @@ instance URLEncode TRequest where
       ]
     where s :: String -> String;  s = id; {-# INLINE s #-}
 
-encodeRequest :: URI -> TRequest -> URI
+encodeRequest :: URI -> AnnounceQuery -> URI
 encodeRequest announce req = URL.urlEncode req
                     `addToURI`      announce
                     `addHashToURI`  reqInfoHash req
 
 {-----------------------------------------------------------------------
-  UDP tracker encoding
+  UDP announce
 -----------------------------------------------------------------------}
 
 type EventId = Word32
@@ -223,8 +223,8 @@ getEvent = do
     3 -> return $ Just Stopped
     _ -> fail "unknown event id"
 
-instance Serialize TRequest where
-  put TRequest {..} = do
+instance Serialize AnnounceQuery where
+  put AnnounceQuery {..} = do
     put           reqInfoHash
     put           reqPeerId
 
@@ -254,7 +254,7 @@ instance Serialize TRequest where
 
     port <- get
 
-    return $ TRequest {
+    return $ AnnounceQuery {
         reqInfoHash   = ih
       , reqPeerId     = pid
       , reqPort       = port
@@ -266,9 +266,9 @@ instance Serialize TRequest where
       , reqEvent      = ev
       }
 
-instance Serialize TResponse where
+instance Serialize AnnounceInfo where
   put (Failure msg) = put $ encodeUtf8 msg
-  put OK {..} = do
+  put  AnnounceInfo {..} = do
     putWord32be $ fromIntegral respInterval
     putWord32be $ fromIntegral $ fromMaybe 0 respIncomplete
     putWord32be $ fromIntegral $ fromMaybe 0 respComplete
@@ -280,7 +280,7 @@ instance Serialize TResponse where
     seeders  <- getWord32be
     peers    <- many get
 
-    return $ OK {
+    return $ AnnounceInfo {
         respWarning     = Nothing
       , respInterval    = fromIntegral interval
       , respMinInterval = Nothing
@@ -288,7 +288,6 @@ instance Serialize TResponse where
       , respComplete    = Just $ fromIntegral seeders
       , respPeers       = peers
       }
-
 
 {-----------------------------------------------------------------------
   Tracker
@@ -316,7 +315,7 @@ mkHTTPRequest uri = Request uri GET [] ""
 -- announce list. This function throws 'IOException' if it couldn't
 -- send request or receive response or decode response.
 --
-askTracker :: URI -> TRequest -> IO TResponse
+askTracker :: URI -> AnnounceQuery -> IO AnnounceInfo
 askTracker announce req = do
     let r = mkHTTPRequest (encodeRequest announce req)
 
@@ -333,7 +332,7 @@ askTracker announce req = do
 
 -- | The same as the 'askTracker' but ignore response. Used in
 -- conjunction with 'Stopped'.
-leaveTracker :: URI -> TRequest -> IO ()
+leaveTracker :: URI -> AnnounceQuery -> IO ()
 leaveTracker announce req = do
   let r = mkHTTPRequest (encodeRequest announce req)
   void $ simpleHTTP r >>= getResponseBody

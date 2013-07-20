@@ -88,8 +88,8 @@ tconnection t = TConnection (tAnnounce t) (tInfoHash t)
 
 
 -- | used to avoid boilerplate; do NOT export me
-genericReq :: TConnection -> Progress -> TRequest
-genericReq ses pr =   TRequest {
+genericReq :: TConnection -> Progress -> AnnounceQuery
+genericReq ses pr =   AnnounceQuery {
     reqInfoHash   = tconnInfoHash ses
   , reqPeerId     = tconnPeerId   ses
   , reqPort       = tconnPort     ses
@@ -107,7 +107,7 @@ genericReq ses pr =   TRequest {
 -- | The first request to the tracker that should be created is
 --   'startedReq'. It includes necessary 'Started' event field.
 --
-startedReq :: TConnection -> Progress -> TRequest
+startedReq :: TConnection -> Progress -> AnnounceQuery
 startedReq ses pr = (genericReq ses pr) {
     reqIP         = Nothing
   , reqNumWant    = Just defaultNumWant
@@ -118,7 +118,7 @@ startedReq ses pr = (genericReq ses pr) {
 --   notify tracker about current state of the client
 --   so new peers could connect to the client.
 --
-regularReq :: Int -> TConnection -> Progress -> TRequest
+regularReq :: Int -> TConnection -> Progress -> AnnounceQuery
 regularReq numWant ses pr = (genericReq ses pr) {
     reqIP         = Nothing
   , reqNumWant    = Just numWant
@@ -128,7 +128,7 @@ regularReq numWant ses pr = (genericReq ses pr) {
 -- | Must be sent to the tracker if the client is shutting down
 -- gracefully.
 --
-stoppedReq :: TConnection -> Progress -> TRequest
+stoppedReq :: TConnection -> Progress -> AnnounceQuery
 stoppedReq ses pr = (genericReq ses pr) {
     reqIP         = Nothing
   , reqNumWant    = Nothing
@@ -139,7 +139,7 @@ stoppedReq ses pr = (genericReq ses pr) {
 -- However, must not be sent if the download was already 100%
 -- complete.
 --
-completedReq :: TConnection -> Progress -> TRequest
+completedReq :: TConnection -> Progress -> AnnounceQuery
 completedReq ses pr = (genericReq ses pr) {
     reqIP         = Nothing
   , reqNumWant    = Nothing
@@ -233,7 +233,7 @@ withTracker initProgress conn action = bracket start end (action . fst)
         resp <- tryJust isIOException $ do
                     askTracker (tconnAnnounce conn) (regularReq defaultNumWant conn pr)
         case resp of
-          Right (OK {..}) -> do
+          Right (AnnounceInfo {..}) -> do
             writeIORef seInterval respInterval
 
             -- we rely on the fact that union on lists is not
