@@ -28,10 +28,12 @@
 --     capabilities (such as supported enchancements), this should be
 --     done using 'Network.BitTorrent.Extension'!
 --
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# OPTIONS  -fno-warn-orphans #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# OPTIONS  -fno-warn-orphans          #-}
 module Network.BitTorrent.Peer
        ( -- * Peer identificators
          PeerId (getPeerId), ppPeerId
@@ -70,8 +72,12 @@ module Network.BitTorrent.Peer
 
 
 import Control.Applicative
+import Data.Aeson
+import Data.Aeson.TH
 import Data.BEncode
 import Data.Bits
+import Data.Char
+import Data.List as L
 import Data.Word
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -106,7 +112,7 @@ version = Version [0, 10, 0, 0] []
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerId = PeerId { getPeerId :: ByteString }
-                 deriving (Show, Eq, Ord, BEncodable)
+                 deriving (Show, Eq, Ord, BEncodable, ToJSON, FromJSON)
 
 instance Serialize PeerId where
   put = putByteString . getPeerId
@@ -492,6 +498,21 @@ nameMap =
 {-----------------------------------------------------------------------
     Peer address
 -----------------------------------------------------------------------}
+deriving instance ToJSON PortNumber
+deriving instance FromJSON PortNumber
+
+instance BEncodable PortNumber where
+  toBEncode = toBEncode . fromEnum
+  fromBEncode b = toEnum <$> fromBEncode b
+
+instance Serialize PortNumber where
+  get = fromIntegral <$> getWord16be
+  {-# INLINE get #-}
+  put = putWord16be . fromIntegral
+  {-# INLINE put #-}
+
+-- TODO check semantic of ord and eq instances
+
 
 -- | Peer address info normally extracted from peer list or peer
 -- compact list encoding.
@@ -501,11 +522,7 @@ data PeerAddr = PeerAddr {
     , peerPort :: {-# UNPACK #-} !PortNumber
     } deriving (Show, Eq, Ord)
 
--- TODO check semantic of ord and eq instances
-
-instance BEncodable PortNumber where
-  toBEncode = toBEncode . fromEnum
-  fromBEncode b = toEnum <$> fromBEncode b
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''PeerAddr)
 
 instance BEncodable PeerAddr where
   toBEncode (PeerAddr pid pip pport) = fromAssocs
@@ -520,12 +537,6 @@ instance BEncodable PeerAddr where
              <*> d >--  "port"
 
   fromBEncode _ = decodingError "PeerAddr"
-
-instance Serialize PortNumber where
-  get = fromIntegral <$> getWord16be
-  {-# INLINE get #-}
-  put = putWord16be . fromIntegral
-  {-# INLINE put #-}
 
 instance Serialize PeerAddr where
   put PeerAddr {..} = put peerID >> put peerPort

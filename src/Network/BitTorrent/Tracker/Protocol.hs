@@ -71,6 +71,7 @@ data Event = Started
              -- ^ To be sent when the peer completes a download.
              deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''Event)
 
 -- | A tracker request is HTTP GET request; used to include metrics
 --   from clients that help the tracker keep overall statistics about
@@ -111,6 +112,7 @@ data AnnounceQuery = AnnounceQuery {
       -- ^ If not specified, the request is regular periodic request.
    } deriving Show
 
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceQuery)
 
 -- | The tracker response includes a peer list that helps the client
 --   participate in the torrent. The most important is 'respPeer' list
@@ -141,6 +143,7 @@ data AnnounceInfo =
        -- ^ Peers that must be contacted.
      } deriving Show
 
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceInfo)
 
 -- | Ports typically reserved for bittorrent P2P listener.
 defaultPorts :: [PortNumber]

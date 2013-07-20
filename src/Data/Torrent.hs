@@ -16,13 +16,14 @@
 --   <http://www.bittorrent.org/beps/bep_0003.html#metainfo-files>,
 --   <https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure>
 --
-{-# OPTIONS -fno-warn-orphans #-}
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# OPTIONS -fno-warn-orphans           #-}
 -- TODO refine interface
 module Data.Torrent
        ( -- * Torrent
@@ -69,6 +70,7 @@ import Control.Monad
 
 import qualified Crypto.Hash.SHA1 as C
 
+import Data.Aeson
 import Data.Aeson.TH
 import Data.BEncode as BE
 import Data.Char
@@ -98,7 +100,7 @@ import Numeric
 
 -- | Exactly 20 bytes long SHA1 hash of the info part of torrent file.
 newtype InfoHash = InfoHash { getInfoHash :: ByteString }
-                   deriving (Eq, Ord)
+                   deriving (Eq, Ord, ToJSON, FromJSON)
 
 instance Show InfoHash where
   show = render . ppInfoHash
