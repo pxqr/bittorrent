@@ -1,10 +1,10 @@
-The protocol has many extensions(more precisely enchancements, but
-we'll use that word) and it's seems like no one will want to use just
-core protocol, at least I'm not. Any modern application that uses
-bittorrent protocol in any way will use some subset of extensions.
-Thus it's reasonable to implement at least some part of widely used
-extensions here, so we could provide nice high level API and well
-integrated interface.
+The protocol has [many extensions][bep-list] (more precisely
+enchancements, but we'll use that word) and it's seems like no one
+will want to use just core protocol, at least I'm not. Any modern
+application that uses bittorrent protocol in any way will use some
+subset of extensions.  Thus it's reasonable to implement at least some
+part of widely used extensions here, so we could provide nice high
+level API and well integrated interface.
 
 This section should keep track current state of package in respect of
 BEP's.  Please _don't_ use this list as issue or bug tracker or TODO
@@ -29,15 +29,21 @@ We should try keep table in order of priority, so first BEPs should be
 are most important and last BEPs are least important. (but important
 too)
 
-| BEP # | Title                                      | Modules                             | Status
-|:-----:|:------------------------------------------:|:------------------------------------|:-----------
-| 3     | The BitTorrent Protocol Specification      | Data.Torrent                        | Implemented
-|       |                                            | Network.BitTorrent.Peer             |
-|       |                                            | Network.BitTorrent.Exchange         |
-|       |                                            | Network.BitTorrent.Tracker          |
-| 4     | Known Number Allocations                   | Network.BitTorrent.Extension        | Want -> Implemented
-| 20    | Peer ID Conventions                        | Network.BitTorrent.Peer             | Want -> Implemented
-| 9     | Extension for Peers to Send Metadata Files |                                     | Want
-| 23    | Tracker Return Compact Peer Lists          | Network.BitTorrent.Tracker.Protocol | Implemented
-| 5     | DHT                                        | Network.BitTorrent.DHT              | Want
-| 6     | Fast Extension                             | Network.BitTorrent.Exchange         | Want -> Implemented
+| BEP # | Title                                              | Status
+|:-----:|:--------------------------------------------------:|:-----------
+| 3     | [The BitTorrent Protocol Specification][bep3]      | Implemented
+| 4     | [Known Number Allocations][bep4]                   | Want -> Implemented
+| 20    | [Peer ID Conventions][bep20]                       | Want -> Implemented
+| 9     | [Extension for Peers to Send Metadata Files][bep9] | Want
+| 23    | [Tracker Return Compact Peer Lists][bep23]         | Implemented
+| 5     | [DHT][bep5]                                        | Want
+| 6     | [Fast Extension][bep6]                             | Want -> Implemented
+
+[bep-list]: http://www.bittorrent.org/beps/bep_0000.html
+[bep3]:  http://www.bittorrent.org/beps/bep_0003.html
+[bep4]:  http://www.bittorrent.org/beps/bep_0004.html
+[bep5]:  http://www.bittorrent.org/beps/bep_0005.html
+[bep6]:  http://www.bittorrent.org/beps/bep_0006.html
+[bep9]:  http://www.bittorrent.org/beps/bep_0009.html
+[bep20]: http://www.bittorrent.org/beps/bep_0020.html
+[bep23]: http://www.bittorrent.org/beps/bep_0023.html
