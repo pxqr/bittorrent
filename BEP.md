@@ -34,6 +34,7 @@ too)
 | 3     | [The BitTorrent Protocol Specification][bep3]      | Implemented
 | 4     | [Known Number Allocations][bep4]                   | Want -> Implemented
 | 20    | [Peer ID Conventions][bep20]                       | Want -> Implemented
+| 15    | [UDP Tracker Protocol for BitTorrent][bep15]       | Want -> Implemented
 | 9     | [Extension for Peers to Send Metadata Files][bep9] | Want
 | 23    | [Tracker Return Compact Peer Lists][bep23]         | Implemented
 | 5     | [DHT][bep5]                                        | Want
@@ -45,5 +46,6 @@ too)
 [bep5]:  http://www.bittorrent.org/beps/bep_0005.html
 [bep6]:  http://www.bittorrent.org/beps/bep_0006.html
 [bep9]:  http://www.bittorrent.org/beps/bep_0009.html
+[bep15]: http://www.bittorrent.org/beps/bep_0015.html
 [bep20]: http://www.bittorrent.org/beps/bep_0020.html
 [bep23]: http://www.bittorrent.org/beps/bep_0023.html
