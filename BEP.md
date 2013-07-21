@@ -33,13 +33,11 @@ too)
 |:-----:|:------------------------------------------:|:------------------------------------|:-----------
 | 3     | The BitTorrent Protocol Specification      | Data.Torrent                        | Implemented
 |       |                                            | Network.BitTorrent.Peer             |
-|       |                                            | Network.BitTorrent.PeerWire         |
+|       |                                            | Network.BitTorrent.Exchange         |
 |       |                                            | Network.BitTorrent.Tracker          |
 | 4     | Known Number Allocations                   | Network.BitTorrent.Extension        | Want -> Implemented
-| 20    | Peer ID Conventions                        | Network.BitTorrent.Peer.ID          | Want -> Implemented
-|       |                                            | Network.BitTorrent.Peer.ClientInfo  |
+| 20    | Peer ID Conventions                        | Network.BitTorrent.Peer             | Want -> Implemented
 | 9     | Extension for Peers to Send Metadata Files |                                     | Want
 | 23    | Tracker Return Compact Peer Lists          | Network.BitTorrent.Tracker.Protocol | Implemented
-|       |                                            | Network.BitTorrent.PeerWire.Message |
-| 5     | DHT                                        |                                     | Want
-| 6     | Fast Extension                             | Network.BitTorrent.PeerWire.Message | Want -> Implemented
+| 5     | DHT                                        | Network.BitTorrent.DHT              | Want
+| 6     | Fast Extension                             | Network.BitTorrent.Exchange         | Want -> Implemented
