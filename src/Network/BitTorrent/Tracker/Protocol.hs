@@ -50,7 +50,6 @@ import Data.Torrent
 
 import Network
 import Network.Socket
-import Network.URI
 
 import Network.BitTorrent.Peer
 

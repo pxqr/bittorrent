@@ -35,20 +35,10 @@ import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
 
-import Data.BEncode
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import           Data.Char
 import           Data.List as L
-import           Data.Map (Map)
-import qualified Data.Map as M
-import           Data.Monoid
 import           Data.IORef
-import           Data.Text (Text)
 
 import Network
-import Network.HTTP
 import Network.URI
 
 import Data.Torrent
@@ -200,7 +190,7 @@ newSession chanSize pr i ps
              <*> pure chan
 
 waitInterval :: TSession -> IO ()
-waitInterval se @ TSession {..} = do
+waitInterval TSession {..} = do
     delay <- readIORef seInterval
     threadDelay (delay * sec)
   where
