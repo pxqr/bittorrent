@@ -5,14 +5,9 @@
 --   Stability   :  experimental
 --   Portability :  non-portable
 --
---   This module provides high level API for peer->tracker
+--   This module provides high level API for peer -> tracker
 --   communication. Tracker is used to discover other peers in the
---   network.
---
---   By convention most trackers support another form of request,
---   which queries the state of a given torrent (or all torrents) that
---   the tracker is managing. This module also provides a way to
---   easily request scrape info for a particular torrent list.
+--   network using torrent info hash.
 --
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}

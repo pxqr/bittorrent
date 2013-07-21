@@ -3,19 +3,20 @@
 --   License     :  MIT
 --   Maintainer  :  pxqr.sta@gmail.com
 --   Stability   :  experimental
---   Portability :  non-portable
+--   Portability :  portable
 --
+--   Every tracker should support announce query. This query is used
+--   to discover peers within swarm and have two-fold effect:
 --
---   This module provides straigthforward Tracker protocol
---   implementation. The tracker is an HTTP/HTTPS service used to
---   discovery peers for a particular existing torrent and keep
---   statistics about the swarm.
+--     * peer doing announce discover other peers using peer list from
+--     the response to the announce query.
 --
---   For more convenient high level API see
---   "Network.BitTorrent.Tracker" module.
+--     * tracker store peer information and use it in the succeeding
+--     requests made by other peers, until the peer info expires.
 --
---   For more information see:
---   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
+--   By convention most trackers support another form of request --
+--   scrape query -- which queries the state of a given torrent (or
+--   a list of torrents) that the tracker is managing.
 --
 {-# OPTIONS -fno-warn-orphans           #-}
 {-# LANGUAGE OverloadedStrings          #-}

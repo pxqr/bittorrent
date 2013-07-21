@@ -1,3 +1,18 @@
+-- |
+--   Copyright   :  (c) Sam T. 2013
+--   License     :  MIT
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  non-portable
+--
+--   The tracker is an HTTP/HTTPS service used to discovery peers for
+--   a particular existing torrent and keep statistics about the
+--   swarm. This module also provides a way to easily request scrape
+--   info for a particular torrent list.
+--
+--   For more information see:
+--   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
+--
 {-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.Tracker.HTTP
        ( askTracker, leaveTracker
