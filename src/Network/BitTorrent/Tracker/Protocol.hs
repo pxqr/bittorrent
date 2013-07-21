@@ -18,12 +18,10 @@
 --   scrape query -- which queries the state of a given torrent (or
 --   a list of torrents) that the tracker is managing.
 --
-{-# OPTIONS -fno-warn-orphans           #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# OPTIONS -fno-warn-orphans           #-}
 module Network.BitTorrent.Tracker.Protocol
        ( Event(..), AnnounceQuery(..), AnnounceInfo(..)
        , defaultNumWant , defaultPorts

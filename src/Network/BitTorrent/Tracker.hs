@@ -9,8 +9,6 @@
 --   communication. Tracker is used to discover other peers in the
 --   network using torrent info hash.
 --
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Network.BitTorrent.Tracker
        ( withTracker, completedReq

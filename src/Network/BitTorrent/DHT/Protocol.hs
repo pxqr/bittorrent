@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 module Network.BitTorrent.DHT.Protocol
        (
          newNodeSession

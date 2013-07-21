@@ -39,10 +39,8 @@
 --
 --   Finally we get a simple event-based communication model.
 --
-{-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE BangPatterns               #-}
 module Network.BitTorrent.Exchange
        ( P2P

@@ -13,7 +13,6 @@
 --   For more information see:
 --   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
 --
-{-# LANGUAGE OverloadedStrings #-}
 module Network.BitTorrent.Tracker.HTTP
        ( askTracker, leaveTracker
        , scrapeURL

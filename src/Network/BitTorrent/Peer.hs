@@ -28,8 +28,6 @@
 --     capabilities (such as supported enchancements), this should be
 --     done using 'Network.BitTorrent.Extension'!
 --
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}

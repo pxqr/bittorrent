@@ -16,8 +16,6 @@
 --   <http://www.bittorrent.org/beps/bep_0003.html#metainfo-files>,
 --   <https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure>
 --
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE BangPatterns               #-}

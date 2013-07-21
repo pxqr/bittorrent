@@ -5,8 +5,6 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
 module Network.BitTorrent.Sessions
        ( -- * Progress
          Progress(..), startProgress

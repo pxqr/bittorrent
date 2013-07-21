@@ -25,8 +25,6 @@
 --   For more infomation see:
 --   <https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29>
 --
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# OPTIONS  -fno-warn-orphans #-}
 module Network.BitTorrent.Exchange.Protocol
