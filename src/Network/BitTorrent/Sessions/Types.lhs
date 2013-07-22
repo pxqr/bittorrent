@@ -34,6 +34,7 @@
 >        , SessionState (..)
 >        , status, bitfield
 >        , initialSessionState
+>        , getSessionState
 >
 >        , SessionException (..)
 >        , isSessionException, putSessionException
@@ -415,6 +416,9 @@ Peer session state
 
 > initialSessionState :: PieceCount -> SessionState
 > initialSessionState pc = SessionState (haveNone pc) def
+
+> getSessionState :: PeerSession -> IO SessionState
+> getSessionState PeerSession {..} = readIORef sessionState
 
 Peer session exceptions
 ------------------------------------------------------------------------

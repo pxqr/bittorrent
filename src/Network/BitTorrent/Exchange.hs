@@ -66,6 +66,11 @@ module Network.BitTorrent.Exchange
 
          -- * Block
        , Block(..), BlockIx(..)
+
+         -- * Status
+       , PeerStatus(..), SessionStatus(..)
+       , inverseStatus
+       , canDownload, canUpload
        ) where
 
 import Control.Applicative

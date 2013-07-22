@@ -29,19 +29,28 @@ module Network.BitTorrent.Sessions
        , getCurrentProgress
        , getSwarmCount
        , getPeerCount
+       , getActiveSwarms
        , getSwarm
        , getStorage
        , getTorrentInfo
        , openSwarmSession
 
          -- * Swarm
-       , SwarmSession( SwarmSession, torrentMeta, clientSession )
+       , SwarmSession( SwarmSession, torrentMeta
+                     , clientSession, storage
+                     )
 
        , SessionCount
        , getSessionCount
        , getClientBitfield
+       , getActivePeers
 
        , discover
+
+       , PeerSession ( connectedPeerAddr, enabledExtensions )
+       , getSessionState
+
+       , SessionState (..)
        ) where
 
 import Prelude hiding (mapM_, elem)
@@ -163,6 +172,9 @@ getPeerCount ClientSession {..} = liftIO $ do
   unused  <- peekAvail activeThreads
   return (maxActive - unused)
 
+getActiveSwarms :: ClientSession -> IO [SwarmSession]
+getActiveSwarms ClientSession {..} = M.elems <$> readTVarIO swarmSessions
+
 getListenerPort :: ClientSession -> IO PortNumber
 getListenerPort ClientSession {..} = servPort <$> readMVar peerListener
 
@@ -248,6 +260,10 @@ getSwarm cs @ ClientSession {..} ih = do
 -- TODO do not spawn session!
 getStorage :: ClientSession -> InfoHash -> IO Storage
 getStorage cs ih = storage <$> getSwarm cs ih
+
+-- TODO keep sorted?
+getActivePeers :: SwarmSession -> IO [PeerSession]
+getActivePeers SwarmSession {..} = S.toList <$> readTVarIO connectedPeers
 
 getTorrentInfo :: ClientSession -> InfoHash -> IO (Maybe Torrent)
 getTorrentInfo cs ih = do

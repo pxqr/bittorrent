@@ -56,6 +56,7 @@ module Network.BitTorrent.Exchange.Protocol
        , choking, interested
 
        , SessionStatus(..)
+       , inverseStatus
        , clientStatus, peerStatus
        , canUpload, canDownload
 
@@ -548,6 +549,9 @@ canUpload SessionStatus {..}
 canDownload :: SessionStatus -> Bool
 canDownload SessionStatus {..}
   = _interested _clientStatus && not (_choking _peerStatus)
+
+inverseStatus :: SessionStatus -> SessionStatus
+inverseStatus SessionStatus {..} = SessionStatus _peerStatus _clientStatus
 
 -- | Indicates how many peers are allowed to download from the client
 -- by default.
