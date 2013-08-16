@@ -297,7 +297,8 @@ defaultThreadCount = 1000
 enterSwarm :: SwarmSession -> IO ()
 enterSwarm SwarmSession {..} = do
   MSem.wait (activeThreads clientSession)
-  MSem.wait vacantPeers
+  MSem.wait vacantPeers `onException`
+    MSem.signal  (activeThreads clientSession)
 
 leaveSwarm :: SwarmSession -> IO ()
 leaveSwarm SwarmSession {..} = mask_ $ do
