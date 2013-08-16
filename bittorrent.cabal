@@ -64,7 +64,6 @@ library
                        -- BitTorrent
                      , bencoding        >= 0.1.0.1
                      , krpc             >= 0.1.1
-                     , intset           >= 0.1
                      , torrent-content
 
                        -- Control
@@ -86,16 +85,10 @@ library
 
                        -- Data
                      , data-default
-
-                     , array       >= 0.4
                      , bytestring  >= 0.10.0.0
-
                      , containers  >= 0.4
                      , unordered-containers
-                     , IntervalMap >= 0.3
-
                      , text        >= 0.11.0
-                     , vector
 
                        -- Encoding/Serialization
                      , aeson
@@ -114,12 +107,7 @@ library
                        -- System
                      , filepath    >= 1
                      , directory   >= 1
-                     , mmap        >= 0.5.2
                      , entropy
-
-                       -- Hash
-                     , cryptohash
-                     , hashable
 
                        -- Misc
                      , pretty
