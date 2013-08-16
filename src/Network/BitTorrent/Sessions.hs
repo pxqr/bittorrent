@@ -300,7 +300,7 @@ enterSwarm SwarmSession {..} = do
   MSem.wait vacantPeers
 
 leaveSwarm :: SwarmSession -> IO ()
-leaveSwarm SwarmSession {..} = do
+leaveSwarm SwarmSession {..} = mask_ $ do
   MSem.signal vacantPeers
   MSem.signal (activeThreads clientSession)
 
