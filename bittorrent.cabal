@@ -7,7 +7,7 @@ maintainer:            Sam T. <pxqr.sta@gmail.com>
 copyright:             (c) 2013, Sam T.
 category:              Network
 build-type:            Simple
-cabal-version:         >= 1.8
+cabal-version:         >= 1.10
 tested-with:           GHC == 7.4.1
                      , GHC == 7.6.3
 homepage:              https://github.com/pxqr/bittorrent
@@ -37,6 +37,10 @@ flag testing
 
 library
   default-language:    Haskell2010
+  default-extensions:  PatternGuards
+                     , OverloadedStrings
+                     , RecordWildCards
+  hs-source-dirs:      src
   exposed-modules:     Network.BitTorrent
                      , Network.BitTorrent.Extension
                      , Network.BitTorrent.Peer
@@ -112,12 +116,6 @@ library
                        -- Misc
                      , pretty
 
---                     , bits-atomic >= 0.1
-
-  extensions:          PatternGuards
-                     , OverloadedStrings
-                     , RecordWildCards
-  hs-source-dirs:      src
   if flag(testing)
     cpp-options:       -DTESTING
   ghc-options:         -Wall
@@ -126,9 +124,11 @@ library
 
 
 test-suite properties
+  default-language:    Haskell2010
+  default-extensions:
   type:                exitcode-stdio-1.0
-  main-is:             Main.hs
   hs-source-dirs:      tests
+  main-is:             Main.hs
   build-depends:       base == 4.*
                      , bytestring
                      , directory
@@ -156,6 +156,8 @@ test-suite properties
 
 
 benchmark benchmarks
+  default-language:    Haskell2010
+  default-extensions:
   type:                exitcode-stdio-1.0
   main-is:             Main.hs
   hs-source-dirs:      bench
@@ -177,13 +179,14 @@ benchmark benchmarks
 
 
 executable example
+  default-language:    Haskell2010
   main-is:             Main.hs
   hs-source-dirs:      examples
   build-depends:       base == 4.*
                      , bittorrent
                      , mtl
-  ghc-options:         -prof
--- -threaded -eventlog
+  ghc-options:
   ghc-prof-options:   -prof -rtsopts
+-- -threaded -eventlog
   if !flag(testing)
      buildable:        False
