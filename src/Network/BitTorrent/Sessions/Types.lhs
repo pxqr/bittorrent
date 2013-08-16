@@ -19,7 +19,8 @@
 >
 >        , Progress (..)
 >        , left, uploaded, downloaded
->        , startProgress, enqueuedProgress
+>        , startProgress
+>        , enqueuedProgress, uploadedProgress, dequeuedProgress
 >
 >        , ClientSession (..)
 >

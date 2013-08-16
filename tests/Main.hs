@@ -52,11 +52,6 @@ prop_properBEncode _ expected = actual == Right expected
   where
     actual = decoded $ Lazy.toStrict $ encoded expected
 
-prop_properJSON :: (FromJSON a, ToJSON a) => Eq a => T a -> a -> Bool
-prop_properJSON _ expected = actual == Just expected
-  where
-    actual = JSON.decode $ JSON.encode expected
-
 instance Arbitrary URI where
   arbitrary = pure $ fromJust
               $ parseURI "http://exsample.com:80/123365_asd"

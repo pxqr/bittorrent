@@ -15,7 +15,7 @@
 --
 module Network.BitTorrent.Tracker.HTTP
        ( askTracker, leaveTracker
-       , scrapeURL
+       , scrapeURL, scrape, scrapeOne
        ) where
 
 import Control.Applicative
@@ -30,7 +30,7 @@ import Data.URLEncoded as URL
 import Network.URI
 import Network.HTTP
 
-import Data.Torrent.Metainfo
+import Data.Torrent.Metainfo hiding (announce)
 import Network.BitTorrent.Tracker.Protocol
 
 {-----------------------------------------------------------------------

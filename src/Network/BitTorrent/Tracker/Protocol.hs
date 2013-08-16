@@ -261,7 +261,7 @@ instance Serialize AnnounceQuery where
 
     ev   <- getEvent
     ip   <- getWord32be
-    key  <- getWord32be -- TODO
+--    key  <- getWord32be -- TODO
     want <- getWord32be
 
     port <- get

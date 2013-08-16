@@ -64,7 +64,6 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as Lazy
-import Data.Char
 import Data.Default
 import Data.List as L
 import Data.Word
