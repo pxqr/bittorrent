@@ -91,7 +91,8 @@ import Text.PrettyPrint as PP hiding (($$))
 
 import Network
 
-import Data.Bitfield as BF
+import Data.Torrent.Block
+import Data.Torrent.Bitfield as BF
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Exchange.Protocol
 import Network.BitTorrent.Sessions.Types

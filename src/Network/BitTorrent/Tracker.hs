@@ -39,7 +39,7 @@ import           Data.IORef
 import Network
 import Network.URI
 
-import Data.Torrent
+import Data.Torrent.Metainfo
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Tracker.Protocol

@@ -5,9 +5,9 @@ import Control.DeepSeq
 import Criterion.Main
 import Network
 
-import Network.BitTorrent as BT
 import Network.BitTorrent.Exchange.Protocol as BT
-import Data.Bitfield as BT
+import Data.Torrent.Block as BT
+import Data.Torrent.Bitfield as BT
 
 
 instance NFData PortNumber where
@@ -29,6 +29,7 @@ instance NFData Message where
   rnf (Cancel   b) = rnf b
   rnf (Port     i) = rnf i
   rnf _ = ()  -- other fields are forced by pattern matching
+
 {-
 encodeMessages :: [Message] -> ByteString
 encodeMessages xs = runPut (mapM_ put xs)
@@ -36,5 +37,6 @@ encodeMessages xs = runPut (mapM_ put xs)
 decodeMessages :: ByteString -> Either String [Message]
 decodeMessages = runGet (many get)
 -}
+
 main :: IO ()
 main = defaultMain []

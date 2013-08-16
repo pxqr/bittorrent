@@ -24,7 +24,7 @@ import Data.Text.Encoding
 import Network.Socket hiding (Connected)
 import Network.Socket.ByteString as BS
 
-import Data.Torrent ()
+import Data.Torrent.Metainfo ()
 import Network.BitTorrent.Tracker.Protocol
 
 

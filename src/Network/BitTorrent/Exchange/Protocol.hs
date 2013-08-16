@@ -37,16 +37,6 @@ module Network.BitTorrent.Exchange.Protocol
        , defaultHandshake, defaultBTProtocol, defaultReserved
        , handshakeMaxSize
 
-         -- * Block
-       , PieceIx, BlockLIx, PieceLIx
-       , BlockIx(..), ppBlockIx
-       , Block(..),  ppBlock ,blockSize
-       , pieceIx, blockIx
-       , blockRange, ixRange, isPiece
-
-         -- ** Defaults
-       , defaultBlockSize
-
          -- * Regular messages
        , Message(..)
        , ppMessage
@@ -89,12 +79,28 @@ import Text.PrettyPrint
 import Network
 import Network.Socket.ByteString
 
-import Data.Bitfield
-import Data.Torrent
+import Data.Torrent.Bitfield
+import Data.Torrent.Block
+import Data.Torrent.Metainfo
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
 
 
+getInt :: S.Get Int
+getInt = fromIntegral <$> S.getWord32be
+{-# INLINE getInt #-}
+
+putInt :: S.Putter Int
+putInt = S.putWord32be . fromIntegral
+{-# INLINE putInt #-}
+
+getIntB :: B.Get Int
+getIntB = fromIntegral <$> B.getWord32be
+{-# INLINE getIntB #-}
+
+putIntB :: Int -> B.Put
+putIntB = B.putWord32be . fromIntegral
+{-# INLINE putIntB #-}
 
 {-----------------------------------------------------------------------
     Handshake
@@ -194,128 +200,6 @@ handshake sock hs = do
     when (hsInfoHash hs /= hsInfoHash hs') $ do
       throwIO $ userError  "Handshake info hash do not match."
     return hs'
-
-{-----------------------------------------------------------------------
-    Block Index
------------------------------------------------------------------------}
-
-type BlockLIx = Int
-type PieceLIx = Int
-
-
-data BlockIx = BlockIx {
-    -- | Zero-based piece index.
-    ixPiece  :: {-# UNPACK #-} !PieceLIx
-
-    -- | Zero-based byte offset within the piece.
-  , ixOffset :: {-# UNPACK #-} !Int
-
-    -- | Block size starting from offset.
-  , ixLength :: {-# UNPACK #-} !Int
-  } deriving (Show, Eq)
-
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''BlockIx)
-
-getInt :: S.Get Int
-getInt = fromIntegral <$> S.getWord32be
-{-# INLINE getInt #-}
-
-putInt :: S.Putter Int
-putInt = S.putWord32be . fromIntegral
-{-# INLINE putInt #-}
-
-getIntB :: B.Get Int
-getIntB = fromIntegral <$> B.getWord32be
-{-# INLINE getIntB #-}
-
-putIntB :: Int -> B.Put
-putIntB = B.putWord32be . fromIntegral
-{-# INLINE putIntB #-}
-
-instance Serialize BlockIx where
-  {-# SPECIALIZE instance Serialize BlockIx #-}
-  get = BlockIx <$> getInt <*> getInt <*> getInt
-  {-# INLINE get #-}
-
-  put i = do putInt (ixPiece i)
-             putInt (ixOffset i)
-             putInt (ixLength i)
-  {-# INLINE put #-}
-
-instance Binary BlockIx where
-  {-# SPECIALIZE instance Binary BlockIx #-}
-  get = BlockIx <$> getIntB <*> getIntB <*> getIntB
-  {-# INLINE get #-}
-
-  put BlockIx {..} = do
-    putIntB ixPiece
-    putIntB ixOffset
-    putIntB ixLength
-
--- | Format block index in human readable form.
-ppBlockIx :: BlockIx -> Doc
-ppBlockIx BlockIx {..} =
-  "piece  = " <> int ixPiece  <> "," <+>
-  "offset = " <> int ixOffset <> "," <+>
-  "length = " <> int ixLength
-
-{-----------------------------------------------------------------------
-    Block
------------------------------------------------------------------------}
-
-data Block = Block {
-    -- | Zero-based piece index.
-    blkPiece  :: {-# UNPACK #-} !PieceLIx
-
-    -- | Zero-based byte offset within the piece.
-  , blkOffset :: {-# UNPACK #-} !Int
-
-    -- | Payload.
-  , blkData   :: !Lazy.ByteString
-  } deriving (Show, Eq)
-
--- | Format block in human readable form. Payload is ommitted.
-ppBlock :: Block -> Doc
-ppBlock = ppBlockIx . blockIx
-
-blockSize :: Block -> Int
-blockSize blk = fromIntegral (Lazy.length (blkData blk))
-{-# INLINE blockSize #-}
-
--- | Widely used semi-official block size.
-defaultBlockSize :: Int
-defaultBlockSize = 16 * 1024
-
-
-isPiece :: Int -> Block -> Bool
-isPiece pieceSize (Block i offset bs) =
-     offset == 0
-  && fromIntegral (Lazy.length bs) == pieceSize
-  && i >= 0
-{-# INLINE isPiece #-}
-
-pieceIx :: Int -> Int -> BlockIx
-pieceIx i = BlockIx i 0
-{-# INLINE pieceIx #-}
-
-blockIx :: Block -> BlockIx
-blockIx = BlockIx <$> blkPiece <*> blkOffset <*> blockSize
-
-blockRange :: (Num a, Integral a) => Int -> Block -> (a, a)
-blockRange pieceSize blk = (offset, offset + len)
-  where
-    offset = fromIntegral pieceSize * fromIntegral (blkPiece blk)
-           + fromIntegral (blkOffset blk)
-    len    = fromIntegral (Lazy.length (blkData blk))
-{-# INLINE blockRange #-}
-
-ixRange :: (Num a, Integral a) => Int -> BlockIx -> (a, a)
-ixRange pieceSize i = (offset, offset + len)
-  where
-    offset = fromIntegral  pieceSize * fromIntegral (ixPiece i)
-           + fromIntegral (ixOffset i)
-    len    = fromIntegral (ixLength i)
-{-# INLINE ixRange #-}
 
 {-----------------------------------------------------------------------
     Regular messages

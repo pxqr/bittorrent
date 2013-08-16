@@ -37,19 +37,14 @@ flag testing
 
 library
   default-language:    Haskell2010
-  exposed-modules:     Data.Torrent
-                     , Data.Bitfield
-                     , Network.BitTorrent
+  exposed-modules:     Network.BitTorrent
                      , Network.BitTorrent.Extension
                      , Network.BitTorrent.Peer
                      , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Exchange
                      , Network.BitTorrent.DHT
-                     , System.Torrent.Storage
                      , Network.BitTorrent.Sessions
-
   other-modules:       Network.BitTorrent.Sessions.Types
-
 
   if flag(testing)
      exposed-modules:  Network.BitTorrent.Exchange.Protocol
@@ -57,16 +52,20 @@ library
                      , Network.BitTorrent.Tracker.HTTP
                      , Network.BitTorrent.Tracker.UDP
                      , Network.BitTorrent.DHT.Protocol
-                     , System.IO.MMap.Fixed
   if !flag(testing)
      other-modules:    Network.BitTorrent.Exchange.Protocol
                      , Network.BitTorrent.Tracker.Protocol
                      , Network.BitTorrent.Tracker.HTTP
                      , Network.BitTorrent.Tracker.UDP
                      , Network.BitTorrent.DHT.Protocol
-                     , System.IO.MMap.Fixed
 
   build-depends:       base       == 4.*
+
+                       -- BitTorrent
+                     , bencoding        >= 0.1.0.1
+                     , krpc             >= 0.1.1
+                     , intset           >= 0.1
+                     , torrent-content
 
                        -- Control
                      , mtl
@@ -93,7 +92,6 @@ library
 
                      , containers  >= 0.4
                      , unordered-containers
-                     , intset      >= 0.1
                      , IntervalMap >= 0.3
 
                      , text        >= 0.11.0
@@ -101,7 +99,6 @@ library
 
                        -- Encoding/Serialization
                      , aeson
-                     , bencoding   >= 0.1.0.1
                      , cereal      >= 0.3
                      , binary      >= 0.5
                      , urlencoded  >= 0.4
@@ -113,7 +110,6 @@ library
                        -- Network
                      , network    >= 2.4
                      , HTTP       >= 4000.2
-                     , krpc       >= 0.1.1
 
                        -- System
                      , filepath    >= 1
@@ -137,7 +133,7 @@ library
   if flag(testing)
     cpp-options:       -DTESTING
   ghc-options:         -Wall
-  ghc-prof-option:
+  ghc-prof-options:
 
 
 
@@ -162,6 +158,7 @@ test-suite properties
                      , test-framework-hunit
 
                      , bencoding
+                     , torrent-content
                      , bittorrent
 
   ghc-options:         -Wall -fno-warn-orphans
@@ -182,6 +179,7 @@ benchmark benchmarks
                      , criterion
                      , deepseq
 
+                     , torrent-content
                      , bittorrent
 
   ghc-options:         -O2 -Wall -fno-warn-orphans

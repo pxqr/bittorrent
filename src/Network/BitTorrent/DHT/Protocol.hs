@@ -32,7 +32,7 @@ import System.Entropy
 import Remote.KRPC
 import Remote.KRPC.Protocol
 import Data.BEncode
-import Data.Torrent
+import Data.Torrent.Metainfo
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Exchange.Protocol ()
 

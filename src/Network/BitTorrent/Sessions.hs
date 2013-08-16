@@ -73,8 +73,8 @@ import Network hiding (accept)
 import Network.BSD
 import Network.Socket
 
-import Data.Bitfield as BF
-import Data.Torrent
+import Data.Torrent.Bitfield as BF
+import Data.Torrent.Metainfo
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Sessions.Types

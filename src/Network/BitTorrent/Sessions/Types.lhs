@@ -59,8 +59,8 @@
 
 > import Network
 
-> import Data.Bitfield as BF
-> import Data.Torrent
+> import Data.Torrent.Bitfield as BF
+> import Data.Torrent.Metainfo
 > import Network.BitTorrent.Extension
 > import Network.BitTorrent.Peer
 > import Network.BitTorrent.Exchange.Protocol as BT
@@ -248,7 +248,7 @@ fresh required extensions.
 Normally, you would have one client session, however, if we needed, in
 one application we could have many clients with different peer ID's
 and different enabled extensions at the same time.
- 
+
 > -- |
 > data ClientSession = ClientSession {
 >     -- | Used in handshakes and discovery mechanism.
