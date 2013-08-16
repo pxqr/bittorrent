@@ -21,6 +21,8 @@ import Data.Serialize
 import Data.Word
 import Data.Text
 import Data.Text.Encoding
+import Network.Socket hiding (Connected)
+import Network.Socket.ByteString as BS
 
 import Data.Torrent ()
 import Network.BitTorrent.Tracker.Protocol
@@ -28,17 +30,17 @@ import Network.BitTorrent.Tracker.Protocol
 
 -- | Connection Id is used for entire tracker session.
 newtype ConnId  = ConnId  { getConnId  :: Word64 }
-                  deriving (Show, Serialize)
+                  deriving (Show, Eq, Serialize)
 
 -- | Transaction Id is used for within UDP RPC.
 newtype TransId = TransId { getTransId :: Word32 }
-                  deriving (Show, Serialize)
-
-genConnectionId :: IO ConnId
-genConnectionId = return (ConnId 0)
+                  deriving (Show, Eq, Serialize)
 
 genTransactionId :: IO TransId
 genTransactionId = return (TransId 0)
+
+initialConnectionId :: ConnId
+initialConnectionId = ConnId 0
 
 data Request  = Connect
               | Announce  AnnounceQuery
@@ -153,3 +155,37 @@ instance Serialize (Transaction Response) where
             Left ex   -> fail (show ex)
             Right msg -> return $ Failed msg
         |      otherwise      = fail "unknown message id"
+
+maxPacketSize :: Int
+maxPacketSize = 98 -- announce request packet
+
+call :: Request -> IO Response
+call request = do
+  tid <- genTransactionId
+  let trans = Transaction initialConnectionId tid request
+
+  let addr = error "TODO"
+  sock <- socket AF_INET Datagram defaultProtocol
+  BS.sendAllTo sock (encode trans) addr
+  (resp, addr') <- BS.recvFrom sock 4096
+  if addr' /= addr
+    then error "address mismatch"
+    else case decode resp of
+      Left msg -> error msg
+      Right (Transaction {..}) -> do
+        if tid /= transId
+          then error "transaction id mismatch"
+          else return body
+
+data Connection = Connection
+
+type URI = ()
+
+connectTracker :: URI -> IO Connection
+connectTracker = undefined
+
+announceTracker :: Connection -> AnnounceQuery -> IO AnnounceInfo
+announceTracker = undefined
+
+scrape :: Connection -> ScrapeQuery -> IO [ScrapeInfo]
+scrape = undefined
