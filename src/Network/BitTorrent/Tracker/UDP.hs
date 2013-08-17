@@ -19,6 +19,7 @@ module Network.BitTorrent.Tracker.UDP
        , putTracker
        , connectUDP
        , freshConnection
+       , announceUDP
        ) where
 
 import Control.Applicative
@@ -30,7 +31,7 @@ import Data.List as L
 import Data.Maybe
 import Data.Monoid
 import Data.Serialize
-import Data.Text
+import Data.Text as T
 import Data.Text.Encoding
 import Data.Time
 import Data.Word
@@ -264,7 +265,7 @@ putTracker UDPTracker {..} = do
   print trackerURI
   print =<< readIORef trackerConnection
 
-transaction :: UDPTracker -> Request -> IO (Transaction Response)
+transaction :: UDPTracker -> Request -> IO Response
 transaction tracker @ UDPTracker {..} request = do
   cid <- getConnectionId tracker
   tid <- genTransactionId
@@ -273,16 +274,18 @@ transaction tracker @ UDPTracker {..} request = do
   addr <- getTrackerAddr trackerURI
   res  <- call addr (encode trans)
   case decode res of
-    Right (responseT @ TransactionR {..})
-      | tid == transIdR -> return responseT
-      |   otherwise    -> throwIO $ userError "transaction id mismatch"
-    Left msg           -> throwIO $ userError msg
+    Right (TransactionR {..})
+      | tid == transIdR -> return response
+      |   otherwise     -> throwIO $ userError "transaction id mismatch"
+    Left msg            -> throwIO $ userError msg
 
 connectUDP :: UDPTracker -> IO ConnectionId
 connectUDP tracker = do
-  TransactionR tid resp <- transaction tracker Connect
+  resp <- transaction tracker Connect
   case resp of
     Connected cid -> return cid
+    Failed    msg -> throwIO $ userError $ T.unpack msg
+    _             -> throwIO $ userError "message type mismatch"
 
 initialTracker :: URI -> IO UDPTracker
 initialTracker uri = do
@@ -299,22 +302,19 @@ freshConnection tracker @ UDPTracker {..} = do
     connId <- connectUDP tracker
     updateConnection connId tracker
 
-{-
-
 announceUDP :: UDPTracker -> AnnounceQuery -> IO AnnounceInfo
-announceUDP t query = do
-  Transaction tid cid resp <- call transaction (Announce query)
+announceUDP tracker ann = do
+  resp <- transaction tracker (Announce ann)
   case resp of
     Announced info -> return info
     _              -> fail "response type mismatch"
 
 scrapeUDP :: UDPTracker -> ScrapeQuery -> IO Scrape
-scrapeUDP UDPTracker {..} query = do
-  resp <- call trackerURI $ Scrape query
+scrapeUDP tracker scr = do
+  resp <- transaction tracker (Scrape scr)
   case resp of
     Scraped scrape -> return undefined
 
 instance Tracker UDPTracker where
   announce = announceUDP
   scrape_  = scrapeUDP
--}
