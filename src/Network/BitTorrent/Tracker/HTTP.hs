@@ -33,6 +33,17 @@ import Network.HTTP
 import Data.Torrent.Metainfo hiding (announce)
 import Network.BitTorrent.Tracker.Protocol
 
+
+data HTTPTracker = HTTPTracker URI
+
+instance Tracker URI where
+  announce = askTracker
+  scrape_  uri ihs = do
+    e <- scrape uri ihs
+    case e of
+      Left str  -> error str
+      Right si  -> return si
+
 {-----------------------------------------------------------------------
   Announce
 -----------------------------------------------------------------------}
@@ -42,8 +53,8 @@ encodeRequest announce req = URL.urlEncode req
                     `addToURI`      announce
                     `addHashToURI`  reqInfoHash req
 
-mkHTTPRequest :: URI -> Request ByteString
-mkHTTPRequest uri = Request uri GET [] ""
+mkGET :: URI -> Request ByteString
+mkGET uri = Request uri GET [] ""
 
 -- TODO rename to something like "announceBlahBlah"
 
@@ -53,7 +64,7 @@ mkHTTPRequest uri = Request uri GET [] ""
 --
 askTracker :: URI -> AnnounceQuery -> IO AnnounceInfo
 askTracker announce req = do
-    let r = mkHTTPRequest (encodeRequest announce req)
+    let r = mkGET (encodeRequest announce req)
 
     rawResp  <- simpleHTTP r
     respBody <- getResponseBody rawResp
@@ -69,15 +80,12 @@ askTracker announce req = do
 -- conjunction with 'Stopped'.
 leaveTracker :: URI -> AnnounceQuery -> IO ()
 leaveTracker announce req = do
-  let r = mkHTTPRequest (encodeRequest announce req)
+  let r = mkGET (encodeRequest announce req)
   void $ simpleHTTP r >>= getResponseBody
 
 {-----------------------------------------------------------------------
   Scrape
 -----------------------------------------------------------------------}
-
--- | Scrape info about a set of torrents.
-type Scrape = Map InfoHash ScrapeInfo
 
 -- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'
 --   gives 'Nothing' then tracker do not support scraping. The info hash

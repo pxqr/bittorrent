@@ -23,9 +23,22 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# OPTIONS -fno-warn-orphans           #-}
 module Network.BitTorrent.Tracker.Protocol
-       ( Event(..), AnnounceQuery(..), AnnounceInfo(..)
-       , defaultNumWant , defaultPorts
-       , ScrapeQuery, ScrapeInfo(..)
+       ( -- * Announce
+         Event(..)
+       , AnnounceQuery(..)
+       , AnnounceInfo(..)
+
+         -- ** Defaults
+       , defaultNumWant
+       , defaultPorts
+
+         -- * Scrape
+       , ScrapeQuery
+       , ScrapeInfo(..)
+       , Scrape
+
+         -- * TODO
+       , Tracker(..)
        )
        where
 
@@ -325,6 +338,9 @@ data ScrapeInfo = ScrapeInfo {
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
 
+-- | Scrape info about a set of torrents.
+type Scrape = Map InfoHash ScrapeInfo
+
 instance BEncodable ScrapeInfo where
   toBEncode ScrapeInfo {..} = fromAssocs
     [ "complete"   -->  siComplete
@@ -357,3 +373,8 @@ instance Serialize ScrapeInfo where
       , siIncomplete = fromIntegral leechers
       , siName       = Nothing
       }
+
+-- | Set of tracker RPCs.
+class Tracker s where
+  announce :: s -> AnnounceQuery -> IO AnnounceInfo
+  scrape_  :: s -> ScrapeQuery   -> IO Scrape
