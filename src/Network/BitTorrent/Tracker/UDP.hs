@@ -123,11 +123,11 @@ instance Serialize (Transaction Request) where
         put connectId
         put transIdQ
 
-      Announce query -> do
+      Announce ann -> do
         put connIdQ
         put announceId
         put transIdQ
-        put query
+        put ann
 
       Scrape   hashes -> do
         put connIdQ
@@ -136,23 +136,18 @@ instance Serialize (Transaction Request) where
         forM_ hashes put
 
   get = do
-    cid <- get
-    mid <- getWord32be
-    tid <- get
-    bod <- getBody mid
-
-    return $ TransactionQ {
-        connIdQ  = cid
-      , transIdQ = tid
-      , request  = bod
-      }
+      cid <- get
+      mid <- getWord32be
+      TransactionQ cid <$> get <*> getBody mid
     where
       getBody :: MessageId -> Get Request
       getBody msgId
         | msgId == connectId  = pure Connect
         | msgId == announceId = Announce <$> get
         | msgId == scrapeId   = Scrape   <$> many get
-        |       otherwise     = fail "unknown message id"
+        |       otherwise     = fail errMsg
+        where
+          errMsg = "unknown request message id: " ++ show msgId
 
 instance Serialize (Transaction Response) where
   put TransactionR {..} = do
@@ -179,27 +174,18 @@ instance Serialize (Transaction Response) where
 
 
   get = do
---    cid <- get
-    mid <- getWord32be
-    tid <- get
-    bod <- getBody mid
-
-    return $ TransactionR
-      { transIdR = tid
-      , response = bod
-      }
+      mid <- getWord32be
+      TransactionR <$> get <*> getBody mid
     where
       getBody :: MessageId -> Get Response
       getBody msgId
         | msgId == connectId  = Connected <$> get
         | msgId == announceId = Announced <$> get
         | msgId == scrapeId   = Scraped   <$> many get
-        | msgId == errorId    = do
-          bs <- get
-          case decodeUtf8' bs of
-            Left ex   -> fail (show ex)
-            Right msg -> return $ Failed msg
-        |  otherwise  = fail $ "unknown message id: " ++ show msgId
+        | msgId == errorId    = (Failed . decodeUtf8) <$> get
+        |       otherwise     = fail msg
+        where
+          msg = "unknown message response id: " ++ show msgId
 
 {-----------------------------------------------------------------------
   Connection
