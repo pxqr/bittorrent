@@ -16,10 +16,9 @@
 module Network.BitTorrent.Tracker.UDP
        ( UDPTracker
        , initialTracker
+
+         -- * Debug
        , putTracker
-       , connectUDP
-       , freshConnection
-       , announceUDP
        ) where
 
 import Control.Applicative
@@ -28,6 +27,7 @@ import Control.Monad
 import Data.ByteString (ByteString)
 import Data.IORef
 import Data.List as L
+import Data.Map as M
 import Data.Maybe
 import Data.Monoid
 import Data.Serialize
@@ -40,6 +40,7 @@ import Network.Socket hiding (Connected)
 import Network.Socket.ByteString as BS
 import Network.URI
 import System.Entropy
+import System.Timeout
 import Numeric
 
 import Data.Torrent.Metainfo ()
@@ -304,17 +305,43 @@ freshConnection tracker @ UDPTracker {..} = do
 
 announceUDP :: UDPTracker -> AnnounceQuery -> IO AnnounceInfo
 announceUDP tracker ann = do
+  freshConnection tracker
   resp <- transaction tracker (Announce ann)
   case resp of
     Announced info -> return info
-    _              -> fail "response type mismatch"
+    _              -> fail "announce: response type mismatch"
 
 scrapeUDP :: UDPTracker -> ScrapeQuery -> IO Scrape
 scrapeUDP tracker scr = do
+  freshConnection tracker
   resp <- transaction tracker (Scrape scr)
   case resp of
-    Scraped scrape -> return undefined
+    Scraped scrape -> return $ M.fromList $ L.zip scr scrape
+    _              -> fail "scrape: response type mismatch"
 
+{-----------------------------------------------------------------------
+  Retransmission
+-----------------------------------------------------------------------}
+
+sec :: Int
+sec = 1000000
+
+minTimeout :: Int
+minTimeout = 15 * sec
+
+maxTimeout :: Int
+maxTimeout = 15 * 2 ^ (8 :: Int) * sec
+
+retransmission :: IO a -> IO a
+retransmission action = go minTimeout
+  where
+    go curTimeout
+      | maxTimeout < curTimeout = throwIO $ userError "tracker down"
+      |       otherwise         = do
+        r <- timeout curTimeout action
+        maybe (go (2 * curTimeout)) return r
+
+{----------------------------------------------------------------------}
 instance Tracker UDPTracker where
-  announce = announceUDP
-  scrape_  = scrapeUDP
+  announce t = retransmission . announceUDP t
+  scrape_  t = retransmission . scrapeUDP   t

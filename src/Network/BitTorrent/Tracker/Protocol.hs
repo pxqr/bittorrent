@@ -338,6 +338,7 @@ data ScrapeInfo = ScrapeInfo {
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
 
+-- TODO hash map
 -- | Scrape info about a set of torrents.
 type Scrape = Map InfoHash ScrapeInfo
 
