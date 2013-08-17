@@ -12,6 +12,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies               #-}
 module Network.BitTorrent.Tracker.UDP
        ( UDPTracker
        , initialTracker
@@ -94,13 +95,18 @@ data Response = Connected ConnId
               | Failed    Text
                 deriving Show
 
--- TODO rename to message?
-data Transaction a = Transaction
-  { connId  :: !ConnId
-  , transId :: !TransId
-  , body    :: !a
-  } deriving Show
+data family Transaction a
+data instance Transaction Request  = TransactionQ
+    { connIdQ  :: {-# UNPACK #-} !ConnId
+    , transIdQ :: {-# UNPACK #-} !TransId
+    , request  :: !Request
+    } deriving Show
+data instance Transaction Response = TransactionR
+    { transIdR :: {-# UNPACK #-} !TransId
+    , response :: !Response
+    } deriving Show
 
+-- TODO newtype
 type MessageId = Word32
 
 connectId, announceId, scrapeId, errorId :: MessageId
@@ -110,23 +116,23 @@ scrapeId   = 2
 errorId    = 3
 
 instance Serialize (Transaction Request) where
-  put Transaction {..} = do
-    case body of
+  put TransactionQ {..} = do
+    case request of
       Connect        -> do
         put initialConnectionId
         put connectId
-        put transId
+        put transIdQ
 
       Announce query -> do
-        put connId
+        put connIdQ
         put announceId
-        put transId
+        put transIdQ
         put query
 
       Scrape   hashes -> do
-        put connId
+        put connIdQ
         put scrapeId
-        put transId
+        put transIdQ
         forM_ hashes put
 
   get = do
@@ -135,10 +141,10 @@ instance Serialize (Transaction Request) where
     tid <- get
     bod <- getBody mid
 
-    return $ Transaction {
-        connId  = cid
-      , transId = tid
-      , body    = bod
+    return $ TransactionQ {
+        connIdQ  = cid
+      , transIdQ = tid
+      , request  = bod
       }
     where
       getBody :: MessageId -> Get Request
@@ -149,26 +155,26 @@ instance Serialize (Transaction Request) where
         |       otherwise     = fail "unknown message id"
 
 instance Serialize (Transaction Response) where
-  put Transaction {..} = do
-    case body of
+  put TransactionR {..} = do
+    case response of
       Connected conn -> do
         put connectId
-        put transId
+        put transIdR
         put conn
 
       Announced info -> do
         put announceId
-        put transId
+        put transIdR
         put info
 
       Scraped infos -> do
         put scrapeId
-        put transId
+        put transIdR
         forM_ infos put
 
       Failed info -> do
         put errorId
-        put transId
+        put transIdR
         put (encodeUtf8 info)
 
 
@@ -178,10 +184,9 @@ instance Serialize (Transaction Response) where
     tid <- get
     bod <- getBody mid
 
-    return $ Transaction {
-        connId  = initialConnectionId -- TODO
-      , transId = tid
-      , body    = bod
+    return $ TransactionR
+      { transIdR = tid
+      , response = bod
       }
     where
       getBody :: MessageId -> Get Response
@@ -277,19 +282,19 @@ transaction :: UDPTracker -> Request -> IO (Transaction Response)
 transaction tracker @ UDPTracker {..} request = do
   cid <- getConnectionId tracker
   tid <- genTransactionId
-  let trans = Transaction cid tid request
+  let trans = TransactionQ cid tid request
 
   addr <- getTrackerAddr trackerURI
   res  <- call addr (encode trans)
   case decode res of
-    Right (response @ Transaction {..})
-      | tid == transId -> return response
+    Right (responseT @ TransactionR {..})
+      | tid == transIdR -> return responseT
       |   otherwise    -> throwIO $ userError "transaction id mismatch"
     Left msg           -> throwIO $ userError msg
 
 connectUDP :: UDPTracker -> IO ConnId
 connectUDP tracker = do
-  Transaction _ tid resp <- transaction tracker Connect
+  TransactionR tid resp <- transaction tracker Connect
   case resp of
     Connected cid -> return cid
 
