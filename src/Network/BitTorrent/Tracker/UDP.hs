@@ -55,30 +55,29 @@ genToken = do
   where
     err = error "genToken: impossible happen"
 
--- TODO rename
 -- | Connection Id is used for entire tracker session.
-newtype ConnId  = ConnId Word64
-                  deriving (Eq, Serialize)
+newtype ConnectionId  = ConnectionId Word64
+                        deriving (Eq, Serialize)
 
-instance Show ConnId where
-  showsPrec _ (ConnId cid) = showString "0x" <> showHex cid
+instance Show ConnectionId where
+  showsPrec _ (ConnectionId cid) = showString "0x" <> showHex cid
 
-genConnectionId :: IO ConnId
-genConnectionId = ConnId <$> genToken
+genConnectionId :: IO ConnectionId
+genConnectionId = ConnectionId <$> genToken
 
-initialConnectionId :: ConnId
-initialConnectionId = ConnId 0x41727101980
+initialConnectionId :: ConnectionId
+initialConnectionId =  ConnectionId 0x41727101980
 
 -- TODO rename
 -- | Transaction Id is used within a UDP RPC.
-newtype TransId = TransId Word32
-                  deriving (Eq, Serialize)
+newtype TransactionId = TransactionId Word32
+                        deriving (Eq, Serialize)
 
-instance Show TransId where
-  showsPrec _ (TransId tid) = showString "0x" <> showHex tid
+instance Show TransactionId where
+  showsPrec _ (TransactionId tid) = showString "0x" <> showHex tid
 
-genTransactionId :: IO TransId
-genTransactionId = (TransId . fromIntegral) <$> genToken
+genTransactionId :: IO TransactionId
+genTransactionId = (TransactionId . fromIntegral) <$> genToken
 
 {-----------------------------------------------------------------------
   Transactions
@@ -89,7 +88,7 @@ data Request  = Connect
               | Scrape    ScrapeQuery
                 deriving Show
 
-data Response = Connected ConnId
+data Response = Connected ConnectionId
               | Announced AnnounceInfo
               | Scraped   [ScrapeInfo]
               | Failed    Text
@@ -97,12 +96,12 @@ data Response = Connected ConnId
 
 data family Transaction a
 data instance Transaction Request  = TransactionQ
-    { connIdQ  :: {-# UNPACK #-} !ConnId
-    , transIdQ :: {-# UNPACK #-} !TransId
+    { connIdQ  :: {-# UNPACK #-} !ConnectionId
+    , transIdQ :: {-# UNPACK #-} !TransactionId
     , request  :: !Request
     } deriving Show
 data instance Transaction Response = TransactionR
-    { transIdR :: {-# UNPACK #-} !TransId
+    { transIdR :: {-# UNPACK #-} !TransactionId
     , response :: !Response
     } deriving Show
 
@@ -199,7 +198,7 @@ connectionLifetimeServer :: NominalDiffTime
 connectionLifetimeServer = 120
 
 data Connection = Connection
-    { connectionId        :: ConnId
+    { connectionId        :: ConnectionId
     , connectionTimestamp :: UTCTime
     } deriving Show
 
@@ -251,12 +250,12 @@ data UDPTracker = UDPTracker
     , trackerConnection :: IORef Connection
     }
 
-updateConnection :: ConnId -> UDPTracker -> IO ()
+updateConnection :: ConnectionId -> UDPTracker -> IO ()
 updateConnection cid UDPTracker {..} = do
   newConnection <- Connection cid <$> getCurrentTime
   writeIORef trackerConnection newConnection
 
-getConnectionId :: UDPTracker -> IO ConnId
+getConnectionId :: UDPTracker -> IO ConnectionId
 getConnectionId UDPTracker {..}
   = connectionId <$> readIORef trackerConnection
 
@@ -279,7 +278,7 @@ transaction tracker @ UDPTracker {..} request = do
       |   otherwise    -> throwIO $ userError "transaction id mismatch"
     Left msg           -> throwIO $ userError msg
 
-connectUDP :: UDPTracker -> IO ConnId
+connectUDP :: UDPTracker -> IO ConnectionId
 connectUDP tracker = do
   TransactionR tid resp <- transaction tracker Connect
   case resp of
