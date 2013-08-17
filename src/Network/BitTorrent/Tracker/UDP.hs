@@ -107,7 +107,8 @@ data instance Transaction Response = TransactionR
     } deriving Show
 
 -- TODO newtype
-type MessageId = Word32
+newtype MessageId = MessageId Word32
+                    deriving (Show, Eq, Num, Serialize)
 
 connectId, announceId, scrapeId, errorId :: MessageId
 connectId  = 0
@@ -137,7 +138,7 @@ instance Serialize (Transaction Request) where
 
   get = do
       cid <- get
-      mid <- getWord32be
+      mid <- get
       TransactionQ cid <$> get <*> getBody mid
     where
       getBody :: MessageId -> Get Request
@@ -147,7 +148,7 @@ instance Serialize (Transaction Request) where
         | msgId == scrapeId   = Scrape   <$> many get
         |       otherwise     = fail errMsg
         where
-          errMsg = "unknown request message id: " ++ show msgId
+          errMsg = "unknown request: " ++ show msgId
 
 instance Serialize (Transaction Response) where
   put TransactionR {..} = do
@@ -174,7 +175,7 @@ instance Serialize (Transaction Response) where
 
 
   get = do
-      mid <- getWord32be
+      mid <- get
       TransactionR <$> get <*> getBody mid
     where
       getBody :: MessageId -> Get Response
@@ -185,7 +186,7 @@ instance Serialize (Transaction Response) where
         | msgId == errorId    = (Failed . decodeUtf8) <$> get
         |       otherwise     = fail msg
         where
-          msg = "unknown message response id: " ++ show msgId
+          msg = "unknown response: " ++ show msgId
 
 {-----------------------------------------------------------------------
   Connection
