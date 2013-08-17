@@ -23,14 +23,14 @@ too)
 
 | BEP # | Title                                              | Status
 |:-----:|:--------------------------------------------------:|:-----------
-| 3     | [The BitTorrent Protocol Specification][bep3]      | Implemented
-| 4     | [Known Number Allocations][bep4]                   | Implemented
-| 20    | [Peer ID Conventions][bep20]                       | Implemented
-| 23    | [Tracker Return Compact Peer Lists][bep23]         | Implemented
-| 15    | [UDP Tracker Protocol for BitTorrent][bep15]       | In progress
+| 3     | [The BitTorrent Protocol Specification][bep3]      | [Implemented][bep3-impl]
+| 4     | [Known Number Allocations][bep4]                   | [In progress][bep4-impl]
+| 20    | [Peer ID Conventions][bep20]                       | [Implemented][bep20-impl]
+| 23    | [Tracker Return Compact Peer Lists][bep23]         | [Implemented][bep23-impl]
+| 15    | [UDP Tracker Protocol for BitTorrent][bep15]       | [In progress][bep15-impl]
 | 9     | [Extension for Peers to Send Metadata Files][bep9] | Want
-| 5     | [DHT][bep5]                                        | In progress
-| 6     | [Fast Extension][bep6]                             | In progress
+| 5     | [DHT][bep5]                                        | [In progress][bep5-impl]
+| 6     | [Fast Extension][bep6]                             | [In progress][bep6-impl]
 
 [bep-list]: http://www.bittorrent.org/beps/bep_0000.html
 [bep3]:  http://www.bittorrent.org/beps/bep_0003.html
@@ -41,3 +41,11 @@ too)
 [bep15]: http://www.bittorrent.org/beps/bep_0015.html
 [bep20]: http://www.bittorrent.org/beps/bep_0020.html
 [bep23]: http://www.bittorrent.org/beps/bep_0023.html
+
+[bep3-impl]:  src
+[bep4-impl]:  src/Network/BitTorrent/Extension.hs
+[bep5-impl]:  src/Network/BitTorrent/DHT/Protocol.hs
+[bep6-impl]:  src/Network/BitTorrent/Exchange.hs
+[bep15-impl]: src/Network/BitTorrent/Tracker/UDP.hs
+[bep20-impl]: src/Network/BitTorrent/Peer.hs
+[bep23-impl]: https://github.com/cobit/torrent-content/tree/master/src/Data/Torrent/Metainfo.hs
