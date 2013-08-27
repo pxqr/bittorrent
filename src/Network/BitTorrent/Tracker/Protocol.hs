@@ -63,6 +63,7 @@ import Network
 import Network.Socket
 
 import Network.BitTorrent.Peer
+import Network.BitTorrent.Sessions.Types
 
 {-----------------------------------------------------------------------
   Announce messages
@@ -97,14 +98,8 @@ data AnnounceQuery = AnnounceQuery {
      -- peers. Normally, tracker should respond with this port when
      -- some peer request the tracker with the same info hash.
 
-   , reqUploaded   :: !Integer
-     -- ^ Number of bytes that the peer has uploaded in the swarm.
-
-   , reqDownloaded :: !Integer
-     -- ^ Number of bytes downloaded in the swarm by the peer.
-
-   , reqLeft       :: !Integer
-     -- ^ Number of bytes needed in order to complete download.
+   , reqProgress   :: !Progress
+     -- ^ Current progress of peer doing request.
 
    , reqIP         :: Maybe HostAddress
      -- ^ The peer IP. Needed only when client communicated with
@@ -213,9 +208,9 @@ instance URLEncode AnnounceQuery where
   urlEncode AnnounceQuery {..} = mconcat
       [ s "peer_id"    %=  reqPeerId
       , s "port"       %=  reqPort
-      , s "uploaded"   %=  reqUploaded
-      , s "downloaded" %=  reqDownloaded
-      , s "left"       %=  reqLeft
+      , s "uploaded"   %=  _uploaded   reqProgress
+      , s "left"       %=  _left       reqProgress
+      , s "downloaded" %=  _downloaded reqProgress
       , s "ip"         %=? reqIP
       , s "numwant"    %=? reqNumWant
       , s "event"      %=? reqEvent
@@ -248,15 +243,12 @@ getEvent = do
     3 -> return $ Just Stopped
     _ -> fail "unknown event id"
 
+
 instance Serialize AnnounceQuery where
   put AnnounceQuery {..} = do
     put           reqInfoHash
     put           reqPeerId
-
-    putWord64be $ fromIntegral reqDownloaded
-    putWord64be $ fromIntegral reqLeft
-    putWord64be $ fromIntegral reqUploaded
-
+    put           reqProgress
     putEvent      reqEvent
     putWord32be $ fromMaybe 0 reqIP
     putWord32be $ 0 -- TODO what the fuck is "key"?
@@ -268,9 +260,7 @@ instance Serialize AnnounceQuery where
     ih   <- get
     pid  <- get
 
-    down <- getWord64be
-    left <- getWord64be
-    up   <- getWord64be
+    progress <- get
 
     ev   <- getEvent
     ip   <- getWord32be
@@ -283,9 +273,7 @@ instance Serialize AnnounceQuery where
         reqInfoHash   = ih
       , reqPeerId     = pid
       , reqPort       = port
-      , reqUploaded   = fromIntegral up
-      , reqDownloaded = fromIntegral down
-      , reqLeft       = fromIntegral left
+      , reqProgress   = progress
       , reqIP         = if ip == 0 then Nothing else Just ip
       , reqNumWant    = if want == -1 then Nothing else Just (fromIntegral want)
       , reqEvent      = ev

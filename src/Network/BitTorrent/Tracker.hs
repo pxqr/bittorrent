@@ -41,7 +41,6 @@ import Network.URI
 
 import Data.Torrent.Metainfo
 import Network.BitTorrent.Peer
-import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Tracker.Protocol
 import Network.BitTorrent.Tracker.HTTP
 
@@ -73,9 +72,7 @@ genericReq ses pr =   AnnounceQuery {
   , reqPeerId     = tconnPeerId   ses
   , reqPort       = tconnPort     ses
 
-  , reqUploaded   = _uploaded   pr
-  , reqDownloaded = _downloaded pr
-  , reqLeft       = _left       pr
+  , reqProgress   = pr
 
   , reqIP         = Nothing
   , reqNumWant    = Nothing
