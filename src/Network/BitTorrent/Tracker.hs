@@ -43,6 +43,28 @@ import Data.Torrent.Metainfo
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Tracker.Protocol as Tracker
 import Network.BitTorrent.Tracker.HTTP
+import Network.BitTorrent.Tracker.UDP
+
+{-----------------------------------------------------------------------
+    Generalized Tracker instance — UDP + HTTP
+-----------------------------------------------------------------------}
+
+data BitTracker = HTTPTr HTTPTracker
+                | UDPTr UDPTracker
+
+instance Tracker BitTracker where
+  connect uri @ URI {..}
+    | uriScheme == "udp:"  = UDPTr  <$> connect uri
+    | uriScheme == "http:" = HTTPTr <$> connect uri
+    |       otherwise      = throwIO $ userError msg
+    where
+      msg = "unknown tracker protocol scheme: " ++ show uriScheme
+
+  announce (HTTPTr t) = Tracker.announce t
+  announce (UDPTr  t) = Tracker.announce t
+
+  scrape (HTTPTr t) = scrape t
+  scrape (UDPTr  t) = scrape t
 
 {-----------------------------------------------------------------------
     Tracker connection
@@ -149,7 +171,7 @@ data TSession = TSession {
     seProgress   :: TVar Progress
   , seInterval   :: IORef TimeInterval
   , sePeers      :: BoundedChan PeerAddr
-  , seTracker    :: HTTPTracker
+  , seTracker    :: BitTracker
   }
 
 type PeerCount = Int
@@ -164,7 +186,7 @@ getProgress :: TSession -> IO Progress
 getProgress = readTVarIO . seProgress
 
 newSession :: PeerCount -> Progress -> TimeInterval -> [PeerAddr]
-           -> HTTPTracker
+           -> BitTracker
            -> IO TSession
 newSession chanSize pr i ps tr
   | chanSize < 1
