@@ -14,17 +14,17 @@
 --   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
 --
 module Network.BitTorrent.Tracker.HTTP
-       ( askTracker, leaveTracker
-       , scrapeURL, scrape, scrapeOne
+       ( HTTPTracker
+
+         -- * Extra
+       , scrapeURL
        ) where
 
-import Control.Applicative
-import Control.Monad
+import Control.Exception
 import Data.BEncode
 import Data.ByteString as B
 import Data.ByteString.Char8 as BC
 import Data.List as L
-import Data.Map as M
 import Data.Monoid
 import Data.URLEncoded as URL
 import Network.URI
@@ -34,37 +34,34 @@ import Data.Torrent.Metainfo hiding (announce)
 import Network.BitTorrent.Tracker.Protocol
 
 
-data HTTPTracker = HTTPTracker URI
+data HTTPTracker = HTTPTracker
+  { announceURI :: URI
+  } deriving Show
 
-instance Tracker URI where
-  announce = askTracker
-  scrape_  uri ihs = do
-    e <- scrape uri ihs
-    case e of
-      Left str  -> error str
-      Right si  -> return si
+instance Tracker HTTPTracker where
+  connect  = return . HTTPTracker
+  announce = announceHTTP
+  scrape   = scrapeHTTP
 
 {-----------------------------------------------------------------------
   Announce
 -----------------------------------------------------------------------}
 
 encodeRequest :: URI -> AnnounceQuery -> URI
-encodeRequest announce req = URL.urlEncode req
-                    `addToURI`      announce
+encodeRequest announceURI req = URL.urlEncode req
+                    `addToURI`      announceURI
                     `addHashToURI`  reqInfoHash req
 
 mkGET :: URI -> Request ByteString
 mkGET uri = Request uri GET [] ""
 
--- TODO rename to something like "announceBlahBlah"
-
 -- | Send request and receive response from the tracker specified in
 -- announce list. This function throws 'IOException' if it couldn't
 -- send request or receive response or decode response.
 --
-askTracker :: URI -> AnnounceQuery -> IO AnnounceInfo
-askTracker announce req = do
-    let r = mkGET (encodeRequest announce req)
+announceHTTP :: HTTPTracker -> AnnounceQuery -> IO AnnounceInfo
+announceHTTP HTTPTracker {..} req = do
+    let r = mkGET (encodeRequest announceURI req)
 
     rawResp  <- simpleHTTP r
     respBody <- getResponseBody rawResp
@@ -75,13 +72,6 @@ askTracker announce req = do
     checkResult (Right (Failure err))
       = ioError $ userError $ show err ++ " in tracker response"
     checkResult (Right resp)          = return resp
-
--- | The same as the 'askTracker' but ignore response. Used in
--- conjunction with 'Stopped'.
-leaveTracker :: URI -> AnnounceQuery -> IO ()
-leaveTracker announce req = do
-  let r = mkGET (encodeRequest announce req)
-  void $ simpleHTTP r >>= getResponseBody
 
 {-----------------------------------------------------------------------
   Scrape
@@ -113,25 +103,15 @@ scrapeURL uri ihs = do
 --   all available torrents.
 --   Note that the 'URI' should be /announce/ URI, not /scrape/ URI.
 --
-scrape :: URI                -- ^ Announce 'URI'.
-       -> [InfoHash]         -- ^ Torrents to be scrapped.
-       -> IO (Result Scrape) -- ^ 'ScrapeInfo' for each torrent.
-scrape announce ihs
-  | Just uri<- scrapeURL announce ihs = do
+scrapeHTTP :: HTTPTracker -- ^ Announce 'URI'.
+           -> [InfoHash]  -- ^ Torrents to be scrapped.
+           -> IO Scrape   -- ^ 'ScrapeInfo' for each torrent.
+scrapeHTTP HTTPTracker {..} ihs
+  | Just uri <- scrapeURL announceURI ihs = do
     rawResp  <- simpleHTTP (Request uri GET [] "")
     respBody <- getResponseBody rawResp
-    return (decoded (BC.pack respBody))
+    case decoded (BC.pack respBody) of
+      Left  e -> throwIO $ userError $ e ++ " in scrape response"
+      Right r -> return r
 
-  | otherwise = return (Left "Tracker do not support scraping")
-
--- | More particular version of 'scrape', just for one torrent.
---
-scrapeOne :: URI                     -- ^ Announce 'URI'
-          -> InfoHash                -- ^ Hash of the torrent info.
-          -> IO (Result ScrapeInfo)  -- ^ 'ScrapeInfo' for the torrent.
-scrapeOne uri ih = extract <$> scrape uri [ih]
-  where
-    extract (Right m)
-      | Just s <- M.lookup ih m = Right s
-      | otherwise = Left "unable to find info hash in response dict"
-    extract (Left e) = Left e
+  | otherwise = throwIO $ userError "Tracker do not support scraping"

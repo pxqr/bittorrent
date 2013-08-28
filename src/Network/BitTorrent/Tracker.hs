@@ -41,7 +41,7 @@ import Network.URI
 
 import Data.Torrent.Metainfo
 import Network.BitTorrent.Peer
-import Network.BitTorrent.Tracker.Protocol
+import Network.BitTorrent.Tracker.Protocol as Tracker
 import Network.BitTorrent.Tracker.HTTP
 
 {-----------------------------------------------------------------------
@@ -83,9 +83,8 @@ genericReq ses pr =   AnnounceQuery {
 --   'startedReq'. It includes necessary 'Started' event field.
 --
 startedReq :: TConnection -> Progress -> AnnounceQuery
-startedReq ses pr = (genericReq ses pr) {
-    reqIP         = Nothing
-  , reqNumWant    = Just defaultNumWant
+startedReq ses pr = (genericReq ses pr)
+  { reqNumWant    = Just defaultNumWant
   , reqEvent      = Just Started
   }
 
@@ -94,9 +93,8 @@ startedReq ses pr = (genericReq ses pr) {
 --   so new peers could connect to the client.
 --
 regularReq :: Int -> TConnection -> Progress -> AnnounceQuery
-regularReq numWant ses pr = (genericReq ses pr) {
-    reqIP         = Nothing
-  , reqNumWant    = Just numWant
+regularReq numWant ses pr = (genericReq ses pr)
+  { reqNumWant    = Just numWant
   , reqEvent      = Nothing
   }
 
@@ -104,9 +102,8 @@ regularReq numWant ses pr = (genericReq ses pr) {
 -- gracefully.
 --
 stoppedReq :: TConnection -> Progress -> AnnounceQuery
-stoppedReq ses pr = (genericReq ses pr) {
-    reqIP         = Nothing
-  , reqNumWant    = Nothing
+stoppedReq ses pr = (genericReq ses pr)
+  { reqNumWant    = Nothing
   , reqEvent      = Just Stopped
   }
 
@@ -115,9 +112,8 @@ stoppedReq ses pr = (genericReq ses pr) {
 -- complete.
 --
 completedReq :: TConnection -> Progress -> AnnounceQuery
-completedReq ses pr = (genericReq ses pr) {
-    reqIP         = Nothing
-  , reqNumWant    = Nothing
+completedReq ses pr = (genericReq ses pr)
+  { reqNumWant    = Nothing
   , reqEvent      = Just Completed
   }
 
@@ -153,6 +149,7 @@ data TSession = TSession {
     seProgress   :: TVar Progress
   , seInterval   :: IORef TimeInterval
   , sePeers      :: BoundedChan PeerAddr
+  , seTracker    :: HTTPTracker
   }
 
 type PeerCount = Int
@@ -167,8 +164,9 @@ getProgress :: TSession -> IO Progress
 getProgress = readTVarIO . seProgress
 
 newSession :: PeerCount -> Progress -> TimeInterval -> [PeerAddr]
+           -> HTTPTracker
            -> IO TSession
-newSession chanSize pr i ps
+newSession chanSize pr i ps tr
   | chanSize < 1
   = throwIO $ userError "size of chan should be more that 1"
 
@@ -183,6 +181,7 @@ newSession chanSize pr i ps
     TSession <$> newTVarIO pr
              <*> newIORef i
              <*> pure chan
+             <*> pure tr
 
 waitInterval :: TSession -> IO ()
 waitInterval TSession {..} = do
@@ -191,39 +190,45 @@ waitInterval TSession {..} = do
   where
     sec = 1000 * 1000 :: Int
 
+announceLoop :: IO (BoundedChan PeerAddr)
+announceLoop = undefined
+
+openSession :: Progress -> TConnection -> IO TSession
+openSession initProgress conn = do
+  t    <- Tracker.connect (tconnAnnounce conn)
+  resp <- Tracker.announce t (startedReq conn initProgress)
+  newSession defaultChanSize initProgress
+          (respInterval resp) (respPeers resp) t
+
+closeSession :: TConnection -> TSession -> IO ()
+closeSession conn se @ TSession {..} = do
+  pr <- getProgress se
+  Tracker.announce seTracker (stoppedReq conn pr)
+  return ()
+
+syncSession :: TConnection -> TSession -> IO ()
+syncSession conn se @ TSession {..} = forever $ do
+  waitInterval se
+  pr   <- getProgress se
+  resp <- tryJust isIOException $ do
+   Tracker.announce seTracker (regularReq defaultNumWant conn pr)
+  case resp of
+    Left _ -> return ()
+    Right (AnnounceInfo {..}) -> do
+      writeIORef seInterval respInterval
+
+      -- we rely on the fact that union on lists is not
+      -- commutative: this implements the heuristic "old peers
+      -- in head"
+      old <- BC.getChanContents sePeers
+      let combined = L.union old respPeers
+      BC.writeList2Chan sePeers combined
+ where
+    isIOException :: IOException -> Maybe IOException
+    isIOException = return
+
 withTracker :: Progress -> TConnection -> (TSession -> IO a) -> IO a
-withTracker initProgress conn action = bracket start end (action . fst)
-  where
-    start = do
-      resp <- askTracker (tconnAnnounce conn) (startedReq conn initProgress)
-      se   <- newSession defaultChanSize initProgress
-                         (respInterval resp) (respPeers resp)
-
-      tid  <- forkIO (syncSession se)
-      return (se, tid)
-
-    syncSession se @ TSession {..} = forever $ do
-        waitInterval se
-        pr   <- getProgress se
-        resp <- tryJust isIOException $ do
-                    askTracker (tconnAnnounce conn) (regularReq defaultNumWant conn pr)
-        case resp of
-          Right (AnnounceInfo {..}) -> do
-            writeIORef seInterval respInterval
-
-            -- we rely on the fact that union on lists is not
-            -- commutative: this implements the heuristic "old peers
-            -- in head"
-            old <- BC.getChanContents sePeers
-            let combined = L.union old respPeers
-            BC.writeList2Chan sePeers combined
-
-          _ -> return ()
-      where
-        isIOException :: IOException -> Maybe IOException
-        isIOException = return
-
-    end (se, tid) = do
-      killThread tid
-      pr <- getProgress se
-      leaveTracker (tconnAnnounce conn) (stoppedReq conn pr)
+withTracker initProgress conn
+    = bracket
+      (openSession initProgress conn)
+      (closeSession conn)

@@ -39,12 +39,13 @@ module Network.BitTorrent.Tracker.Protocol
 
          -- * TODO
        , Tracker(..)
+       , scrapeOne
        )
        where
 
 import Control.Applicative
+import Control.Exception
 import Control.Monad
-
 import Data.Aeson.TH
 import Data.Char as Char
 import Data.Map  as M
@@ -58,12 +59,11 @@ import Data.Text.Encoding
 import Data.Serialize hiding (Result)
 import Data.URLEncoded as URL
 import Data.Torrent.Metainfo
-
 import Network
+import Network.URI
 import Network.Socket
 
 import Network.BitTorrent.Peer
-import Network.BitTorrent.Sessions.Types
 
 {-----------------------------------------------------------------------
   Announce messages
@@ -365,5 +365,13 @@ instance Serialize ScrapeInfo where
 
 -- | Set of tracker RPCs.
 class Tracker s where
+  connect  :: URI -> IO s
   announce :: s -> AnnounceQuery -> IO AnnounceInfo
-  scrape_  :: s -> ScrapeQuery   -> IO Scrape
+  scrape   :: s -> ScrapeQuery   -> IO Scrape
+
+-- | More particular version of 'scrape', just for one torrent.
+--
+scrapeOne :: Tracker t => t -> InfoHash -> IO ScrapeInfo
+scrapeOne uri ih = scrape uri [ih] >>= maybe err return . M.lookup ih
+  where
+    err = throwIO $ userError "unable to find info hash in response dict"

@@ -15,7 +15,6 @@
 {-# LANGUAGE TypeFamilies               #-}
 module Network.BitTorrent.Tracker.UDP
        ( UDPTracker
-       , initialTracker
 
          -- * Debug
        , putTracker
@@ -316,8 +315,8 @@ scrapeUDP tracker scr = do
   freshConnection tracker
   resp <- transaction tracker (Scrape scr)
   case resp of
-    Scraped scrape -> return $ M.fromList $ L.zip scr scrape
-    _              -> fail "scrape: response type mismatch"
+    Scraped info -> return $ M.fromList $ L.zip scr info
+    _            -> fail "scrape: response type mismatch"
 
 {-----------------------------------------------------------------------
   Retransmission
@@ -342,6 +341,8 @@ retransmission action = go minTimeout
         maybe (go (2 * curTimeout)) return r
 
 {----------------------------------------------------------------------}
+
 instance Tracker UDPTracker where
+  connect    = initialTracker
   announce t = retransmission . announceUDP t
-  scrape_  t = retransmission . scrapeUDP   t
+  scrape   t = retransmission . scrapeUDP   t
