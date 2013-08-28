@@ -58,6 +58,7 @@ import Prelude hiding (mapM_, elem)
 import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Concurrent.BoundedChan as BC
 import Control.Concurrent.MSem as MSem
 import Control.Monad (forever, (>=>))
 import Control.Exception
@@ -202,12 +203,12 @@ discover swarm @ SwarmSession {..} = {-# SCC discover #-} do
       , tconnPort     = port
       }
 
-  progress <- getCurrentProgress clientSession
-
-  withTracker progress conn $ \tses -> do
-    forever $ do
-      addr <- getPeerAddr tses
-      forkThrottle swarm $ do
+  let progress = currentProgress clientSession
+  ch  <- newBoundedChan 100 -- TODO
+  tid <- forkIO $ tracker ch progress conn
+  forever $ do
+    addr <- BC.readChan ch
+    forkThrottle swarm $ do
         initiatePeerSession swarm addr $ \pconn -> do
           print addr
           runP2P pconn p2p
