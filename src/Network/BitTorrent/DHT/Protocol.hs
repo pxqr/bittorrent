@@ -42,7 +42,7 @@ import Network.BitTorrent.Exchange.Protocol ()
 
 type NodeId = ByteString
 
--- WARN is the 'system' random suitable for this?
+-- TODO WARN is the 'system' random suitable for this?
 -- | Generate random NodeID used for the entire session.
 --   Distribution of ID's should be as uniform as possible.
 --
@@ -56,9 +56,7 @@ data NodeAddr = NodeAddr {
 
 instance Serialize NodeAddr where
   get = NodeAddr <$> getWord32be <*> get
-  put NodeAddr {..} = do
-    putWord32be nodeIP
-    put         nodePort
+  put NodeAddr {..} = putWord32be nodeIP >> put nodePort
 
 data NodeInfo = NodeInfo {
     nodeID   :: !NodeId

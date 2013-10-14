@@ -59,6 +59,86 @@ instance Arbitrary URI where
 instance Arbitrary Text where
   arbitrary = T.pack <$> arbitrary
 
+{-
+{-----------------------------------------------------------------------
+    MemMap
+-----------------------------------------------------------------------}
+
+tmpdir :: FilePath
+tmpdir = "tmp"
+
+boundaryTest :: Assertion
+boundaryTest = do
+  f <- mallocTo (Fixed.interval 0 1) Fixed.empty
+  f <- mallocTo (Fixed.interval 1 2) f
+  writeElem f 0 (1 :: Word8)
+  writeElem f 1 (2 :: Word8)
+  bs <- readBytes (Fixed.interval 0 2) f
+  "\x1\x2" @=? bs
+
+mmapSingle :: Assertion
+mmapSingle = do
+  f  <- mmapTo (tmpdir </> "single.test") (10, 5) 5 Fixed.empty
+  writeBytes (Fixed.interval 5 5) "abcde" f
+  bs <- readBytes (Fixed.interval 5 5) f
+  "abcde" @=? bs
+
+coalesceTest :: Assertion
+coalesceTest = do
+  f <- mmapTo (tmpdir </> "a.test")  (0, 1) 10 Fixed.empty
+  f <- mmapTo (tmpdir </> "bc.test") (0, 2) 12 f
+  f <- mmapTo (tmpdir </> "c.test")  (0, 1) 13 f
+  writeBytes (Fixed.interval 10 4) "abcd" f
+  bs <- readBytes  (Fixed.interval 10 4) f
+  "abcd" @=? bs
+-}
+
+{-----------------------------------------------------------------------
+    Bitfield
+-----------------------------------------------------------------------}
+-- other properties are tested in IntervalSet
+
+prop_completenessRange :: Bitfield -> Bool
+prop_completenessRange bf = 0 <= c && c <= 1
+  where
+    c = completeness bf
+
+prop_minMax :: Bitfield -> Bool
+prop_minMax bf
+  | BF.null bf = True
+  | otherwise  = BF.findMin bf <= BF.findMax bf
+
+prop_rarestInRange :: [Bitfield] -> Bool
+prop_rarestInRange xs = case rarest xs of
+  Just r  -> 0 <= r
+          && r < totalCount (maximumBy (comparing totalCount) xs)
+  Nothing -> True
+
+{- this one should give pretty good coverage -}
+prop_differenceDeMorgan :: Bitfield -> Bitfield -> Bitfield -> Bool
+prop_differenceDeMorgan a b c =
+  (a `BF.difference` (b `BF.intersection` c))
+     == ((a `BF.difference` b) `BF.union` (a `BF.difference` c))
+  &&
+  (a `BF.difference` (b `BF.union` c))
+     == ((a `BF.difference` b) `BF.intersection` (a `BF.difference` c))
+
+              {-
+  [ -- mem map
+    testCase "boudary"  boundaryTest
+  , testCase "single"   mmapSingle
+  , testCase "coalesce" coalesceTest
+  ]
+
+instance Arbitrary Bitfield where
+  arbitrary = mkBitfield <$> (succ . min 1000 <$> positive)
+                         <*> arbitrary
+
+    testProperty "completeness range"      prop_completenessRange
+  , testProperty "rarest in range"         prop_rarestInRange
+  , testProperty "min less that max"       prop_minMax
+  , testProperty "difference de morgan"    prop_differenceDeMorgan
+-}
 {-----------------------------------------------------------------------
     Handshake
 -----------------------------------------------------------------------}

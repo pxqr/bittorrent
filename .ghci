@@ -3,3 +3,5 @@ import Data.Serialize as S
 import Network
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString
+
+import Network.BitTorrent.DHT.Protocol
