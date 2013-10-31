@@ -52,13 +52,6 @@ module Data.Torrent
        , isTorrentPath
        , fromFile
        , toFile
-
-{-
-       , nullTorrent
-       , mktorrent
-
-
--}
        ) where
 
 import Prelude hiding (sum)
@@ -68,17 +61,19 @@ import Control.DeepSeq
 import Control.Exception
 import Control.Lens
 
+import Data.Aeson.Types (ToJSON(..), FromJSON(..), Value(..), withText)
 import Data.Aeson.TH
 import Data.BEncode as BE
 import Data.BEncode.Types as BE
 import           Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
 import qualified Data.ByteString.Lazy  as BL
-import           Data.Char
+import           Data.Char as Char
 import           Data.Hashable   as Hashable
 import qualified Data.List as L
-import           Data.Text (Text)
-import           Data.Time.Clock.POSIX
+import           Data.Text as T
+import Data.Time
+import Data.Time.Clock.POSIX
 import Data.Typeable
 import Network.URI
 import System.FilePath
@@ -110,7 +105,7 @@ data InfoDict = InfoDict
     --   BEP 27: <http://www.bittorrent.org/beps/bep_0027.html>
   } deriving (Show, Read, Eq, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''InfoDict)
+$(deriveJSON (L.map Char.toLower . L.dropWhile isLower) ''InfoDict)
 
 makeLensesFor
   [ ("idInfoHash"  , "infohash"  )
@@ -188,6 +183,21 @@ data Torrent = Torrent
     -- ^ The RSA signature of the info dictionary (specifically, the
     --   encrypted SHA-1 hash of the info dictionary).
     } deriving (Show, Eq, Typeable)
+
+instance FromJSON URI where
+  parseJSON = withText "URI" $
+    maybe (fail "could not parse URI") pure . parseURI . T.unpack
+
+instance ToJSON URI where
+  toJSON = String . T.pack . show
+
+instance ToJSON NominalDiffTime where
+  toJSON = toJSON . posixSecondsToUTCTime
+
+instance FromJSON NominalDiffTime where
+  parseJSON v = utcTimeToPOSIXSeconds <$> parseJSON v
+
+$(deriveToJSON (L.map Char.toLower . L.dropWhile isLower) ''Torrent)
 
 makeLensesFor
   [ ("tAnnounce"    , "announce"    )
