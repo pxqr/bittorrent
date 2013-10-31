@@ -1,3 +1,4 @@
+* TODO torrent linting for indexing
 * TODO move PeerClient to Data.Torrent.Client
 * TODO Word64 for Progress fields
 * TODO rename TConnection -> Connection, etc

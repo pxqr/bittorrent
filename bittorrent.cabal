@@ -105,6 +105,7 @@ library
                      , aeson
                      , base16-bytestring
                      , base32-bytestring
+                     , base64-bytestring
                      , bencoding   >= 0.4
                      , binary
                      , cereal      >= 0.3
