@@ -5,6 +5,8 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
+--   Torrent content validation.
+--
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -12,9 +14,8 @@ module Data.Torrent.Piece
        ( -- * Piece attributes
          -- ** Piece size
          PieceSize (..)
-       , defaultBlockSize -- TODO use data-default
        , optimalPieceCount
-       , defaultPieceSize -- TODO use data-default
+       , defaultPieceSize
 
          -- ** Piece index
        , PieceIx
@@ -57,6 +58,8 @@ import Data.Text.Encoding as T
 import Data.Typeable
 import Text.PrettyPrint
 
+import Data.Torrent.Block
+
 
 class Lint a where
   lint :: a -> Either String a
@@ -73,10 +76,6 @@ newtype PieceSize = PieceSize Int
            , Num, Real, Integral
            , BEncode, ToJSON, FromJSON
            )
-
--- | Widely used semi-official block size.
-defaultBlockSize :: Int
-defaultBlockSize = 16 * 1024
 
 maxPieceSize :: Int
 maxPieceSize = 4 * 1024 * 1024

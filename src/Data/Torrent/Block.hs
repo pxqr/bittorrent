@@ -3,6 +3,7 @@ module Data.Torrent.Block
        ( -- * Block attribytes
          BlockLIx
        , PieceLIx
+       , defaultBlockSize -- TODO use data-default
 
          -- * Block index
        , BlockIx(..)
@@ -32,6 +33,11 @@ import Data.Binary.Put as B
 import Data.Serialize as S
 
 import Text.PrettyPrint
+
+
+-- | Widely used semi-official block size.
+defaultBlockSize :: Int
+defaultBlockSize = 16 * 1024
 
 {-----------------------------------------------------------------------
     Block Index
