@@ -56,6 +56,7 @@ newtype BlockSize = BlockSize { unBlockSize :: Int }
 -- | Widely used semi-official block size.
 instance Default BlockSize where
   def = 16 * 1024
+  {-# INLINE def #-}
 
 type BlockLIx = Int
 type PieceLIx = Int

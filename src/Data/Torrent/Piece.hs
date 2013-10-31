@@ -12,13 +12,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Torrent.Piece
        ( -- * Piece attributes
-         -- ** Piece size
-         PieceSize (..)
-       , optimalPieceCount
+         PieceIx
+       , PieceCount
+       , PieceSize (..)
        , defaultPieceSize
-
-         -- ** Piece index
-       , PieceIx
 
          -- * Piece data
        , Piece (..)
@@ -32,7 +29,6 @@ module Data.Torrent.Piece
        , pieceHash
        , pieceCount
        , checkPieceLazy
-
 
          -- * Internal
        , getPieceInfo
@@ -65,8 +61,14 @@ import Data.Torrent.Block
 class Lint a where
   lint :: a -> Either String a
 
-type PieceCount = Int -- TODO newtype
 type PieceIx = Int    -- TODO remove
+
+newtype PieceCount = PieceCount { unPieceCount :: Int }
+
+-- | TODO
+instance Default PieceCount where
+  def = PieceCount 1000
+  {-# INLINE def #-}
 
 newtype PieceIndex = PieceIndex Int
 
@@ -97,10 +99,6 @@ instance Bounded PieceSize where
   minBound = PieceSize minPieceSize
   {-# INLINE minBound #-}
 
--- | TODO
-optimalPieceCount :: Int
-optimalPieceCount = 1000
-{-# INLINE optimalPieceCount #-}
 
 toPow2 :: Int -> Int
 toPow2 x = bit $ fromIntegral (leadingZeros (0 :: Int) - leadingZeros x)
@@ -109,7 +107,7 @@ toPow2 x = bit $ fromIntegral (leadingZeros (0 :: Int) - leadingZeros x)
 defaultPieceSize :: Int64 -> Int
 defaultPieceSize x = max minPieceSize $ min maxPieceSize $ toPow2 pc
   where
-    pc = fromIntegral (x `div` fromIntegral optimalPieceCount)
+    pc = fromIntegral (x `div` fromIntegral (unPieceCount def))
 
 -- TODO check if pieceLength is power of 2
 -- | Piece payload should be strict or lazy bytestring.
@@ -201,10 +199,11 @@ pieceHash PieceInfo {..} i = slice (hashsize * i) hashsize (unHashArray piPieceH
 -- | Find count of pieces in the torrent. If torrent size is not a
 -- multiple of piece size then the count is rounded up.
 pieceCount :: PieceInfo -> PieceCount
-pieceCount PieceInfo {..} = BS.length (unHashArray piPieceHashes) `quot` hashsize
+pieceCount PieceInfo {..}
+  = PieceCount (BS.length (unHashArray piPieceHashes) `quot` hashsize)
 
 isLastPiece :: PieceInfo -> PieceIx -> Bool
-isLastPiece ci i = pieceCount ci == succ i
+isLastPiece ci i = unPieceCount (pieceCount ci) == succ i
 
 class Validation a where
   validate :: PieceInfo -> Piece a -> Bool
