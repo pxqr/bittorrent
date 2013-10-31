@@ -27,16 +27,12 @@ module Data.Torrent.Magnet
 
 import Control.Applicative
 import Control.Monad
-import Data.ByteString as BS
-import Data.ByteString.Base16 as Base16
-import Data.ByteString.Base32 as Base32
 import Data.Map as M
 import Data.Maybe
 import Data.List as L
 import Data.URLEncoded as URL
 import Data.String
 import Data.Text as T
-import Data.Text.Encoding as T
 import Network.URI
 import Text.Read
 
@@ -90,16 +86,7 @@ renderURN URN {..}
 urnToInfoHash :: URN -> Maybe InfoHash
 urnToInfoHash  (URN {..})
   | urnNamespace /= btih = Nothing
-  |      hashLen == 20   = Just $ InfoHash hashStr
-  |      hashLen == 32   = Just $ InfoHash $ Base32.decode hashStr
-  |      hashLen == 40   = let (ihStr, inv) = Base16.decode hashStr
-                           in if BS.length inv == 0
-                              then Just $ InfoHash ihStr
-                              else Nothing
-  |        otherwise     = Nothing
-  where
-    hashLen = BS.length hashStr
-    hashStr = T.encodeUtf8 urnString
+  |       otherwise      = textToInfoHash urnString
 
 infoHashToURN :: InfoHash -> URN
 infoHashToURN = URN btih . T.pack . show
