@@ -1,7 +1,8 @@
+import Control.Lens
+import Data.BEncode
 import Data.Serialize as S
-
+import Data.Torrent
 import Network
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString
-
 import Network.BitTorrent.DHT.Protocol

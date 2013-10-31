@@ -29,10 +29,9 @@ import Network
 import Network.Socket
 import System.Entropy
 
-import Remote.KRPC
-import Remote.KRPC.Protocol
 import Data.BEncode
-import Data.Torrent.Metainfo
+import Network.KRPC
+import Network.KRPC.Protocol
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Exchange.Protocol ()
 

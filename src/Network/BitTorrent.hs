@@ -7,7 +7,7 @@
 --
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent
-       ( module Data.Torrent.Metainfo
+       ( module Data.Torrent
 
        , TorrentLoc(..), TorrentMap, Progress(..)
        , ThreadCount, SessionCount
@@ -49,7 +49,7 @@ import Text.PrettyPrint
 import System.Directory
 import System.FilePath
 
-import Data.Torrent.Metainfo
+import Data.Torrent
 import Network.BitTorrent.Sessions.Types
 import Network.BitTorrent.Sessions
 import Network.BitTorrent.Extension

@@ -50,7 +50,7 @@ import Foreign.C.Error
 
 import Data.Torrent.Bitfield as BF
 import Data.Torrent.Block
-import Data.Torrent.Metainfo
+import Data.Torrent
 import System.IO.MMap.Fixed as Fixed
 
 -- TODO merge piece validation and Sessions.available into one transaction.

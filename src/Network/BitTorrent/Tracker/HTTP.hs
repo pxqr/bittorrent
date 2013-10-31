@@ -30,7 +30,6 @@ import Data.URLEncoded as URL
 import Network.URI
 import Network.HTTP
 
-import Data.Torrent.Metainfo hiding (announce)
 import Network.BitTorrent.Tracker.Protocol
 
 

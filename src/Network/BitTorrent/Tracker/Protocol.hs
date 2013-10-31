@@ -58,7 +58,7 @@ import Data.Text (Text)
 import Data.Text.Encoding
 import Data.Serialize hiding (Result)
 import Data.URLEncoded as URL
-import Data.Torrent.Metainfo
+import Data.Torrent
 import Network
 import Network.URI
 import Network.Socket

@@ -36,7 +36,7 @@ import Data.Text as T
 import Network
 import Network.URI
 
-import Data.Torrent.Metainfo
+import Data.Torrent
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Tracker.Protocol as Tracker
 import Network.BitTorrent.Tracker.HTTP

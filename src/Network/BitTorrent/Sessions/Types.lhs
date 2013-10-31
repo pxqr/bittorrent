@@ -56,7 +56,6 @@
 > import Network
 
 > import Data.Torrent.Bitfield as BF
-> import Data.Torrent.Metainfo
 > import Network.BitTorrent.Extension
 > import Network.BitTorrent.Peer
 > import Network.BitTorrent.Exchange.Protocol as BT

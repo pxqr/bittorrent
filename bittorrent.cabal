@@ -1,17 +1,17 @@
 name:                  bittorrent
-version:               0.1.0.0
-license:               MIT
+version:               0.0.0.0
+license:               BSD3
 license-file:          LICENSE
-author:                Sam T.
-maintainer:            Sam T. <pxqr.sta@gmail.com>
-copyright:             (c) 2013, Sam T.
+author:                Sam Truzjan
+maintainer:            Sam Truzjan <pxqr.sta@gmail.com>
+copyright:             (c) 2013, Sam Truzjan
 category:              Network
 build-type:            Simple
 cabal-version:         >= 1.10
 tested-with:           GHC == 7.4.1
                      , GHC == 7.6.3
-homepage:              https://github.com/pxqr/bittorrent
-bug-reports:           https://github.com/pxqr/bittorrent/issues
+homepage:              https://github.com/cobit/bittorrent
+bug-reports:           https://github.com/cobit/bittorrent/issues
 synopsis:              Bittorrent protocol implementation.
 description:
 
@@ -20,20 +20,19 @@ description:
   For more information see:
   <https://github.com/pxqr/bittorrent/blob/master/README.md>
 
-
-extra-source-files:    res/dapper-dvd-amd64.iso.torrent
--- not a source file, but we need to keep it in tarball for tests
-
+extra-source-files:    res/*
+                     , README.md
+                     , changelog
 
 source-repository head
   type:                git
-  location:            git://github.com/pxqr/bittorrent.git
+  location:            git://github.com/cobit/bittorrent.git
 
-
-flag testing
-  description:         Expose debug stuff in export declarations.
-  default:             False
-
+source-repository this
+  type:                git
+  location:            git://github.com/cobit/bittorrent.git
+  branch:              master
+  tag:                 v0.0.0.0
 
 library
   default-language:    Haskell2010
@@ -41,39 +40,40 @@ library
                      , OverloadedStrings
                      , RecordWildCards
   hs-source-dirs:      src
-  exposed-modules:     Network.BitTorrent
-                     , Network.BitTorrent.Extension
-                     , Network.BitTorrent.Peer
-                     , Network.BitTorrent.Tracker
-                     , Network.BitTorrent.Exchange
-                     , Network.BitTorrent.DHT
-                     , Network.BitTorrent.Sessions
-  other-modules:       Network.BitTorrent.Sessions.Types
+  exposed-modules:     Data.Torrent
+                     , Data.Torrent.Bitfield
+                     , Data.Torrent.Block
+                     , Data.Torrent.InfoHash
+                     , Data.Torrent.Layout
+                     , Data.Torrent.Magnet
+                     , Data.Torrent.Piece
+                     , Data.Torrent.Tree
 
-  if flag(testing)
-     exposed-modules:  Network.BitTorrent.Exchange.Protocol
-                     , Network.BitTorrent.Tracker.Protocol
-                     , Network.BitTorrent.Tracker.HTTP
-                     , Network.BitTorrent.Tracker.UDP
-                     , Network.BitTorrent.DHT.Protocol
-  if !flag(testing)
-     other-modules:    Network.BitTorrent.Exchange.Protocol
-                     , Network.BitTorrent.Tracker.Protocol
-                     , Network.BitTorrent.Tracker.HTTP
-                     , Network.BitTorrent.Tracker.UDP
-                     , Network.BitTorrent.DHT.Protocol
+--                     , System.IO.MMap.Fixed
+--                     , System.Torrent.Storage
 
+--                       Network.BitTorrent
+--                     , Network.BitTorrent.Extension
+--                     , Network.BitTorrent.Peer
+--                     , Network.BitTorrent.Tracker
+--                     , Network.BitTorrent.Tracker.Protocol
+--                     , Network.BitTorrent.Tracker.HTTP
+--                     , Network.BitTorrent.Tracker.UDP
+--                     , Network.BitTorrent.Exchange
+--                     , Network.BitTorrent.Exchange.Protocol
+--                     , Network.BitTorrent.DHT
+--                     , Network.BitTorrent.DHT.Protocol
+--                     , Network.BitTorrent.Sessions
+--  other-modules:       Network.BitTorrent.Sessions.Types
   build-depends:       base       == 4.*
-
-                       -- BitTorrent
-                     , bencoding        >= 0.1.0.1
-                     , krpc             >= 0.1.1
-                     , torrent-content
+                     , bits-extras
+                     , pretty
 
                        -- Control
+                     , deepseq
+                     , lens
                      , mtl
                      , resourcet
-                     , lens
                      , transformers
 
                        -- Concurrency
@@ -81,46 +81,52 @@ library
                      , BoundedChan >= 1.0.1.0
                      , stm         >= 2.4
 
-                       -- Conduits
+                       -- Streaming
                      , conduit          >= 1.0
                      , network-conduit  >= 1.0
                      , cereal-conduit   >= 0.5
                      , binary-conduit
 
-                       -- Data
-                     , data-default
+                       -- Data & Data structures
                      , bytestring  >= 0.10.0.0
                      , containers  >= 0.4
-                     , unordered-containers
+                     , data-default
+                     , IntervalMap
+                     , intset
                      , text        >= 0.11.0
+                     , unordered-containers
+                     , vector
 
-                       -- Encoding/Serialization
+                       -- Hashing
+                     , cryptohash
+                     , hashable
+
+                       -- Codecs & Serialization
                      , aeson
+                     , base16-bytestring
+                     , base32-bytestring
+                     , bencoding   >= 0.4
+                     , binary
                      , cereal      >= 0.3
-                     , binary      >= 0.5
                      , urlencoded  >= 0.4
 
                        -- Time
-                     , time        >= 0.1
                      , old-locale  >= 1.0
+                     , time        >= 0.1
 
                        -- Network
-                     , network    >= 2.4
-                     , HTTP       >= 4000.2
+                     , network     >= 2.4
+                     , HTTP        >= 4000.2
+                     , krpc        >= 0.3
 
                        -- System
-                     , filepath    >= 1
                      , directory   >= 1
                      , entropy
+                     , filepath    >= 1
+                     , mmap
 
-                       -- Misc
-                     , pretty
-
-  if flag(testing)
-    cpp-options:       -DTESTING
   ghc-options:         -Wall
   ghc-prof-options:
-
 
 
 test-suite properties
@@ -146,21 +152,17 @@ test-suite properties
                      , test-framework-hunit
 
                      , bencoding
-                     , torrent-content
                      , bittorrent
 
   ghc-options:         -Wall -fno-warn-orphans
-  if !flag(testing)
-     buildable:        False
-
 
 
 benchmark benchmarks
   default-language:    Haskell2010
   default-extensions:
   type:                exitcode-stdio-1.0
-  main-is:             Main.hs
   hs-source-dirs:      bench
+  main-is:             Main.hs
   build-depends:       base
                      , bytestring
                      , cereal
@@ -169,24 +171,6 @@ benchmark benchmarks
                      , criterion
                      , deepseq
 
-                     , torrent-content
                      , bittorrent
 
   ghc-options:         -O2 -Wall -fno-warn-orphans
-  if !flag(testing)
-     buildable:        False
-
-
-
-executable example
-  default-language:    Haskell2010
-  main-is:             Main.hs
-  hs-source-dirs:      examples
-  build-depends:       base == 4.*
-                     , bittorrent
-                     , mtl
-  ghc-options:
-  ghc-prof-options:   -prof -rtsopts
--- -threaded -eventlog
-  if !flag(testing)
-     buildable:        False

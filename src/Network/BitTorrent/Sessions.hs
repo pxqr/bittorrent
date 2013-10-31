@@ -75,7 +75,7 @@ import Network.BSD
 import Network.Socket
 
 import Data.Torrent.Bitfield as BF
-import Data.Torrent.Metainfo
+import Data.Torrent
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
 import Network.BitTorrent.Sessions.Types

@@ -42,7 +42,6 @@ import System.Entropy
 import System.Timeout
 import Numeric
 
-import Data.Torrent.Metainfo ()
 import Network.BitTorrent.Tracker.Protocol
 
 {-----------------------------------------------------------------------

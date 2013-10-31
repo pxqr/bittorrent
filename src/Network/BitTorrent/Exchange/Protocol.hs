@@ -80,7 +80,7 @@ import Network.Socket.ByteString
 
 import Data.Torrent.Bitfield
 import Data.Torrent.Block
-import Data.Torrent.Metainfo
+import Data.Torrent
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Peer
 
