@@ -1,9 +1,18 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   TODO
+--
 {-# LANGUAGE TemplateHaskell #-}
 module Data.Torrent.Block
-       ( -- * Block attribytes
+       ( -- * Block attributes
          BlockLIx
        , PieceLIx
-       , defaultBlockSize -- TODO use data-default
+       , BlockSize (..)
 
          -- * Block index
        , BlockIx(..)
@@ -22,9 +31,11 @@ module Data.Torrent.Block
 
 import Control.Applicative
 
+import Data.Aeson (ToJSON, FromJSON)
 import Data.Aeson.TH
 import qualified Data.ByteString.Lazy as Lazy
 import Data.Char
+import Data.Default
 import Data.List as L
 
 import Data.Binary as B
@@ -35,17 +46,23 @@ import Data.Serialize as S
 import Text.PrettyPrint
 
 
--- | Widely used semi-official block size.
-defaultBlockSize :: Int
-defaultBlockSize = 16 * 1024
-
 {-----------------------------------------------------------------------
-    Block Index
+--  Block attributes
 -----------------------------------------------------------------------}
+
+newtype BlockSize = BlockSize { unBlockSize :: Int }
+                    deriving (Show, Eq, Num, ToJSON, FromJSON)
+
+-- | Widely used semi-official block size.
+instance Default BlockSize where
+  def = 16 * 1024
 
 type BlockLIx = Int
 type PieceLIx = Int
 
+{-----------------------------------------------------------------------
+    Block Index
+-----------------------------------------------------------------------}
 
 data BlockIx = BlockIx {
     -- | Zero-based piece index.
@@ -55,7 +72,7 @@ data BlockIx = BlockIx {
   , ixOffset :: {-# UNPACK #-} !Int
 
     -- | Block size starting from offset.
-  , ixLength :: {-# UNPACK #-} !Int
+  , ixLength :: {-# UNPACK #-} !BlockSize
   } deriving (Show, Eq)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''BlockIx)
@@ -78,31 +95,35 @@ putIntB = B.putWord32be . fromIntegral
 
 instance Serialize BlockIx where
   {-# SPECIALIZE instance Serialize BlockIx #-}
-  get = BlockIx <$> getInt <*> getInt <*> getInt
+  get = BlockIx <$> getInt
+                <*> getInt
+                <*> (BlockSize <$> getInt)
   {-# INLINE get #-}
 
   put BlockIx {..} = do
     putInt ixPiece
     putInt ixOffset
-    putInt ixLength
+    putInt (unBlockSize ixLength)
   {-# INLINE put #-}
 
 instance Binary BlockIx where
   {-# SPECIALIZE instance Binary BlockIx #-}
-  get = BlockIx <$> getIntB <*> getIntB <*> getIntB
+  get = BlockIx <$> getIntB
+                <*> getIntB
+                <*> (BlockSize <$> getIntB)
   {-# INLINE get #-}
 
   put BlockIx {..} = do
     putIntB ixPiece
     putIntB ixOffset
-    putIntB ixLength
+    putIntB (unBlockSize ixLength)
 
 -- | Format block index in human readable form.
 ppBlockIx :: BlockIx -> Doc
 ppBlockIx BlockIx {..} =
   "piece  = " <> int ixPiece  <> "," <+>
   "offset = " <> int ixOffset <> "," <+>
-  "length = " <> int ixLength
+  "length = " <> int (unBlockSize ixLength)
 
 {-----------------------------------------------------------------------
     Block
@@ -124,7 +145,7 @@ ppBlock :: Block Lazy.ByteString -> Doc
 ppBlock = ppBlockIx . blockIx
 {-# INLINE ppBlock #-}
 
-blockSize :: Block Lazy.ByteString -> Int
+blockSize :: Block Lazy.ByteString -> BlockSize
 blockSize blk = fromIntegral (Lazy.length (blkData blk))
 {-# INLINE blockSize #-}
 
@@ -136,7 +157,7 @@ isPiece pieceSize (Block i offset bs) =
 {-# INLINE isPiece #-}
 
 pieceIx :: Int -> Int -> BlockIx
-pieceIx i = BlockIx i 0
+pieceIx i = BlockIx i 0 . BlockSize
 {-# INLINE pieceIx #-}
 
 blockIx :: Block Lazy.ByteString -> BlockIx
@@ -155,5 +176,5 @@ ixRange pieceSize i = (offset, offset + len)
   where
     offset = fromIntegral  pieceSize * fromIntegral (ixPiece i)
            + fromIntegral (ixOffset i)
-    len    = fromIntegral (ixLength i)
+    len    = fromIntegral (unBlockSize (ixLength i))
 {-# INLINE ixRange #-}

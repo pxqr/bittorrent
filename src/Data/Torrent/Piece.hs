@@ -52,6 +52,7 @@ import           Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Base64 as Base64
 import Data.Char
+import Data.Default
 import Data.Int
 import Data.List as L
 import Data.Text.Encoding as T
@@ -82,7 +83,7 @@ maxPieceSize = 4 * 1024 * 1024
 {-# INLINE maxPieceSize #-}
 
 minPieceSize :: Int
-minPieceSize = defaultBlockSize * 4
+minPieceSize = unBlockSize def * 4
 {-# INLINE minPieceSize #-}
 
 -- | NOTE: Have max and min size constrained to wide used
