@@ -5,7 +5,7 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   Torrent content validation.
+--   Pieces are used to validate torrent content.
 --
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -14,12 +14,16 @@ module Data.Torrent.Piece
        ( -- * Piece attributes
          PieceIx
        , PieceCount
-       , PieceSize (..)
+       , PieceSize
        , defaultPieceSize
+       , maxPieceSize
+       , minPieceSize
 
          -- * Piece data
        , Piece (..)
        , ppPiece
+       , pieceSize
+       , isPiece
 
          -- * Piece control
        , PieceInfo (..)
@@ -48,7 +52,6 @@ import           Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Base64 as Base64
 import Data.Char
-import Data.Default
 import Data.Int
 import Data.List as L
 import Data.Text.Encoding as T
@@ -61,25 +64,18 @@ import Data.Torrent.Block
 class Lint a where
   lint :: a -> Either String a
 
-type PieceIx = Int    -- TODO remove
+-- | Number of pieces in torrent or a part of torrent.
+type PieceCount = Int
 
-newtype PieceCount = PieceCount { unPieceCount :: Int }
+-- | Optimal number of pieces in torrent.
+optimalPieceCount :: PieceCount
+optimalPieceCount = 1000
+{-# INLINE optimalPieceCount #-}
 
--- | TODO
-instance Default PieceCount where
-  def = PieceCount 1000
-  {-# INLINE def #-}
-
-newtype PieceIndex = PieceIndex Int
-
--- | An int used to denote piece size.
-newtype PieceSize = PieceSize Int
-  deriving (Show, Read, Typeable
-           , Eq, Ord, Enum
-           , Num, Real, Integral
-           , BEncode, ToJSON, FromJSON
-           )
-
+-- | NOTE: Have max and min size constrained to wide used
+-- semi-standard values. This bounds should be used to make decision
+-- about piece size for new torrents.
+--
 maxPieceSize :: Int
 maxPieceSize = 4 * 1024 * 1024
 {-# INLINE maxPieceSize #-}
@@ -88,18 +84,6 @@ minPieceSize :: Int
 minPieceSize = defaultTransferSize * 4
 {-# INLINE minPieceSize #-}
 
--- | NOTE: Have max and min size constrained to wide used
--- semi-standard values. This bounds should be used to make decision
--- about piece size for new torrents.
---
-instance Bounded PieceSize where
-  maxBound = PieceSize maxPieceSize
-  {-# INLINE maxBound #-}
-
-  minBound = PieceSize minPieceSize
-  {-# INLINE minBound #-}
-
-
 toPow2 :: Int -> Int
 toPow2 x = bit $ fromIntegral (leadingZeros (0 :: Int) - leadingZeros x)
 
@@ -107,13 +91,14 @@ toPow2 x = bit $ fromIntegral (leadingZeros (0 :: Int) - leadingZeros x)
 defaultPieceSize :: Int64 -> Int
 defaultPieceSize x = max minPieceSize $ min maxPieceSize $ toPow2 pc
   where
-    pc = fromIntegral (x `div` fromIntegral (unPieceCount def))
+    pc = fromIntegral (x `div` fromIntegral optimalPieceCount)
 
 -- TODO check if pieceLength is power of 2
 -- | Piece payload should be strict or lazy bytestring.
 data Piece a = Piece
-  { -- | Zero-based piece index in torrent. TODO how pieces are indexed?
+  { -- | Zero-based piece index in torrent.
     pieceIndex :: {-# UNPACK #-} !PieceIx
+
     -- | Payload.
   , pieceData  :: !a
   } deriving (Show, Read, Eq, Typeable)
@@ -126,6 +111,16 @@ instance NFData (Piece a)
 ppPiece :: Piece a -> Doc
 ppPiece Piece {..}
   = "Piece" <+> braces ("index" <+> "=" <+> int pieceIndex)
+
+-- | Get size of piece in bytes.
+pieceSize :: Piece BL.ByteString -> PieceSize
+pieceSize Piece {..} = fromIntegral (BL.length pieceData)
+
+-- | Test if a block can be safely turned into a piece.
+isPiece :: PieceSize -> Block BL.ByteString -> Bool
+isPiece pieceSize blk @ (Block i offset _) =
+     offset == 0 && blockSize blk == pieceSize && i >= 0
+{-# INLINE isPiece #-}
 
 newtype HashArray = HashArray { unHashArray :: ByteString }
                     deriving (Show, Read, Eq, BEncode)
@@ -181,7 +176,7 @@ instance BEncode PieceInfo where
 
 -- | Format piece info in human readable form. Hashes are omitted.
 ppPieceInfo :: PieceInfo -> Doc
-ppPieceInfo PieceInfo { piPieceLength = PieceSize len } =
+ppPieceInfo PieceInfo { piPieceLength = len } =
   "PieceInfo" <+> braces ("length" <+> "=" <+> int len)
 
 hashsize :: Int
@@ -199,11 +194,10 @@ pieceHash PieceInfo {..} i = slice (hashsize * i) hashsize (unHashArray piPieceH
 -- | Find count of pieces in the torrent. If torrent size is not a
 -- multiple of piece size then the count is rounded up.
 pieceCount :: PieceInfo -> PieceCount
-pieceCount PieceInfo {..}
-  = PieceCount (BS.length (unHashArray piPieceHashes) `quot` hashsize)
+pieceCount PieceInfo {..} = BS.length (unHashArray piPieceHashes) `quot` hashsize
 
 isLastPiece :: PieceInfo -> PieceIx -> Bool
-isLastPiece ci i = unPieceCount (pieceCount ci) == succ i
+isLastPiece ci i = pieceCount ci == succ i
 
 class Validation a where
   validate :: PieceInfo -> Piece a -> Bool

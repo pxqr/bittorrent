@@ -5,39 +5,39 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   TODO
+--   Blocks are used to transfer pieces.
 --
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 module Data.Torrent.Block
-       ( -- * Block attributes
-         BlockLIx
-       , PieceLIx
+       ( -- * Piece attributes
+         PieceIx
+       , PieceSize
+
+         -- * Block attributes
+       , BlockOffset
+       , BlockCount
        , BlockSize
        , defaultTransferSize
 
          -- * Block index
        , BlockIx(..)
        , ppBlockIx
+       , blockIxRange
 
          -- * Block data
        , Block(..)
        , ppBlock
-       , blockSize
-       , pieceIx
        , blockIx
+       , blockSize
        , blockRange
-       , ixRange
-       , isPiece
        ) where
 
 import Control.Applicative
 
-import Data.Aeson (ToJSON, FromJSON)
 import Data.Aeson.TH
 import qualified Data.ByteString.Lazy as Lazy
 import Data.Char
-import Data.Default
 import Data.List as L
 
 import Data.Binary as B
@@ -49,14 +49,37 @@ import Text.PrettyPrint
 
 
 {-----------------------------------------------------------------------
+--  Piece attributes
+-----------------------------------------------------------------------}
+
+-- | Zero-based index of piece in torrent content.
+type PieceIx     = Int
+
+-- | Size of piece in bytes. Should be a power of 2.
+type PieceSize = Int
+
+{-----------------------------------------------------------------------
 --  Block attributes
 -----------------------------------------------------------------------}
 
-type BlockSize = Int
-type BlockLIx = Int
-type PieceLIx = Int
+-- | Offset of a block in a piece in bytes. Should be multiple of
+-- the choosen block size.
+type BlockOffset = Int
 
--- | Widely used semi-official block size.
+-- | Size of a block in bytes. Should be power of 2.
+--
+--   Normally block size is equal to 'defaultTransferSize'.
+--
+type BlockSize   = Int
+
+-- | Number of block in a piece of a torrent. Used to distinguish
+-- block count from piece count.
+type BlockCount  = Int
+
+-- | Widely used semi-official block size. Some clients can ignore if
+-- block size of BlockIx in Request message is not equal to this
+-- value.
+--
 defaultTransferSize :: BlockSize
 defaultTransferSize = 16 * 1024
 
@@ -64,12 +87,13 @@ defaultTransferSize = 16 * 1024
     Block Index
 -----------------------------------------------------------------------}
 
+-- | BlockIx correspond.
 data BlockIx = BlockIx {
     -- | Zero-based piece index.
-    ixPiece  :: {-# UNPACK #-} !PieceLIx
+    ixPiece  :: {-# UNPACK #-} !PieceIx
 
     -- | Zero-based byte offset within the piece.
-  , ixOffset :: {-# UNPACK #-} !Int
+  , ixOffset :: {-# UNPACK #-} !BlockOffset
 
     -- | Block size starting from offset.
   , ixLength :: {-# UNPACK #-} !BlockSize
@@ -125,16 +149,25 @@ ppBlockIx BlockIx {..} =
   "offset = " <> int ixOffset <> "," <+>
   "length = " <> int ixLength
 
+-- | Get location of payload bytes in the torrent content.
+blockIxRange :: (Num a, Integral a) => PieceSize -> BlockIx -> (a, a)
+blockIxRange pieceSize BlockIx {..} = (offset, offset + len)
+  where
+    offset = fromIntegral  pieceSize * fromIntegral ixPiece
+           + fromIntegral ixOffset
+    len    = fromIntegral ixLength
+{-# INLINE blockIxRange #-}
+
 {-----------------------------------------------------------------------
     Block
 -----------------------------------------------------------------------}
 
 data Block payload = Block {
     -- | Zero-based piece index.
-    blkPiece  :: {-# UNPACK #-} !PieceLIx
+    blkPiece  :: {-# UNPACK #-} !PieceIx
 
     -- | Zero-based byte offset within the piece.
-  , blkOffset :: {-# UNPACK #-} !Int
+  , blkOffset :: {-# UNPACK #-} !BlockOffset
 
     -- | Payload bytes.
   , blkData   :: !payload
@@ -145,36 +178,16 @@ ppBlock :: Block Lazy.ByteString -> Doc
 ppBlock = ppBlockIx . blockIx
 {-# INLINE ppBlock #-}
 
+-- | Get size of block /payload/ in bytes.
 blockSize :: Block Lazy.ByteString -> BlockSize
 blockSize blk = fromIntegral (Lazy.length (blkData blk))
 {-# INLINE blockSize #-}
 
-isPiece :: Int -> Block Lazy.ByteString -> Bool
-isPiece pieceSize (Block i offset bs) =
-     offset == 0
-  && fromIntegral (Lazy.length bs) == pieceSize
-  && i >= 0
-{-# INLINE isPiece #-}
-
-pieceIx :: Int -> Int -> BlockIx
-pieceIx i = BlockIx i 0
-{-# INLINE pieceIx #-}
-
+-- | Get block index of a block.
 blockIx :: Block Lazy.ByteString -> BlockIx
 blockIx = BlockIx <$> blkPiece <*> blkOffset <*> blockSize
 
-blockRange :: (Num a, Integral a) => Int -> Block Lazy.ByteString -> (a, a)
-blockRange pieceSize blk = (offset, offset + len)
-  where
-    offset = fromIntegral pieceSize * fromIntegral (blkPiece blk)
-           + fromIntegral (blkOffset blk)
-    len    = fromIntegral (Lazy.length (blkData blk))
+-- | Get location of payload bytes in the torrent content.
+blockRange :: (Num a, Integral a) => PieceSize -> Block Lazy.ByteString -> (a, a)
+blockRange pieceSize = blockIxRange pieceSize . blockIx
 {-# INLINE blockRange #-}
-
-ixRange :: (Num a, Integral a) => Int -> BlockIx -> (a, a)
-ixRange pieceSize i = (offset, offset + len)
-  where
-    offset = fromIntegral  pieceSize * fromIntegral (ixPiece i)
-           + fromIntegral (ixOffset i)
-    len    = fromIntegral (ixLength i)
-{-# INLINE ixRange #-}
