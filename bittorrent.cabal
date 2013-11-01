@@ -130,12 +130,12 @@ library
   ghc-prof-options:
 
 
-test-suite properties
+test-suite spec
   default-language:    Haskell2010
-  default-extensions:
+  default-extensions:  OverloadedStrings
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
-  main-is:             Main.hs
+  main-is:             Spec.hs
   build-depends:       base == 4.*
                      , bytestring
                      , directory
@@ -146,32 +146,28 @@ test-suite properties
                      , network
                      , text
 
+                     , hspec
                      , QuickCheck
-                     , HUnit
-                     , test-framework
-                     , test-framework-quickcheck2
-                     , test-framework-hunit
+                     , quickcheck-instances
 
                      , bencoding
                      , bittorrent
-
   ghc-options:         -Wall -fno-warn-orphans
 
 
-benchmark benchmarks
-  default-language:    Haskell2010
-  default-extensions:
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      bench
-  main-is:             Main.hs
-  build-depends:       base
-                     , bytestring
-                     , cereal
-                     , network
-
-                     , criterion
-                     , deepseq
-
-                     , bittorrent
-
-  ghc-options:         -O2 -Wall -fno-warn-orphans
+--benchmark bench
+--  default-language:    Haskell2010
+--  default-extensions:
+--  type:                exitcode-stdio-1.0
+--  hs-source-dirs:      bench
+--  main-is:             Main.hs
+--  build-depends:       base
+--                     , bytestring
+--                     , cereal
+--                     , network
+--
+--                     , criterion
+--                     , deepseq
+--
+--                     , bittorrent
+--  ghc-options:         -O2 -Wall -fno-warn-orphans
