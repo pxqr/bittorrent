@@ -22,8 +22,8 @@ For documentation see haddock generated documentation.
 
 [![Build Status][1]][2]
 
-[1]: https://travis-ci.org/pxqr/bittorrent.png
-[2]: https://travis-ci.org/pxqr/bittorrent
+[1]: https://travis-ci.org/cobit/bittorrent.png
+[2]: https://travis-ci.org/cobit/bittorrent
 
 
 ### Maintainer
@@ -33,4 +33,4 @@ This library is written and maintained by Sam T. <pxqr.sta@gmail.com>
 Feel free to report bugs and suggestions via
 [github issue tracker][issues] or the mail.
 
-[issues]:      https://github.com/pxqr/bittorrent/issues/new
+[issues]:      https://github.com/cobit/bittorrent/issues/new

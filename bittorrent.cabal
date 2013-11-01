@@ -18,7 +18,7 @@ description:
   A library for making Haskell bittorrent applications easy.
   .
   For more information see:
-  <https://github.com/pxqr/bittorrent/blob/master/README.md>
+  <https://github.com/cobit/bittorrent/blob/master/README.md>
 
 extra-source-files:    res/*
                      , README.md
