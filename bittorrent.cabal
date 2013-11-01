@@ -20,7 +20,8 @@ description:
   For more information see:
   <https://github.com/cobit/bittorrent/blob/master/README.md>
 
-extra-source-files:    res/*
+extra-source-files:    res/dapper-dvd-amd64.iso.torrent
+                       res/pkg.torrent
                      , README.md
                      , changelog
 
