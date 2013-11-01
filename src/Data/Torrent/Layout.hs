@@ -5,6 +5,8 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
+--
+--
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE StandaloneDeriving         #-}
@@ -13,25 +15,33 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# OPTIONS  -fno-warn-orphans          #-}
 module Data.Torrent.Layout
-       ( -- * File attribytes
+       ( -- * File attributes
          FileOffset
        , FileSize
 
          -- * Single file info
        , FileInfo (..)
+
+         -- ** Lens
        , fileLength
        , filePath
        , fileMD5Sum
 
          -- * File layout
        , LayoutInfo (..)
+
+         -- ** Lens
        , singleFile
        , multiFile
        , rootDirName
+
+         -- ** Predicates
        , isSingleFile
        , isMultiFile
-       , fileNumber
+
+         -- ** Folds
        , contentLength
+       , fileCount
        , blockCount
 
          -- * Flat file layout
@@ -60,11 +70,14 @@ import Data.Typeable
 import System.FilePath
 import System.Posix.Types
 
+import Data.Torrent.Block
+
 
 {-----------------------------------------------------------------------
 --  File attribytes
 -----------------------------------------------------------------------}
 
+-- | Size of a file in bytes.
 type FileSize = FileOffset
 
 deriving instance FromJSON FileOffset
@@ -75,7 +88,7 @@ deriving instance BEncode  FileOffset
 --  File info both either from info dict or file list
 -----------------------------------------------------------------------}
 
--- | Contain info about one single file.
+-- | Contain metainfo about one single file.
 data FileInfo a = FileInfo {
       fiLength      :: {-# UNPACK #-} !FileSize
       -- ^ Length of the file in bytes.
@@ -87,9 +100,9 @@ data FileInfo a = FileInfo {
 
     , fiName        :: !a
       -- ^ One or more string elements that together represent the
-      --   path and filename. Each element in the list corresponds to
-      --   either a directory name or (in the case of the last
-      --   element) the filename.  For example, the file:
+      -- path and filename. Each element in the list corresponds to
+      -- either a directory name or (in the case of the last element)
+      -- the filename.  For example, the file:
       --
       --   > "dir1/dir2/file.ext"
       --
@@ -152,9 +165,16 @@ instance BEncode (FileInfo ByteString) where
 --  Original torrent file layout info
 -----------------------------------------------------------------------}
 
+-- | Original (found in torrent file) layout info is either:
+--
+--     * Single file with its /name/.
+--
+--     * Multiple files with its relative file /paths/.
+--
 data LayoutInfo
   = SingleFile
-    { liFile     :: !(FileInfo ByteString)
+    { -- | Single file info.
+      liFile     :: !(FileInfo ByteString)
     }
   | MultiFile
     { -- | List of the all files that torrent contains.
@@ -212,16 +232,14 @@ contentLength :: LayoutInfo -> FileSize
 contentLength SingleFile { liFile  = FileInfo {..} } = fiLength
 contentLength MultiFile  { liFiles = tfs           } = sum (L.map fiLength tfs)
 
--- | Get count of all files in torrent.
-fileNumber :: LayoutInfo -> Int
-fileNumber SingleFile {..} = 1
-fileNumber MultiFile  {..} = L.length liFiles
+-- | Get number of all files in torrent.
+fileCount :: LayoutInfo -> Int
+fileCount SingleFile {..} = 1
+fileCount MultiFile  {..} = L.length liFiles
 
 -- | Find number of blocks of the specified size. If torrent size is
 -- not a multiple of block size then the count is rounded up.
-blockCount :: Int         -- ^ Block size.
-           -> LayoutInfo  -- ^ Torrent content info.
-           -> Int         -- ^ Number of blocks.
+blockCount :: BlockSize -> LayoutInfo -> Int
 blockCount blkSize ci = contentLength ci `sizeInBase` blkSize
 
 {-----------------------------------------------------------------------
@@ -249,6 +267,7 @@ flatLayout prefixPath MultiFile  {..}     = L.map mkPath liFiles
         path = prefixPath </> BC.unpack liDirName
            </> joinPath (L.map BC.unpack fiName)
 
+-- | Calculate offset of each file based on its length, incrementally.
 accumOffsets :: Layout FileSize -> Layout FileOffset
 accumOffsets = go 0
   where

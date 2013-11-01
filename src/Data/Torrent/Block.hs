@@ -7,12 +7,14 @@
 --
 --   TODO
 --
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell            #-}
 module Data.Torrent.Block
        ( -- * Block attributes
          BlockLIx
        , PieceLIx
-       , BlockSize (..)
+       , BlockSize
+       , defaultTransferSize
 
          -- * Block index
        , BlockIx(..)
@@ -50,16 +52,13 @@ import Text.PrettyPrint
 --  Block attributes
 -----------------------------------------------------------------------}
 
-newtype BlockSize = BlockSize { unBlockSize :: Int }
-                    deriving (Show, Eq, Num, ToJSON, FromJSON)
-
--- | Widely used semi-official block size.
-instance Default BlockSize where
-  def = 16 * 1024
-  {-# INLINE def #-}
-
+type BlockSize = Int
 type BlockLIx = Int
 type PieceLIx = Int
+
+-- | Widely used semi-official block size.
+defaultTransferSize :: BlockSize
+defaultTransferSize = 16 * 1024
 
 {-----------------------------------------------------------------------
     Block Index
@@ -98,33 +97,33 @@ instance Serialize BlockIx where
   {-# SPECIALIZE instance Serialize BlockIx #-}
   get = BlockIx <$> getInt
                 <*> getInt
-                <*> (BlockSize <$> getInt)
+                <*> getInt
   {-# INLINE get #-}
 
   put BlockIx {..} = do
     putInt ixPiece
     putInt ixOffset
-    putInt (unBlockSize ixLength)
+    putInt ixLength
   {-# INLINE put #-}
 
 instance Binary BlockIx where
   {-# SPECIALIZE instance Binary BlockIx #-}
   get = BlockIx <$> getIntB
                 <*> getIntB
-                <*> (BlockSize <$> getIntB)
+                <*> getIntB
   {-# INLINE get #-}
 
   put BlockIx {..} = do
     putIntB ixPiece
     putIntB ixOffset
-    putIntB (unBlockSize ixLength)
+    putIntB ixLength
 
 -- | Format block index in human readable form.
 ppBlockIx :: BlockIx -> Doc
 ppBlockIx BlockIx {..} =
   "piece  = " <> int ixPiece  <> "," <+>
   "offset = " <> int ixOffset <> "," <+>
-  "length = " <> int (unBlockSize ixLength)
+  "length = " <> int ixLength
 
 {-----------------------------------------------------------------------
     Block
@@ -158,7 +157,7 @@ isPiece pieceSize (Block i offset bs) =
 {-# INLINE isPiece #-}
 
 pieceIx :: Int -> Int -> BlockIx
-pieceIx i = BlockIx i 0 . BlockSize
+pieceIx i = BlockIx i 0
 {-# INLINE pieceIx #-}
 
 blockIx :: Block Lazy.ByteString -> BlockIx
@@ -177,5 +176,5 @@ ixRange pieceSize i = (offset, offset + len)
   where
     offset = fromIntegral  pieceSize * fromIntegral (ixPiece i)
            + fromIntegral (ixOffset i)
-    len    = fromIntegral (unBlockSize (ixLength i))
+    len    = fromIntegral (ixLength i)
 {-# INLINE ixRange #-}

@@ -85,7 +85,7 @@ maxPieceSize = 4 * 1024 * 1024
 {-# INLINE maxPieceSize #-}
 
 minPieceSize :: Int
-minPieceSize = unBlockSize def * 4
+minPieceSize = defaultTransferSize * 4
 {-# INLINE minPieceSize #-}
 
 -- | NOTE: Have max and min size constrained to wide used

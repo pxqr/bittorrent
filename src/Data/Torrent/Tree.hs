@@ -15,8 +15,8 @@ module Data.Torrent.Tree
        , Data.Torrent.Tree.lookup
        , lookupDir
 
-       , fileCount
-       , dirCount
+       , fileNumber
+       , dirNumber
        ) where
 
 import Control.Arrow
@@ -62,10 +62,10 @@ lookupDir ps d
       File _  -> Nothing
       Dir  es -> Just $ M.toList es
 
-fileCount :: DirTree a -> Sum Int
-fileCount File {..} = Sum 1
-fileCount Dir  {..} = foldMap fileCount children
+fileNumber :: DirTree a -> Sum Int
+fileNumber File {..} = Sum 1
+fileNumber Dir  {..} = foldMap fileNumber children
 
-dirCount :: DirTree a -> Sum Int
-dirCount File {..} = Sum 0
-dirCount Dir  {..} = Sum 1 <> foldMap dirCount children
+dirNumber :: DirTree a -> Sum Int
+dirNumber File {..} = Sum 0
+dirNumber Dir  {..} = Sum 1 <> foldMap dirNumber children

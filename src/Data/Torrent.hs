@@ -23,7 +23,6 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# OPTIONS -fno-warn-orphans           #-}
--- TODO refine interface
 module Data.Torrent
        ( -- * Info dictionary
          InfoDict (..)
