@@ -53,9 +53,14 @@ import Text.PrettyPrint
 -----------------------------------------------------------------------}
 
 -- | Zero-based index of piece in torrent content.
-type PieceIx     = Int
+type PieceIx   = Int
 
 -- | Size of piece in bytes. Should be a power of 2.
+--
+--   NOTE: Have max and min size constrained to wide used
+--   semi-standard values. This bounds should be used to make decision
+--   about piece size for new torrents.
+--
 type PieceSize = Int
 
 {-----------------------------------------------------------------------

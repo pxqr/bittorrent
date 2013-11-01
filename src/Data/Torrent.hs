@@ -26,6 +26,8 @@
 module Data.Torrent
        ( -- * Info dictionary
          InfoDict (..)
+
+         -- ** Lenses
        , infohash
        , layoutInfo
        , pieceInfo
@@ -33,6 +35,8 @@ module Data.Torrent
 
          -- * Torrent file
        , Torrent(..)
+
+         -- ** Lenses
        , announce
        , announceList
        , comment
@@ -44,11 +48,14 @@ module Data.Torrent
        , publisherURL
        , signature
 
+         -- * Construction
        , nullTorrent
 
-         -- * IO
+         -- * File paths
        , torrentExt
        , isTorrentPath
+
+         -- * IO
        , fromFile
        , toFile
        ) where
