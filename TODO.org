@@ -1,4 +1,4 @@
-* TODO version 0.0.0.0
+* DONE version 0.0.0.1
 * TODO torrent linting for indexing
 * TODO move PeerClient to Data.Torrent.Client
 * TODO Word64 for Progress fields
