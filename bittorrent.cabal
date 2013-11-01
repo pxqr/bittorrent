@@ -41,7 +41,7 @@ library
                      , RecordWildCards
   hs-source-dirs:      src
   exposed-modules:     Data.Torrent
-                     , Data.Torrent.Bitfield
+--                     , Data.Torrent.Bitfield
                      , Data.Torrent.Block
                      , Data.Torrent.InfoHash
                      , Data.Torrent.Layout

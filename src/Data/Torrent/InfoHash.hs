@@ -1,3 +1,12 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   Infohash is a unique identifier of torrent.
+--
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Torrent.InfoHash

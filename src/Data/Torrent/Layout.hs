@@ -5,7 +5,7 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---
+--   Layout of files in torrent.
 --
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE FlexibleInstances          #-}
