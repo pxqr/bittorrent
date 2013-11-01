@@ -203,7 +203,7 @@ instance ToJSON NominalDiffTime where
 instance FromJSON NominalDiffTime where
   parseJSON v = utcTimeToPOSIXSeconds <$> parseJSON v
 
-$(deriveToJSON (L.map Char.toLower . L.dropWhile isLower) ''Torrent)
+$(deriveJSON (L.map Char.toLower . L.dropWhile isLower) ''Torrent)
 
 makeLensesFor
   [ ("tAnnounce"    , "announce"    )
