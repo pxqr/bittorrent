@@ -51,6 +51,9 @@ module Data.Torrent
          -- * Construction
        , nullTorrent
 
+         -- * Mime types
+       , typeTorrent
+
          -- * File paths
        , torrentExt
        , isTorrentPath
@@ -269,7 +272,11 @@ nullTorrent ann info = Torrent
     ann  Nothing Nothing Nothing Nothing Nothing
     info Nothing Nothing Nothing
 
--- | Extension usually used for torrent metafiles.
+-- | Mime type of torrent files.
+typeTorrent :: BS.ByteString
+typeTorrent = "application/x-bittorrent"
+
+-- | Extension usually used for torrent files.
 torrentExt :: String
 torrentExt = "torrent"
 
