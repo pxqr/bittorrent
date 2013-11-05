@@ -12,9 +12,17 @@
 module Data.Torrent.InfoHash
        ( -- * Info hash
          InfoHash(..)
+
+         -- * Parsing
        , textToInfoHash
-       , addHashToURI
+
+         -- * Rendering
+       , longHex
+       , shortHex
        , ppInfoHash
+
+       , addHashToURI
+
 
        , Data.Torrent.InfoHash.hash
        , Data.Torrent.InfoHash.hashlazy
@@ -38,7 +46,7 @@ import Data.Hashable   as Hashable
 import Data.URLEncoded as URL
 import Data.Serialize
 import Data.String
-import Data.Text
+import Data.Text as T
 import Data.Text.Encoding as T
 import Network.URI
 import Numeric
@@ -111,13 +119,13 @@ textToInfoHash text
     hashLen = BS.length hashStr
     hashStr = T.encodeUtf8 text
 
--- | Hash strict bytestring using SHA1 algorithm.
-hash :: BS.ByteString -> InfoHash
-hash = InfoHash . C.hash
+-- | Hex encode infohash to text, full length.
+longHex :: InfoHash -> Text
+longHex = T.decodeUtf8 . Base16.encode . getInfoHash
 
--- | Hash lazy bytestring using SHA1 algorithm.
-hashlazy :: BL.ByteString -> InfoHash
-hashlazy = InfoHash . C.hashlazy
+-- | The same as 'longHex', but 7 character long.
+shortHex :: InfoHash -> Text
+shortHex = T.take 7 . longHex
 
 -- | Pretty print info hash in hexadecimal format.
 ppInfoHash :: InfoHash -> Doc
@@ -125,6 +133,14 @@ ppInfoHash = text . BC.unpack . ppHex . getInfoHash
 
 ppHex :: BS.ByteString -> BS.ByteString
 ppHex = BL.toStrict . B.toLazyByteString . B.byteStringHexFixed
+
+-- | Hash strict bytestring using SHA1 algorithm.
+hash :: BS.ByteString -> InfoHash
+hash = InfoHash . C.hash
+
+-- | Hash lazy bytestring using SHA1 algorithm.
+hashlazy :: BL.ByteString -> InfoHash
+hashlazy = InfoHash . C.hashlazy
 
 -- | Add query info hash parameter to uri.
 --
