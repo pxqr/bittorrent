@@ -39,7 +39,8 @@ module Data.Torrent.Layout
        , isSingleFile
        , isMultiFile
 
-         -- ** Folds
+         -- ** Query
+       , suggestedName
        , contentLength
        , fileCount
        , blockCount
@@ -226,6 +227,12 @@ isMultiFile :: LayoutInfo -> Bool
 isMultiFile MultiFile {} = True
 isMultiFile _            = False
 {-# INLINE isMultiFile #-}
+
+-- | Get name of the torrent based on the root path piece.
+suggestedName :: LayoutInfo -> ByteString
+suggestedName (SingleFile FileInfo {..}) = fiName
+suggestedName  MultiFile           {..}  = liDirName
+{-# INLINE suggestedName #-}
 
 -- | Find sum of sizes of the all torrent files.
 contentLength :: LayoutInfo -> FileSize

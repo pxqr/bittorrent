@@ -13,10 +13,17 @@
 --   Bittorrent specific info:
 --   <http://www.bittorrent.org/beps/bep_0009.html>
 --
+{-# LANGUAGE NamedFieldPuns #-}
 module Data.Torrent.Magnet
        ( -- * Magnet
          Magnet(..)
+
+         -- * Construction
        , nullMagnet
+       , simpleMagnet
+       , detailedMagnet
+
+         -- * Conversion
        , parseMagnet
        , renderMagnet
 
@@ -33,11 +40,13 @@ import Data.List as L
 import Data.URLEncoded as URL
 import Data.String
 import Data.Text as T
+import Data.Text.Encoding as T
 import Network.URI
 import Text.Read
 
+import Data.Torrent
 import Data.Torrent.InfoHash
-
+import Data.Torrent.Layout
 
 {-----------------------------------------------------------------------
 -- URN
@@ -151,6 +160,24 @@ nullMagnet u = Magnet
     , exactSource      = Nothing
     , tracker    = Nothing
     , supplement = M.empty
+    }
+
+-- | A simple magnet link including infohash ('xt' param) and display
+-- name ('dn' param).
+--
+simpleMagnet :: Torrent -> Magnet
+simpleMagnet Torrent {tInfoDict = InfoDict {..}}
+  = (nullMagnet idInfoHash)
+    { displayName = Just $ T.decodeUtf8 $ suggestedName idLayoutInfo
+    }
+
+-- | Like 'simpleMagnet' but also include exactLength ('xl' param) and
+-- tracker ('tr' param).
+detailedMagnet :: Torrent -> Magnet
+detailedMagnet t @ Torrent {tInfoDict = InfoDict {..}, tAnnounce}
+  = (simpleMagnet t)
+    { exactLength = Just $ fromIntegral $ contentLength idLayoutInfo
+    , tracker     = Just tAnnounce
     }
 
 fromQuery :: URLEncoded -> Either String Magnet
