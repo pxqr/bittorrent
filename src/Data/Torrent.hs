@@ -26,6 +26,7 @@
 module Data.Torrent
        ( -- * Info dictionary
          InfoDict (..)
+       , ppInfoDict
 
          -- ** Lenses
        , infohash
@@ -35,6 +36,7 @@ module Data.Torrent
 
          -- * Torrent file
        , Torrent(..)
+       , ppTorrent
 
          -- ** Lenses
        , announce
@@ -85,6 +87,7 @@ import Data.Time
 import Data.Time.Clock.POSIX
 import Data.Typeable
 import Network.URI
+import Text.PrettyPrint as PP
 import System.FilePath
 
 import Data.Torrent.InfoHash as IH
@@ -151,6 +154,17 @@ instance BEncode InfoDict where
                   <*> getPrivate
     where
       ih = IH.hashlazy (encode dict)
+
+ppPrivacy :: Bool -> Doc
+ppPrivacy privacy =
+  "Privacy: " <> if privacy then "private" else "public"
+
+-- | Format info dictionary in human-readable form.
+ppInfoDict :: InfoDict -> Doc
+ppInfoDict InfoDict {..} =
+  ppLayoutInfo idLayoutInfo $$
+  ppPieceInfo  idPieceInfo  $$
+  ppPrivacy    idPrivate
 
 {-----------------------------------------------------------------------
 --  Torrent info
@@ -265,6 +279,36 @@ instance BEncode Torrent where
             <*>? "publisher"
             <*>? "publisher-url"
             <*>? "signature"
+
+(<:>) :: Doc -> Doc -> Doc
+name <:>   v       = name <> ":" <+> v
+
+(<:>?) :: Doc -> Maybe Doc -> Doc
+_    <:>?  Nothing = PP.empty
+name <:>? (Just d) = name <:> d
+
+ppTorrent :: Torrent -> Doc
+ppTorrent Torrent {..} =
+       "InfoHash: " <> ppInfoHash (idInfoHash tInfoDict)
+    $$ hang "General" 4 generalInfo
+    $$ hang "Tracker" 4 trackers
+    $$ ppInfoDict tInfoDict
+  where
+    trackers = case tAnnounceList of
+        Nothing  -> text (show tAnnounce)
+        Just xxs -> vcat $ L.map ppTier $ L.zip [1..] xxs
+      where
+        ppTier (n, xs) = "Tier #" <> int n <:> vcat (L.map (text . show) xs)
+
+    generalInfo =
+        "Comment"       <:>? ((text . T.unpack) <$> tComment)      $$
+        "Created by"    <:>? ((text . T.unpack) <$> tCreatedBy)    $$
+        "Created on"    <:>? ((text . show . posixSecondsToUTCTime)
+                               <$> tCreationDate) $$
+        "Encoding"      <:>? ((text . T.unpack) <$> tEncoding)     $$
+        "Publisher"     <:>? ((text . show) <$> tPublisher)    $$
+        "Publisher URL" <:>? ((text . show) <$> tPublisherURL) $$
+        "Signature"     <:>? ((text . show) <$> tSignature)
 
 -- | A simple torrent contains only required fields.
 nullTorrent :: URI -> InfoDict -> Torrent

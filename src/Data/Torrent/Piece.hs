@@ -194,8 +194,8 @@ instance BEncode PieceInfo where
 
 -- | Format piece info in human readable form. Hashes are omitted.
 ppPieceInfo :: PieceInfo -> Doc
-ppPieceInfo PieceInfo { piPieceLength = len } =
-  "PieceInfo" <+> braces ("length" <+> "=" <+> int len)
+ppPieceInfo PieceInfo {..} =
+  "Piece size: " <> int piPieceLength
 
 hashsize :: Int
 hashsize = 20
