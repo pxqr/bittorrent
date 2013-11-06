@@ -12,6 +12,9 @@
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveFoldable             #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# OPTIONS  -fno-warn-orphans          #-}
 module Data.Torrent.Layout
@@ -21,6 +24,7 @@ module Data.Torrent.Layout
 
          -- * Single file info
        , FileInfo (..)
+       , ppFileInfo
 
          -- ** Lens
        , fileLength
@@ -29,6 +33,8 @@ module Data.Torrent.Layout
 
          -- * File layout
        , LayoutInfo (..)
+       , ppLayoutInfo
+       , joinFilePath
 
          -- ** Lens
        , singleFile
@@ -65,13 +71,18 @@ import Data.BEncode
 import Data.BEncode.Types
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
-import Data.Char
+import Data.Char as Char
+import Data.Foldable as F
 import Data.List as L
+import Data.Text as T
+import Data.Text.Encoding as T
 import Data.Typeable
+import Text.PrettyPrint as PP
 import System.FilePath
 import System.Posix.Types
 
 import Data.Torrent.Block
+import Data.Torrent.InfoHash
 
 
 {-----------------------------------------------------------------------
@@ -111,9 +122,11 @@ data FileInfo a = FileInfo {
       --
       --   > ["dir1", "dir2", "file.ext"]
       --
-    } deriving (Show, Read, Eq, Typeable)
+    } deriving (Show, Read, Eq, Typeable
+               , Functor, Foldable
+               )
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''FileInfo)
+$(deriveJSON (L.map Char.toLower . L.dropWhile isLower) ''FileInfo)
 
 makeLensesFor
   [ ("fiLength", "fileLength")
@@ -162,6 +175,19 @@ instance BEncode (FileInfo ByteString) where
   fromBEncode = fromDict getFileInfoSingle
   {-# INLINE fromBEncode #-}
 
+-- | Format 'FileInfo' in human-readable form.
+ppFileInfo :: FileInfo ByteString -> Doc
+ppFileInfo FileInfo {..} =
+       "Path: " <> text (T.unpack (T.decodeUtf8 fiName))
+    $$ "Size: " <> text (show fiLength)
+    $$ maybe PP.empty ppMD5 fiMD5Sum
+  where
+    ppMD5 md5 = "MD5 : " <> text (show (InfoHash md5))
+
+-- | Join file path.
+joinFilePath :: FileInfo [ByteString] -> FileInfo ByteString
+joinFilePath = fmap (BS.intercalate "/")
+
 {-----------------------------------------------------------------------
 --  Original torrent file layout info
 -----------------------------------------------------------------------}
@@ -186,7 +212,7 @@ data LayoutInfo
     , liDirName  :: !ByteString
     } deriving (Show, Read, Eq, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''LayoutInfo)
+$(deriveJSON (L.map Char.toLower . L.dropWhile isLower) ''LayoutInfo)
 
 makeLensesFor
   [ ("liFile"   , "singleFile" )
@@ -216,6 +242,11 @@ instance BEncode LayoutInfo where
   toBEncode   = toDict . (`putLayoutInfo` endDict)
   fromBEncode = fromDict getLayoutInfo
 
+-- | Format 'LayoutInfo' in human readable form.
+ppLayoutInfo :: LayoutInfo -> Doc
+ppLayoutInfo SingleFile {..} = ppFileInfo liFile
+ppLayoutInfo MultiFile  {..} = vcat $ L.map (ppFileInfo . joinFilePath) liFiles
+
 -- | Test if this is single file torrent.
 isSingleFile :: LayoutInfo -> Bool
 isSingleFile SingleFile {} = True
@@ -237,7 +268,7 @@ suggestedName  MultiFile           {..}  = liDirName
 -- | Find sum of sizes of the all torrent files.
 contentLength :: LayoutInfo -> FileSize
 contentLength SingleFile { liFile  = FileInfo {..} } = fiLength
-contentLength MultiFile  { liFiles = tfs           } = sum (L.map fiLength tfs)
+contentLength MultiFile  { liFiles = tfs           } = L.sum (L.map fiLength tfs)
 
 -- | Get number of all files in torrent.
 fileCount :: LayoutInfo -> Int
