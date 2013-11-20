@@ -41,20 +41,25 @@ library
                      , OverloadedStrings
                      , RecordWildCards
   hs-source-dirs:      src
-  exposed-modules:     Data.Torrent
+  exposed-modules:     Paths_bittorrent
+                     , Data.Torrent
 --                     , Data.Torrent.Bitfield
                      , Data.Torrent.Block
+                     , Data.Torrent.Client
                      , Data.Torrent.InfoHash
                      , Data.Torrent.Layout
                      , Data.Torrent.Magnet
                      , Data.Torrent.Piece
+                     , Data.Torrent.Progress
                      , Data.Torrent.Tree
-
+                     , Network.BitTorrent.Core.PeerId
+                     , Network.BitTorrent.Core.PeerAddr
 --                     , System.IO.MMap.Fixed
 --                     , System.Torrent.Storage
 
 --                       Network.BitTorrent
 --                     , Network.BitTorrent.Extension
+
 --                     , Network.BitTorrent.Peer
 --                     , Network.BitTorrent.Tracker
 --                     , Network.BitTorrent.Tracker.Protocol
@@ -99,7 +104,7 @@ library
                      , vector
 
                        -- Hashing
-                     , cryptohash
+                     , cryptohash == 0.10.*
                      , hashable
 
                        -- Codecs & Serialization
