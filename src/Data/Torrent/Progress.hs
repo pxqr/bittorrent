@@ -1,14 +1,28 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   'Progress' used to track amount downloaded\/left\/upload bytes
+--   either on per client or per torrent basis. This value is used to
+--   notify the tracker and usually shown to the user. To aggregate
+--   total progress you can use the Monoid instance.
+--
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
 module Data.Torrent.Progress
        ( -- * Progress
          Progress (..)
+
+         -- * Lens
        , left
        , uploaded
        , downloaded
 
+         -- * Construction
        , startProgress
-
        , downloadedProgress
        , enqueuedProgress
        , uploadedProgress
@@ -18,26 +32,22 @@ module Data.Torrent.Progress
 import Control.Applicative
 import Control.Lens
 import Data.Aeson.TH
-import Data.List as L
 import Data.Default
+import Data.List as L
+import Data.Monoid
 import Data.Serialize as S
+import Data.Word
 
 
--- TODO: Use Word64?
--- TODO: Use atomic bits?
-
--- | 'Progress' contains upload/download/left stats about
---   current client state and used to notify the tracker.
---
--- Progress data is considered as dynamic within one client
+-- | Progress data is considered as dynamic within one client
 -- session. This data also should be shared across client application
 -- sessions (e.g. files), otherwise use 'startProgress' to get initial
--- 'Progress'.
+-- 'Progress' value.
 --
 data Progress = Progress
-  { _downloaded :: !Integer -- ^ Total amount of bytes downloaded;
-  , _left       :: !Integer -- ^ Total amount of bytes left;
-  , _uploaded   :: !Integer -- ^ Total amount of bytes uploaded.
+  { _downloaded :: {-# UNPACK #-} !Word64 -- ^ Total amount of bytes downloaded;
+  , _left       :: {-# UNPACK #-} !Word64 -- ^ Total amount of bytes left;
+  , _uploaded   :: {-# UNPACK #-} !Word64 -- ^ Total amount of bytes uploaded.
   } deriving (Show, Read, Eq)
 
 $(makeLenses ''Progress)
@@ -58,7 +68,16 @@ instance Default Progress where
   def = Progress 0 0 0
   {-# INLINE def #-}
 
--- TODO Monoid instance
+instance Monoid Progress where
+  mempty  = def
+  {-# INLINE mempty #-}
+
+  mappend (Progress da la ua) (Progress db lb ub) = Progress
+    { _downloaded = da + db
+    , _left       = la + lb
+    , _uploaded   = ua + ub
+    }
+  {-# INLINE mappend #-}
 
 -- | Initial progress is used when there are no session before.
 --
@@ -67,7 +86,7 @@ instance Default Progress where
 -- client sessions to avoid that.
 --
 startProgress :: Integer -> Progress
-startProgress = Progress 0 0
+startProgress = Progress 0 0 . fromIntegral
 {-# INLINE startProgress #-}
 
 -- | Used when the client download some data from /any/ peer.
@@ -84,11 +103,11 @@ uploadedProgress (fromIntegral -> amount) = uploaded +~ amount
 
 -- | Used when leecher join client session.
 enqueuedProgress :: Integer -> Progress -> Progress
-enqueuedProgress amount = left +~ amount
+enqueuedProgress amount = left +~ fromIntegral amount
 {-# INLINE enqueuedProgress #-}
 
 -- | Used when leecher leave client session.
 --   (e.g. user deletes not completed torrent)
 dequeuedProgress :: Integer -> Progress -> Progress
-dequeuedProgress amount = left -~ amount
+dequeuedProgress amount = left -~ fromIntegral amount
 {-# INLINE dequeuedProgress #-}
