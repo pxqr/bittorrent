@@ -9,20 +9,27 @@
 --   version which also contained in 'Peer'. For exsample first 6
 --   bytes of peer id of this this library are @-HS0100-@ while for
 --   mainline we have @M4-3-6--@.  We could extract this info and
---   print in human frienly form: this is useful for debugging and
---   logging. For more information see:
---   <http://bittorrent.org/beps/bep_0020.html> NOTE: Do _not_ use
---   this information to control client capabilities (such as
---   supported enchancements), this should be done using
---   'Network.BitTorrent.Extension'!
+--   print in human-friendly form: this is useful for debugging and
+--   logging.
+--
+--   For more information see:
+--   <http://bittorrent.org/beps/bep_0020.html>
+--
+--
+--   NOTE: Do _not_ use this information to control client
+--   capabilities (such as supported enchancements), this should be
+--   done using 'Network.BitTorrent.Extension'!
 --
 module Data.Torrent.Client
-       ( ClientImpl (..)
+       ( -- * Client implementation
+         ClientImpl (..)
        , ppClientImpl
 
+         -- * Client version
        , ClientVersion (..)
        , ppClientVersion
 
+         -- * Client information
        , ClientInfo (..)
        , ppClientInfo
        , libClientInfo
@@ -40,7 +47,11 @@ import Text.PrettyPrint hiding ((<>))
 import Paths_bittorrent (version)
 
 
--- | All known client versions.
+-- | List of registered client versions + IlibHSbittorrent (this
+-- package) + Unknown (for not recognized software). All names are
+-- prefixed by "I" because some of them starts from lowercase letter
+-- but that is not a valid Haskell constructor name.
+--
 data ClientImpl =
    IUnknown
  | IAres
@@ -103,27 +114,28 @@ data ClientImpl =
  | IZipTorrent
    deriving (Show, Eq, Ord, Enum, Bounded)
 
--- | Used to represent not recognized implementation
+-- | Used to represent a not recognized implementation
 instance Default ClientImpl where
   def = IUnknown
 
--- | Format client implementation info in human readable form.
+-- | Format client implementation info in human-readable form.
 ppClientImpl :: ClientImpl -> Doc
 ppClientImpl = text . L.tail . show
 
--- | Raw version of client, normally extracted from peer id.
+-- | Version of client software, normally extracted from peer id.
 newtype ClientVersion = ClientVersion { getClientVersion :: Version }
   deriving (Show, Eq, Ord)
 
+-- | Just the '0' version.
 instance Default ClientVersion where
   def = ClientVersion $ Version [0] []
 
--- | Format client implementation version in human readable form.
+-- | Format client implementation version in human-readable form.
 ppClientVersion :: ClientVersion -> Doc
 ppClientVersion = text . showVersion . getClientVersion
 
--- | All useful infomation that can be obtained from a peer
--- identifier.
+-- | The all sensible infomation that can be obtained from a peer
+-- identifier or torrent /createdBy/ field.
 data ClientInfo = ClientInfo {
     ciImpl    :: ClientImpl
   , ciVersion :: ClientVersion
@@ -133,11 +145,15 @@ data ClientInfo = ClientInfo {
 instance Default ClientInfo where
   def = ClientInfo def def
 
--- | Format client implementation in human readable form.
+-- | Format client info in human-readable form.
 ppClientInfo :: ClientInfo -> Doc
 ppClientInfo ClientInfo {..} =
   ppClientImpl ciImpl <+> "version" <+> ppClientVersion ciVersion
 
+-- | Client info of this (the bittorrent library) package. Normally,
+-- applications should introduce its own idenitifiers, otherwise they
+-- can use 'libClientInfo' value.
+--
 libClientInfo :: ClientInfo
 libClientInfo = ClientInfo IlibHSbittorrent (ClientVersion version)
 
