@@ -27,6 +27,10 @@ module Data.Torrent.Progress
        , enqueuedProgress
        , uploadedProgress
        , dequeuedProgress
+
+         -- * Query
+       , canDownload
+       , canUpload
        ) where
 
 import Control.Applicative
@@ -36,6 +40,7 @@ import Data.Default
 import Data.List as L
 import Data.Monoid
 import Data.Serialize as S
+import Data.Ratio
 import Data.Word
 
 
@@ -111,3 +116,14 @@ enqueuedProgress amount = left +~ fromIntegral amount
 dequeuedProgress :: Integer -> Progress -> Progress
 dequeuedProgress amount = left -~ fromIntegral amount
 {-# INLINE dequeuedProgress #-}
+
+ri2rw64 :: Ratio Int -> Ratio Word64
+ri2rw64 x = fromIntegral (numerator x) % fromIntegral (denominator x)
+
+-- | Check global /download/ limit by uploaded \/ downloaded ratio.
+canDownload :: Ratio Int -> Progress -> Bool
+canDownload limit Progress {..} = _uploaded % _downloaded > ri2rw64 limit
+
+-- | Check global /upload/ limit by downloaded \/ uploaded ratio.
+canUpload :: Ratio Int -> Progress -> Bool
+canUpload limit Progress {..} = _downloaded % _uploaded > ri2rw64 limit

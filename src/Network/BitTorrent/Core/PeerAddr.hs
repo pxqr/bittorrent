@@ -5,8 +5,8 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   * 'PeerAddr' is used to represent peer location. Currently it's
--- just peer IP and peer port but this might be changed later.
+--   'PeerAddr' is used to represent peer location. Currently it's
+--   just peer IP and peer port but this might be changed later.
 --
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE StandaloneDeriving         #-}
