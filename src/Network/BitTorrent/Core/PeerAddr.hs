@@ -5,8 +5,8 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   'PeerAddr' is used to represent peer location. Currently it's
---   just peer IP and peer port but this might be changed later.
+--   'PeerAddr' is used to represent peer address. Currently it's
+--   just peer IP and peer port but this might change in future.
 --
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE StandaloneDeriving         #-}
@@ -53,22 +53,24 @@ instance Serialize PortNumber where
   {-# INLINE put #-}
 
 -- TODO check semantic of ord and eq instances
+-- TODO use SockAddr instead of peerIP and peerPort
 
 -- | Peer address info normally extracted from peer list or peer
 -- compact list encoding.
 data PeerAddr = PeerAddr {
-      peerID   :: Maybe PeerId
+      peerID   :: !(Maybe PeerId)
     , peerIP   :: {-# UNPACK #-} !HostAddress
     , peerPort :: {-# UNPACK #-} !PortNumber
     } deriving (Show, Eq, Ord, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''PeerAddr)
 
+-- | The tracker "announce query" compatible encoding.
 instance BEncode PeerAddr where
   toBEncode (PeerAddr pid pip pport) = toDict $
        "peer id" .=? pid
-    .: "ip"      .=!  pip
-    .: "port"    .=!  pport
+    .: "ip"      .=! pip
+    .: "port"    .=! pport
     .: endDict
 
   fromBEncode = fromDict $ do
@@ -76,12 +78,15 @@ instance BEncode PeerAddr where
              <*>! "ip"
              <*>! "port"
 
+-- | The tracker "compact peer list" compatible encoding. The
+-- 'peerId' is always 'Nothing'.
 instance Serialize PeerAddr where
   put PeerAddr {..} = put peerID >> put peerPort
   {-# INLINE put #-}
   get = PeerAddr Nothing <$> get <*> get
   {-# INLINE get #-}
 
+-- | For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
 getCompactPeerList :: S.Get [PeerAddr]
 getCompactPeerList = many get
 
@@ -112,8 +117,8 @@ connectToPeer p = do
 
 -- | Pretty print peer address in human readable form.
 ppPeer :: PeerAddr -> Doc
-ppPeer p @ PeerAddr {..} = case peerID of
-    Just pid -> ppClientInfo (clientInfo pid) <+> "at" <+> paddr
-    Nothing  -> paddr
+ppPeer p @ PeerAddr {..}
+  | Just pid <- peerID = ppClientInfo (clientInfo pid) <+> "at" <+> paddr
+  |     otherwise      = paddr
   where
     paddr = text (show (peerSockAddr p))

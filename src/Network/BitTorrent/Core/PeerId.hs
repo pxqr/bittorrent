@@ -61,6 +61,7 @@ import Paths_bittorrent (version)
 
 import Data.Torrent.Client
 
+-- TODO use unpacked form (length is known statically)
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerId = PeerId { getPeerId :: ByteString }
