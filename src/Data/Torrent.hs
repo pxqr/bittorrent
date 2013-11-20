@@ -159,6 +159,9 @@ ppPrivacy :: Bool -> Doc
 ppPrivacy privacy =
   "Privacy: " <> if privacy then "private" else "public"
 
+ppAdditionalInfo :: InfoDict -> Doc
+ppAdditionalInfo layout = PP.empty
+
 -- | Format info dictionary in human-readable form.
 ppInfoDict :: InfoDict -> Doc
 ppInfoDict InfoDict {..} =
@@ -336,5 +339,6 @@ fromFile filepath = do
     Right !t -> return t
     Left msg -> throwIO $ userError $ msg ++ " while reading torrent file"
 
+-- | Encode and write a .torrent file.
 toFile :: FilePath -> Torrent -> IO ()
 toFile filepath = BL.writeFile filepath . encode

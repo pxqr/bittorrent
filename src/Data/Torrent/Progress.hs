@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
 module Data.Torrent.Progress
-       ( -- * Peer progress
+       ( -- * Progress
          Progress (..)
        , left
        , uploaded
@@ -13,7 +13,6 @@ module Data.Torrent.Progress
        , enqueuedProgress
        , uploadedProgress
        , dequeuedProgress
-
        ) where
 
 import Control.Applicative
