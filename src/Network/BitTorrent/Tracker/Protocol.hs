@@ -21,6 +21,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# OPTIONS -fno-warn-orphans           #-}
 module Network.BitTorrent.Tracker.Protocol
        ( -- * Announce
@@ -46,24 +47,29 @@ module Network.BitTorrent.Tracker.Protocol
 import Control.Applicative
 import Control.Exception
 import Control.Monad
+import Data.Aeson (ToJSON, FromJSON)
 import Data.Aeson.TH
+import Data.BEncode as BE
+import Data.BEncode.BDict as BE
 import Data.Char as Char
+import Data.List as L
 import Data.Map  as M
 import Data.Maybe
-import Data.List as L
-import Data.Word
 import Data.Monoid
-import Data.BEncode
+import Data.Serialize as S hiding (Result)
 import Data.Text (Text)
 import Data.Text.Encoding
-import Data.Serialize hiding (Result)
+import Data.Typeable
 import Data.URLEncoded as URL
-import Data.Torrent
+import Data.Word
 import Network
 import Network.URI
 import Network.Socket
 
-import Network.BitTorrent.Peer
+import Data.Torrent.InfoHash
+import Data.Torrent.Progress
+import Network.BitTorrent.Core.PeerId
+import Network.BitTorrent.Core.PeerAddr
 
 {-----------------------------------------------------------------------
   Announce messages
@@ -76,7 +82,7 @@ data Event = Started
              -- ^ Sent when the peer is shutting down.
            | Completed
              -- ^ To be sent when the peer completes a download.
-             deriving (Show, Read, Eq, Ord, Enum, Bounded)
+             deriving (Show, Read, Eq, Ord, Enum, Bounded, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''Event)
 
@@ -111,38 +117,41 @@ data AnnounceQuery = AnnounceQuery {
 
    , reqEvent      :: Maybe Event
       -- ^ If not specified, the request is regular periodic request.
-   } deriving Show
+   } deriving (Show, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceQuery)
+
+newtype PeerList = PeerList { getPeerList :: [PeerAddr] }
+                   deriving (Show, Eq, ToJSON, FromJSON, Typeable)
 
 -- | The tracker response includes a peer list that helps the client
 --   participate in the torrent. The most important is 'respPeer' list
 --   used to join the swarm.
 --
 data AnnounceInfo =
-     Failure Text -- ^ Failure reason in human readable form.
+     Failure !Text -- ^ Failure reason in human readable form.
    | AnnounceInfo {
-       respWarning     ::  Maybe Text
-       -- ^ Human readable warning.
+       -- | Number of peers completed the torrent. (seeders)
+       respComplete    :: !(Maybe Int)
 
+       -- | Number of peers downloading the torrent. (leechers)
+     , respIncomplete  :: !(Maybe Int)
+
+       -- | Recommended interval to wait between requests.
      , respInterval    :: !Int
-       -- ^ Recommended interval to wait between requests.
 
-     , respMinInterval ::  Maybe Int
-       -- ^ Minimal amount of time between requests. A peer /should/
+       -- | Minimal amount of time between requests. A peer /should/
        -- make timeout with at least 'respMinInterval' value,
        -- otherwise tracker might not respond. If not specified the
        -- same applies to 'respInterval'.
+     , respMinInterval :: !(Maybe Int)
 
-     , respComplete    ::  Maybe Int
-       -- ^ Number of peers completed the torrent. (seeders)
+       -- | Peers that must be contacted.
+     , respPeers       :: !PeerList
 
-     , respIncomplete  ::  Maybe Int
-       -- ^ Number of peers downloading the torrent. (leechers)
-
-     , respPeers       :: ![PeerAddr]
-       -- ^ Peers that must be contacted.
-     } deriving Show
+       -- | Human readable warning.
+     , respWarning     :: !(Maybe Text)
+     } deriving (Show, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceInfo)
 
@@ -165,32 +174,38 @@ defaultNumWant = 50
   Bencode announce encoding
 -----------------------------------------------------------------------}
 
-instance BEncodable AnnounceInfo where
-  toBEncode (Failure t)        = fromAssocs ["failure reason" --> t]
-  toBEncode  AnnounceInfo {..} = fromAssocs
-    [ "interval"     -->  respInterval
-    , "min interval" -->? respMinInterval
-    , "complete"     -->? respComplete
-    , "incomplete"   -->? respIncomplete
-    , "peers"        -->  respPeers
-    ]
+instance BEncode PeerList where
+  toBEncode   (PeerList xs) = toBEncode xs
+  fromBEncode (BList    l ) = PeerList <$> fromBEncode (BList l)
+  fromBEncode (BString  s ) = PeerList <$> runGet getCompactPeerList s
+  fromBEncode  _            = decodingError "Peer list"
+
+-- | HTTP tracker protocol compatible encoding.
+instance BEncode AnnounceInfo where
+  toBEncode (Failure t)        = toDict $
+       "failure reason" .=! t
+    .: endDict
+
+  toBEncode  AnnounceInfo {..} = toDict $
+       "complete"        .=? respComplete
+    .: "incomplete"      .=? respIncomplete
+    .: "interval"        .=! respInterval
+    .: "min interval"    .=? respMinInterval
+    .: "peers"           .=! respPeers
+    .: "warning message" .=? respWarning
+    .: endDict
 
   fromBEncode (BDict d)
-    | Just t <- M.lookup "failure reason" d = Failure <$> fromBEncode t
-    | otherwise = AnnounceInfo
-                     <$> d >--? "warning message"
-                     <*> d >--  "interval"
-                     <*> d >--? "min interval"
-                     <*> d >--? "complete"
-                     <*> d >--? "incomplete"
-                     <*> getPeers (M.lookup "peers" d)
-      where
-        getPeers :: Maybe BEncode -> Result [PeerAddr]
-        getPeers (Just (BList l))     = fromBEncode (BList l)
-        getPeers (Just (BString s))   = runGet getCompactPeerList s
-        getPeers  _                   = decodingError "Peers"
-
-  fromBEncode _ = decodingError "AnnounceInfo"
+    | Just t <- BE.lookup "failure reason" d = Failure <$> fromBEncode t
+    | otherwise = (`fromDict` (BDict d)) $ do
+      AnnounceInfo
+        <$>? "complete"
+        <*>? "incomplete"
+        <*>! "interval"
+        <*>? "min interval"
+        <*>! "peers"
+        <*>? "warning message"
+  fromBEncode _ = decodingError "Announce info"
 
 instance URLShow PortNumber where
   urlShow = urlShow . fromEnum
@@ -204,13 +219,25 @@ instance URLShow Event where
       -- INVARIANT: this is always nonempty list
       (x : xs) = show e
 
+instance URLShow Word64 where
+  urlShow = show
+
+instance URLEncode Progress where
+  urlEncode Progress {..} = mconcat
+    [ s "uploaded"   %=  _uploaded
+    , s "left"       %=  _left
+    , s "downloaded" %=  _downloaded
+    ]
+    where s :: String -> String;  s = id; {-# INLINE s #-}
+
+-- | HTTP tracker protocol compatible encoding.
 instance URLEncode AnnounceQuery where
   urlEncode AnnounceQuery {..} = mconcat
       [ s "peer_id"    %=  reqPeerId
       , s "port"       %=  reqPort
-      , s "uploaded"   %=  _uploaded   reqProgress
-      , s "left"       %=  _left       reqProgress
-      , s "downloaded" %=  _downloaded reqProgress
+      , urlEncode reqProgress
+
+
       , s "ip"         %=? reqIP
       , s "numwant"    %=? reqNumWant
       , s "event"      %=? reqEvent
@@ -233,7 +260,7 @@ putEvent :: Putter (Maybe Event)
 putEvent Nothing  = putWord32be 0
 putEvent (Just e) = putWord32be (eventId e)
 
-getEvent :: Get (Maybe Event)
+getEvent :: S.Get (Maybe Event)
 getEvent = do
   eid <- getWord32be
   case eid of
@@ -243,7 +270,7 @@ getEvent = do
     3 -> return $ Just Stopped
     _ -> fail "unknown event id"
 
-
+-- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceQuery where
   put AnnounceQuery {..} = do
     put           reqInfoHash
@@ -279,13 +306,14 @@ instance Serialize AnnounceQuery where
       , reqEvent      = ev
       }
 
+-- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceInfo where
   put (Failure msg) = put $ encodeUtf8 msg
   put  AnnounceInfo {..} = do
     putWord32be $ fromIntegral respInterval
     putWord32be $ fromIntegral $ fromMaybe 0 respIncomplete
     putWord32be $ fromIntegral $ fromMaybe 0 respComplete
-    forM_ respPeers put
+    forM_ (getPeerList respPeers) put
 
   get = do
     interval <- getWord32be
@@ -299,7 +327,7 @@ instance Serialize AnnounceInfo where
       , respMinInterval = Nothing
       , respIncomplete  = Just $ fromIntegral leechers
       , respComplete    = Just $ fromIntegral seeders
-      , respPeers       = peers
+      , respPeers       = PeerList peers
       }
 
 {-----------------------------------------------------------------------
@@ -322,7 +350,7 @@ data ScrapeInfo = ScrapeInfo {
     -- | Name of the torrent file, as specified by the "name"
     --   file in the info section of the .torrent file.
   , siName       :: !(Maybe Text)
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
 
@@ -330,21 +358,22 @@ $(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
 -- | Scrape info about a set of torrents.
 type Scrape = Map InfoHash ScrapeInfo
 
-instance BEncodable ScrapeInfo where
-  toBEncode ScrapeInfo {..} = fromAssocs
-    [ "complete"   -->  siComplete
-    , "downloaded" -->  siDownloaded
-    , "incomplete" -->  siIncomplete
-    , "name"       -->? siName
-    ]
+-- | HTTP tracker protocol compatible encoding.
+instance BEncode ScrapeInfo where
+  toBEncode ScrapeInfo {..} = toDict $
+       "complete"   .=! siComplete
+    .: "downloaded" .=! siDownloaded
+    .: "incomplete" .=! siIncomplete
+    .: "name"       .=? siName
+    .: endDict
 
-  fromBEncode (BDict d) =
-    ScrapeInfo <$> d >--  "complete"
-               <*> d >--  "downloaded"
-               <*> d >--  "incomplete"
-               <*> d >--? "name"
-  fromBEncode _ = decodingError "ScrapeInfo"
+  fromBEncode = fromDict $ do
+    ScrapeInfo <$>! "complete"
+               <*>! "downloaded"
+               <*>! "incomplete"
+               <*>? "name"
 
+-- | UDP tracker protocol complatble encoding.
 instance Serialize ScrapeInfo where
   put ScrapeInfo {..} = do
     putWord32be $ fromIntegral siComplete
