@@ -34,13 +34,14 @@ module Data.Torrent.Progress
        ) where
 
 import Control.Applicative
-import Control.Lens
+import Control.Lens hiding ((%=))
 import Data.Aeson.TH
 import Data.Default
 import Data.List as L
 import Data.Monoid
 import Data.Serialize as S
 import Data.Ratio
+import Data.URLEncoded
 import Data.Word
 
 
@@ -58,6 +59,7 @@ data Progress = Progress
 $(makeLenses ''Progress)
 $(deriveJSON L.tail ''Progress)
 
+-- | UDP tracker compatible encoding.
 instance Serialize Progress where
   put Progress {..} = do
     putWord64be $ fromIntegral _downloaded
@@ -73,6 +75,7 @@ instance Default Progress where
   def = Progress 0 0 0
   {-# INLINE def #-}
 
+-- | Can be used to aggregate total progress.
 instance Monoid Progress where
   mempty  = def
   {-# INLINE mempty #-}
@@ -83,6 +86,19 @@ instance Monoid Progress where
     , _uploaded   = ua + ub
     }
   {-# INLINE mappend #-}
+
+instance URLShow Word64 where
+  urlShow = show
+  {-# INLINE urlShow #-}
+
+-- | HTTP Tracker protocol compatible encoding.
+instance URLEncode Progress where
+  urlEncode Progress {..} = mconcat
+    [ s "uploaded"   %=  _uploaded
+    , s "left"       %=  _left
+    , s "downloaded" %=  _downloaded
+    ]
+    where s :: String -> String;  s = id; {-# INLINE s #-}
 
 -- | Initial progress is used when there are no session before.
 --

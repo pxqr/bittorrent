@@ -23,7 +23,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# OPTIONS -fno-warn-orphans           #-}
-module Network.BitTorrent.Tracker.Protocol
+module Network.BitTorrent.Tracker.Message
        ( -- * Announce
          Event(..)
        , AnnounceQuery(..)
@@ -71,8 +71,9 @@ import Data.Torrent.Progress
 import Network.BitTorrent.Core.PeerId
 import Network.BitTorrent.Core.PeerAddr
 
+
 {-----------------------------------------------------------------------
-  Announce messages
+--  Events
 -----------------------------------------------------------------------}
 
 -- | Events used to specify which kind of tracker request is performed.
@@ -85,6 +86,40 @@ data Event = Started
              deriving (Show, Read, Eq, Ord, Enum, Bounded, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''Event)
+
+-- | HTTP tracker protocol compatible encoding.
+instance URLShow Event where
+  urlShow e = urlShow (Char.toLower x : xs)
+    where
+      -- INVARIANT: this is always nonempty list
+      (x : xs) = show e
+
+type EventId = Word32
+
+-- | UDP tracker encoding event codes.
+eventId :: Event -> EventId
+eventId Completed = 1
+eventId Started   = 2
+eventId Stopped   = 3
+
+-- TODO add Regular event
+putEvent :: Putter (Maybe Event)
+putEvent Nothing  = putWord32be 0
+putEvent (Just e) = putWord32be (eventId e)
+
+getEvent :: S.Get (Maybe Event)
+getEvent = do
+  eid <- getWord32be
+  case eid of
+    0 -> return Nothing
+    1 -> return $ Just Completed
+    2 -> return $ Just Started
+    3 -> return $ Just Stopped
+    _ -> fail "unknown event id"
+
+{-----------------------------------------------------------------------
+  Announce query
+-----------------------------------------------------------------------}
 
 -- | A tracker request is HTTP GET request; used to include metrics
 --   from clients that help the tracker keep overall statistics about
@@ -121,114 +156,12 @@ data AnnounceQuery = AnnounceQuery {
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceQuery)
 
-newtype PeerList = PeerList { getPeerList :: [PeerAddr] }
-                   deriving (Show, Eq, ToJSON, FromJSON, Typeable)
-
--- | The tracker response includes a peer list that helps the client
---   participate in the torrent. The most important is 'respPeer' list
---   used to join the swarm.
---
-data AnnounceInfo =
-     Failure !Text -- ^ Failure reason in human readable form.
-   | AnnounceInfo {
-       -- | Number of peers completed the torrent. (seeders)
-       respComplete    :: !(Maybe Int)
-
-       -- | Number of peers downloading the torrent. (leechers)
-     , respIncomplete  :: !(Maybe Int)
-
-       -- | Recommended interval to wait between requests.
-     , respInterval    :: !Int
-
-       -- | Minimal amount of time between requests. A peer /should/
-       -- make timeout with at least 'respMinInterval' value,
-       -- otherwise tracker might not respond. If not specified the
-       -- same applies to 'respInterval'.
-     , respMinInterval :: !(Maybe Int)
-
-       -- | Peers that must be contacted.
-     , respPeers       :: !PeerList
-
-       -- | Human readable warning.
-     , respWarning     :: !(Maybe Text)
-     } deriving (Show, Typeable)
-
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceInfo)
-
--- | Ports typically reserved for bittorrent P2P listener.
-defaultPorts :: [PortNumber]
-defaultPorts =  [6881..6889]
-
--- | Above 25, new peers are highly unlikely to increase download
---   speed.  Even 30 peers is /plenty/, the official client version 3
---   in fact only actively forms new connections if it has less than
---   30 peers and will refuse connections if it has 55.
---
---   So the default value is set to 50 because usually 30-50% of peers
---   are not responding.
---
-defaultNumWant :: Int
-defaultNumWant = 50
-
-{-----------------------------------------------------------------------
-  Bencode announce encoding
------------------------------------------------------------------------}
-
-instance BEncode PeerList where
-  toBEncode   (PeerList xs) = toBEncode xs
-  fromBEncode (BList    l ) = PeerList <$> fromBEncode (BList l)
-  fromBEncode (BString  s ) = PeerList <$> runGet getCompactPeerList s
-  fromBEncode  _            = decodingError "Peer list"
-
--- | HTTP tracker protocol compatible encoding.
-instance BEncode AnnounceInfo where
-  toBEncode (Failure t)        = toDict $
-       "failure reason" .=! t
-    .: endDict
-
-  toBEncode  AnnounceInfo {..} = toDict $
-       "complete"        .=? respComplete
-    .: "incomplete"      .=? respIncomplete
-    .: "interval"        .=! respInterval
-    .: "min interval"    .=? respMinInterval
-    .: "peers"           .=! respPeers
-    .: "warning message" .=? respWarning
-    .: endDict
-
-  fromBEncode (BDict d)
-    | Just t <- BE.lookup "failure reason" d = Failure <$> fromBEncode t
-    | otherwise = (`fromDict` (BDict d)) $ do
-      AnnounceInfo
-        <$>? "complete"
-        <*>? "incomplete"
-        <*>! "interval"
-        <*>? "min interval"
-        <*>! "peers"
-        <*>? "warning message"
-  fromBEncode _ = decodingError "Announce info"
-
 instance URLShow PortNumber where
   urlShow = urlShow . fromEnum
 
 instance URLShow Word32 where
   urlShow = show
-
-instance URLShow Event where
-  urlShow e = urlShow (Char.toLower x : xs)
-    where
-      -- INVARIANT: this is always nonempty list
-      (x : xs) = show e
-
-instance URLShow Word64 where
-  urlShow = show
-
-instance URLEncode Progress where
-  urlEncode Progress {..} = mconcat
-    [ s "uploaded"   %=  _uploaded
-    , s "left"       %=  _left
-    , s "downloaded" %=  _downloaded
-    ]
-    where s :: String -> String;  s = id; {-# INLINE s #-}
+  {-# INLINE urlShow #-}
 
 -- | HTTP tracker protocol compatible encoding.
 instance URLEncode AnnounceQuery where
@@ -236,39 +169,11 @@ instance URLEncode AnnounceQuery where
       [ s "peer_id"    %=  reqPeerId
       , s "port"       %=  reqPort
       , urlEncode reqProgress
-
-
       , s "ip"         %=? reqIP
       , s "numwant"    %=? reqNumWant
       , s "event"      %=? reqEvent
       ]
     where s :: String -> String;  s = id; {-# INLINE s #-}
-
-{-----------------------------------------------------------------------
-  Binary announce encoding
------------------------------------------------------------------------}
-
-type EventId = Word32
-
-eventId :: Event -> EventId
-eventId Completed = 1
-eventId Started   = 2
-eventId Stopped   = 3
-
--- TODO add Regular event
-putEvent :: Putter (Maybe Event)
-putEvent Nothing  = putWord32be 0
-putEvent (Just e) = putWord32be (eventId e)
-
-getEvent :: S.Get (Maybe Event)
-getEvent = do
-  eid <- getWord32be
-  case eid of
-    0 -> return Nothing
-    1 -> return $ Just Completed
-    2 -> return $ Just Started
-    3 -> return $ Just Stopped
-    _ -> fail "unknown event id"
 
 -- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceQuery where
@@ -306,6 +211,77 @@ instance Serialize AnnounceQuery where
       , reqEvent      = ev
       }
 
+{-----------------------------------------------------------------------
+--  Announce response
+-----------------------------------------------------------------------}
+
+newtype PeerList = PeerList { getPeerList :: [PeerAddr] }
+                   deriving (Show, Eq, ToJSON, FromJSON, Typeable)
+
+instance BEncode PeerList where
+  toBEncode   (PeerList xs) = toBEncode xs
+  fromBEncode (BList    l ) = PeerList <$> fromBEncode (BList l)
+  fromBEncode (BString  s ) = PeerList <$> runGet getCompactPeerList s
+  fromBEncode  _            = decodingError "Peer list"
+
+-- | The tracker response includes a peer list that helps the client
+--   participate in the torrent. The most important is 'respPeer' list
+--   used to join the swarm.
+--
+data AnnounceInfo =
+     Failure !Text -- ^ Failure reason in human readable form.
+   | AnnounceInfo {
+       -- | Number of peers completed the torrent. (seeders)
+       respComplete    :: !(Maybe Int)
+
+       -- | Number of peers downloading the torrent. (leechers)
+     , respIncomplete  :: !(Maybe Int)
+
+       -- | Recommended interval to wait between requests.
+     , respInterval    :: !Int
+
+       -- | Minimal amount of time between requests. A peer /should/
+       -- make timeout with at least 'respMinInterval' value,
+       -- otherwise tracker might not respond. If not specified the
+       -- same applies to 'respInterval'.
+     , respMinInterval :: !(Maybe Int)
+
+       -- | Peers that must be contacted.
+     , respPeers       :: !PeerList
+
+       -- | Human readable warning.
+     , respWarning     :: !(Maybe Text)
+     } deriving (Show, Typeable)
+
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceInfo)
+
+-- | HTTP tracker protocol compatible encoding.
+instance BEncode AnnounceInfo where
+  toBEncode (Failure t)        = toDict $
+       "failure reason" .=! t
+    .: endDict
+
+  toBEncode  AnnounceInfo {..} = toDict $
+       "complete"        .=? respComplete
+    .: "incomplete"      .=? respIncomplete
+    .: "interval"        .=! respInterval
+    .: "min interval"    .=? respMinInterval
+    .: "peers"           .=! respPeers
+    .: "warning message" .=? respWarning
+    .: endDict
+
+  fromBEncode (BDict d)
+    | Just t <- BE.lookup "failure reason" d = Failure <$> fromBEncode t
+    | otherwise = (`fromDict` (BDict d)) $ do
+      AnnounceInfo
+        <$>? "complete"
+        <*>? "incomplete"
+        <*>! "interval"
+        <*>? "min interval"
+        <*>! "peers"
+        <*>? "warning message"
+  fromBEncode _ = decodingError "Announce info"
+
 -- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceInfo where
   put (Failure msg) = put $ encodeUtf8 msg
@@ -330,8 +306,24 @@ instance Serialize AnnounceInfo where
       , respPeers       = PeerList peers
       }
 
+-- TODO move this somewhere else
+-- | Ports typically reserved for bittorrent P2P listener.
+defaultPorts :: [PortNumber]
+defaultPorts =  [6881..6889]
+
+-- | Above 25, new peers are highly unlikely to increase download
+--   speed.  Even 30 peers is /plenty/, the official client version 3
+--   in fact only actively forms new connections if it has less than
+--   30 peers and will refuse connections if it has 55.
+--
+--   So the default value is set to 50 because usually 30-50% of peers
+--   are not responding.
+--
+defaultNumWant :: Int
+defaultNumWant = 50
+
 {-----------------------------------------------------------------------
-  Scrape messages
+  Scrape message
 -----------------------------------------------------------------------}
 
 type ScrapeQuery = [InfoHash]

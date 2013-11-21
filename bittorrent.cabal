@@ -59,7 +59,7 @@ library
 --                     , Network.BitTorrent.Extension
 --                     , Network.BitTorrent.Peer
 --                     , Network.BitTorrent.Tracker
-                     , Network.BitTorrent.Tracker.Protocol
+                     , Network.BitTorrent.Tracker.Message
 --                     , Network.BitTorrent.Tracker.HTTP
 --                     , Network.BitTorrent.Tracker.UDP
 --                     , Network.BitTorrent.Exchange
