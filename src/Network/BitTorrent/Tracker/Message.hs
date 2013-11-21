@@ -27,6 +27,7 @@ module Network.BitTorrent.Tracker.Message
        ( -- * Announce
          Event(..)
        , AnnounceQuery(..)
+       , PeerList (..)
        , AnnounceInfo(..)
 
          -- ** Defaults
@@ -47,7 +48,7 @@ module Network.BitTorrent.Tracker.Message
 import Control.Applicative
 import Control.Exception
 import Control.Monad
-import Data.Aeson (ToJSON, FromJSON)
+import Data.Aeson (ToJSON(..), FromJSON(..))
 import Data.Aeson.TH
 import Data.BEncode as BE
 import Data.BEncode.BDict as BE
@@ -215,13 +216,29 @@ instance Serialize AnnounceQuery where
 --  Announce response
 -----------------------------------------------------------------------}
 
-newtype PeerList = PeerList { getPeerList :: [PeerAddr] }
-                   deriving (Show, Eq, ToJSON, FromJSON, Typeable)
+data PeerList
+  =        PeerList { getPeerList :: [PeerAddr] }
+  | CompactPeerList { getPeerList :: [PeerAddr] }
+    deriving (Show, Eq, Typeable)
+
+instance ToJSON PeerList where
+  toJSON      = toJSON . getPeerList
+
+instance FromJSON PeerList where
+  parseJSON v = PeerList <$> parseJSON v
+
+putCompactPeerList :: S.Putter [PeerAddr]
+putCompactPeerList = mapM_ put
+
+getCompactPeerList :: S.Get [PeerAddr]
+getCompactPeerList = many get
 
 instance BEncode PeerList where
-  toBEncode   (PeerList xs) = toBEncode xs
-  fromBEncode (BList    l ) = PeerList <$> fromBEncode (BList l)
-  fromBEncode (BString  s ) = PeerList <$> runGet getCompactPeerList s
+  toBEncode (PeerList        xs) = toBEncode xs
+  toBEncode (CompactPeerList xs) = toBEncode $ runPut (putCompactPeerList xs)
+
+  fromBEncode (BList    l ) = PeerList        <$> fromBEncode (BList l)
+  fromBEncode (BString  s ) = CompactPeerList <$> runGet getCompactPeerList s
   fromBEncode  _            = decodingError "Peer list"
 
 -- | The tracker response includes a peer list that helps the client
@@ -237,13 +254,13 @@ data AnnounceInfo =
        -- | Number of peers downloading the torrent. (leechers)
      , respIncomplete  :: !(Maybe Int)
 
-       -- | Recommended interval to wait between requests.
+       -- | Recommended interval to wait between requests, in seconds.
      , respInterval    :: !Int
 
-       -- | Minimal amount of time between requests. A peer /should/
-       -- make timeout with at least 'respMinInterval' value,
-       -- otherwise tracker might not respond. If not specified the
-       -- same applies to 'respInterval'.
+       -- | Minimal amount of time between requests, in seconds. A
+       -- peer /should/ make timeout with at least 'respMinInterval'
+       -- value, otherwise tracker might not respond. If not specified
+       -- the same applies to 'respInterval'.
      , respMinInterval :: !(Maybe Int)
 
        -- | Peers that must be contacted.
@@ -321,6 +338,8 @@ defaultPorts =  [6881..6889]
 --
 defaultNumWant :: Int
 defaultNumWant = 50
+
+-- default value here: <https://wiki.theory.org/BitTorrent_Tracker_Protocol>
 
 {-----------------------------------------------------------------------
   Scrape message

@@ -60,15 +60,15 @@ library
 --                     , Network.BitTorrent.Peer
 --                     , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Tracker.Message
---                     , Network.BitTorrent.Tracker.HTTP
+                     , Network.BitTorrent.Tracker.HTTP
 --                     , Network.BitTorrent.Tracker.UDP
 --                     , Network.BitTorrent.Exchange
 --                     , Network.BitTorrent.Exchange.Protocol
 --                     , Network.BitTorrent.DHT
 --                     , Network.BitTorrent.DHT.Protocol
 --                     , Network.BitTorrent.Sessions
---  other-modules:       Network.BitTorrent.Sessions.Types
---                       Paths_bittorrent
+-- Network.BitTorrent.Sessions.Types
+  other-modules:       Paths_bittorrent
 
   build-depends:       base       == 4.*
                      , bits-extras

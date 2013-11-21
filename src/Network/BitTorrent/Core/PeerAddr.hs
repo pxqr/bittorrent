@@ -16,7 +16,6 @@
 module Network.BitTorrent.Core.PeerAddr
        ( -- * Peer address
          PeerAddr(..)
-       , getCompactPeerList
        , peerSockAddr
        , connectToPeer
        , ppPeer
@@ -80,15 +79,13 @@ instance BEncode PeerAddr where
 
 -- | The tracker "compact peer list" compatible encoding. The
 -- 'peerId' is always 'Nothing'.
+--
+--   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
 instance Serialize PeerAddr where
   put PeerAddr {..} = put peerID >> put peerPort
   {-# INLINE put #-}
   get = PeerAddr Nothing <$> get <*> get
   {-# INLINE get #-}
-
--- | For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
-getCompactPeerList :: S.Get [PeerAddr]
-getCompactPeerList = many get
 
 -- TODO make platform independent, clarify htonl
 
