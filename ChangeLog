@@ -1,0 +1,14 @@
+2013-11-21  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	Version 0.0.0.2
+
+	* InfoHash.hs: added rendering to Text.
+	* Torrent.hs:  added pretty printing and content type.
+	* Magnet.hs:   added constructors from Torrent datatype.
+	* New:         added Data.Torrent.Client, Data.Torrent.Progress,
+	Network.Bittorrent.Core.PeerId, Network.BitTorrent.PeerAddr
+	modules.
+
+2013-11-01  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	Initial version: 0.0.0.1
