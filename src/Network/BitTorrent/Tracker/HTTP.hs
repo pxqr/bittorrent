@@ -69,7 +69,7 @@ mkGET uri = Request uri GET [] ""
 --
 announceHTTP :: HTTPTracker -> AnnounceQuery -> IO AnnounceInfo
 announceHTTP HTTPTracker {..} req = do
-    let r = mkGET (encodeRequest announceURI req)
+    let r = mkGET (renderAnnounceQuery announceURI req)
 
     rawResp  <- simpleHTTP r
     respBody <- getResponseBody rawResp

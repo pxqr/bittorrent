@@ -28,12 +28,15 @@ module Network.BitTorrent.Tracker.Message
          -- ** Request
          Event(..)
        , AnnounceQuery(..)
-       , encodeRequest
+       , renderAnnounceQuery
+       , ParamParseFailure
+       , parseAnnounceQuery
 
          -- ** Response
        , PeerList (..)
        , AnnounceInfo(..)
        , defaultNumWant
+       , paramFailureCode
 
          -- * Scrape
        , ScrapeQuery
@@ -209,10 +212,73 @@ instance Serialize AnnounceQuery where
       , reqEvent      = ev
       }
 
-encodeRequest :: URI -> AnnounceQuery -> URI
-encodeRequest announceURI req = URL.urlEncode req
-                    `addToURI`      announceURI
-                    `addHashToURI`  reqInfoHash req
+-- | Encoding announce query and add it to the base tracker URL.
+renderAnnounceQuery :: URI -> AnnounceQuery -> URI
+renderAnnounceQuery announceURI req
+  =               URL.urlEncode req
+  `addToURI`      announceURI
+  `addHashToURI`  reqInfoHash req
+
+data QueryParam
+  = ParamInfoHash
+  | ParamPeerId
+  | ParamPort
+  | ParamProgress
+  | ParamIP
+  | ParamNumWant
+  | ParamEvent
+    deriving (Show, Eq, Ord, Enum)
+
+data ParamParseFailure
+  = Missing QueryParam -- ^ param not found in query string
+  | Invalid QueryParam -- ^ param present but not valid.
+
+type ParamResult = Either ParamParseFailure
+
+textToPeerId :: Text -> Maybe PeerId
+textToPeerId = undefined
+
+textToPortNumber :: Text -> Maybe PortNumber
+textToPortNumber = undefined
+
+textToHostAddress :: Text -> Maybe HostAddress
+textToHostAddress = undefined
+
+textToNumWant :: Text -> Maybe Int
+textToNumWant = undefined
+
+textToEvent :: Text -> Maybe Event
+textToEvent = undefined
+
+paramName :: QueryParam -> Text
+paramName ParamInfoHash = "info_hash"
+paramName ParamPeerId   = "peer_id"
+paramName ParamPort     = "port"
+
+-- | Parse announce request from a query string.
+parseAnnounceQuery :: [(Text, Text)] -> Either ParamParseFailure AnnounceQuery
+parseAnnounceQuery params = AnnounceQuery
+    <$> reqParam ParamInfoHash textToInfoHash    params
+    <*> reqParam ParamPeerId   textToPeerId      params
+    <*> reqParam ParamPort     textToPortNumber  params
+    <*> progress params
+    <*> optParam ParamIP       textToHostAddress params
+    <*> optParam ParamNumWant  textToNumWant     params
+    <*> optParam ParamEvent    textToEvent       params
+  where
+    withError e = maybe (Left e) Right
+    reqParam param p = withError (Missing param) . L.lookup (paramName param)
+                   >=> withError (Invalid param) . p
+
+    optParam param p ps
+      | Just x <- L.lookup (paramName param) ps
+      = pure <$> withError (Invalid param) (p x)
+      | otherwise = pure Nothing
+
+    progress = undefined
+    ip       = undefined
+    numwant  = undefined
+    event    = undefined
 
 {-----------------------------------------------------------------------
 --  Announce response
@@ -335,6 +401,20 @@ instance Serialize AnnounceInfo where
 --
 defaultNumWant :: Int
 defaultNumWant = 50
+
+missingOffset :: Int
+missingOffset = 101
+
+invalidOffset :: Int
+invalidOffset = 150
+
+-- | Get
+--
+--   For more info see:
+--   <https://wiki.theory.org/BitTorrent_Tracker_Protocol#Response_Codes>
+paramFailureCode :: ParamParseFailure -> Int
+paramFailureCode (Missing param) = missingOffset + fromEnum param
+paramFailureCode (Invalid param) = invalidOffset + fromEnum param
 
 {-----------------------------------------------------------------------
   Scrape message
