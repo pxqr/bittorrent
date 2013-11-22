@@ -43,6 +43,8 @@ import Data.Text as T
 import Data.Text.Encoding as T
 import Network.URI
 import Text.Read
+import Text.PrettyPrint as PP
+import Text.PrettyPrint.Class
 
 import Data.Torrent
 import Data.Torrent.InfoHash
@@ -147,6 +149,9 @@ instance IsString Magnet where
 instance URLEncode Magnet where
   urlEncode = toQuery
   {-# INLINE urlEncode #-}
+
+instance Pretty Magnet where
+  pretty = PP.text . renderMagnet
 
 -- | Set exact topic only, other params are empty.
 nullMagnet :: InfoHash -> Magnet

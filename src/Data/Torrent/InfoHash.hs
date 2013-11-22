@@ -19,10 +19,8 @@ module Data.Torrent.InfoHash
          -- * Rendering
        , longHex
        , shortHex
-       , ppInfoHash
 
        , addHashToURI
-
 
        , Data.Torrent.InfoHash.hash
        , Data.Torrent.InfoHash.hashlazy
@@ -52,6 +50,7 @@ import Network.URI
 import Numeric
 import Text.ParserCombinators.ReadP as P
 import Text.PrettyPrint
+import Text.PrettyPrint.Class
 
 
 -- | Exactly 20 bytes long SHA1 hash of the info part of torrent file.
@@ -60,7 +59,7 @@ newtype InfoHash = InfoHash { getInfoHash :: BS.ByteString }
 
 -- | for hex encoded strings
 instance Show InfoHash where
-  show = render . ppInfoHash
+  show = render . pretty
 
 -- | for hex encoded strings
 instance Read InfoHash where
@@ -106,6 +105,10 @@ instance FromJSON InfoHash where
 instance URLShow InfoHash where
   urlShow = show
 
+-- | base16 encoded.
+instance Pretty InfoHash where
+  pretty = text . BC.unpack . ppHex . getInfoHash
+
 -- | Tries both base16 and base32 while decoding info hash.
 textToInfoHash :: Text -> Maybe InfoHash
 textToInfoHash text
@@ -126,10 +129,6 @@ longHex = T.decodeUtf8 . Base16.encode . getInfoHash
 -- | The same as 'longHex', but 7 character long.
 shortHex :: InfoHash -> Text
 shortHex = T.take 7 . longHex
-
--- | Pretty print info hash in hexadecimal format.
-ppInfoHash :: InfoHash -> Doc
-ppInfoHash = text . BC.unpack . ppHex . getInfoHash
 
 ppHex :: BS.ByteString -> BS.ByteString
 ppHex = BL.toStrict . B.toLazyByteString . B.byteStringHexFixed

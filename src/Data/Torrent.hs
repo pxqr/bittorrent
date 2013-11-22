@@ -26,7 +26,6 @@
 module Data.Torrent
        ( -- * Info dictionary
          InfoDict (..)
-       , ppInfoDict
 
          -- ** Lenses
        , infohash
@@ -36,7 +35,6 @@ module Data.Torrent
 
          -- * Torrent file
        , Torrent(..)
-       , ppTorrent
 
          -- ** Lenses
        , announce
@@ -66,12 +64,10 @@ module Data.Torrent
        ) where
 
 import Prelude hiding (sum)
-
 import Control.Applicative
 import Control.DeepSeq
 import Control.Exception
 import Control.Lens
-
 import Data.Aeson.Types (ToJSON(..), FromJSON(..), Value(..), withText)
 import Data.Aeson.TH
 import Data.BEncode as BE
@@ -88,6 +84,7 @@ import Data.Time.Clock.POSIX
 import Data.Typeable
 import Network.URI
 import Text.PrettyPrint as PP
+import Text.PrettyPrint.Class
 import System.FilePath
 
 import Data.Torrent.InfoHash as IH
@@ -156,18 +153,16 @@ instance BEncode InfoDict where
       ih = IH.hashlazy (encode dict)
 
 ppPrivacy :: Bool -> Doc
-ppPrivacy privacy =
-  "Privacy: " <> if privacy then "private" else "public"
+ppPrivacy privacy = "Privacy: " <> if privacy then "private" else "public"
 
 ppAdditionalInfo :: InfoDict -> Doc
 ppAdditionalInfo layout = PP.empty
 
--- | Format info dictionary in human-readable form.
-ppInfoDict :: InfoDict -> Doc
-ppInfoDict InfoDict {..} =
-  ppLayoutInfo idLayoutInfo $$
-  ppPieceInfo  idPieceInfo  $$
-  ppPrivacy    idPrivate
+instance Pretty InfoDict where
+  pretty InfoDict {..} =
+    pretty idLayoutInfo $$
+    pretty  idPieceInfo  $$
+    ppPrivacy    idPrivate
 
 {-----------------------------------------------------------------------
 --  Torrent info
@@ -290,13 +285,13 @@ name <:>   v       = name <> ":" <+> v
 _    <:>?  Nothing = PP.empty
 name <:>? (Just d) = name <:> d
 
-ppTorrent :: Torrent -> Doc
-ppTorrent Torrent {..} =
-       "InfoHash: " <> ppInfoHash (idInfoHash tInfoDict)
+instance Pretty Torrent where
+  pretty Torrent {..} =
+       "InfoHash: " <> pretty (idInfoHash tInfoDict)
     $$ hang "General" 4 generalInfo
     $$ hang "Tracker" 4 trackers
-    $$ ppInfoDict tInfoDict
-  where
+    $$ pretty tInfoDict
+   where
     trackers = case tAnnounceList of
         Nothing  -> text (show tAnnounce)
         Just xxs -> vcat $ L.map ppTier $ L.zip [1..] xxs

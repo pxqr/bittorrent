@@ -16,7 +16,6 @@
 module Network.BitTorrent.Core.PeerId
        ( -- * PeerId
          PeerId (getPeerId)
-       , ppPeerId
 
          -- * Generation
        , genPeerId
@@ -57,6 +56,7 @@ import Data.Version     (Version(Version), versionBranch)
 import System.Entropy   (getEntropy)
 import System.Locale    (defaultTimeLocale)
 import Text.PrettyPrint hiding ((<>))
+import Text.PrettyPrint.Class
 import Text.Read        (readMaybe)
 import Paths_bittorrent (version)
 
@@ -83,9 +83,8 @@ instance IsString PeerId where
     where
       bs = fromString str
 
--- | Format peer id in human readable form.
-ppPeerId :: PeerId -> Doc
-ppPeerId = text . BC.unpack . getPeerId
+instance Pretty PeerId where
+  pretty = text . BC.unpack . getPeerId
 
 {-----------------------------------------------------------------------
 --  Encoding

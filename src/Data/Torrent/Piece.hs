@@ -21,13 +21,11 @@ module Data.Torrent.Piece
 
          -- * Piece data
        , Piece (..)
-       , ppPiece
        , pieceSize
        , isPiece
 
          -- * Piece control
        , PieceInfo (..)
-       , ppPieceInfo
        , pieceCount
 
          -- * Lens
@@ -61,6 +59,7 @@ import Data.List as L
 import Data.Text.Encoding as T
 import Data.Typeable
 import Text.PrettyPrint
+import Text.PrettyPrint.Class
 
 import Data.Torrent.Block
 
@@ -121,10 +120,9 @@ $(deriveJSON (L.map toLower . L.dropWhile isLower) ''Piece)
 
 instance NFData (Piece a)
 
--- | Format piece in human readable form. Payload bytes are omitted.
-ppPiece :: Piece a -> Doc
-ppPiece Piece {..}
-  = "Piece" <+> braces ("index" <+> "=" <+> int pieceIndex)
+-- | Payload bytes are omitted.
+instance Pretty (Piece a) where
+  pretty Piece {..} = "Piece" <+> braces ("index" <+> "=" <+> int pieceIndex)
 
 -- | Get size of piece in bytes.
 pieceSize :: Piece BL.ByteString -> PieceSize
@@ -192,10 +190,9 @@ instance BEncode PieceInfo where
   toBEncode   = toDict . (`putPieceInfo` endDict)
   fromBEncode = fromDict getPieceInfo
 
--- | Format piece info in human readable form. Hashes are omitted.
-ppPieceInfo :: PieceInfo -> Doc
-ppPieceInfo PieceInfo {..} =
-  "Piece size: " <> int piPieceLength
+-- | Hashes are omitted.
+instance Pretty PieceInfo where
+  pretty  PieceInfo {..} = "Piece size: " <> int piPieceLength
 
 hashsize :: Int
 hashsize = 20

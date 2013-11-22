@@ -9,6 +9,7 @@
 --
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE FlexibleInstances          #-}
 module Data.Torrent.Block
        ( -- * Piece attributes
          PieceIx
@@ -22,31 +23,26 @@ module Data.Torrent.Block
 
          -- * Block index
        , BlockIx(..)
-       , ppBlockIx
        , blockIxRange
 
          -- * Block data
        , Block(..)
-       , ppBlock
        , blockIx
        , blockSize
        , blockRange
        ) where
 
 import Control.Applicative
-
 import Data.Aeson.TH
 import qualified Data.ByteString.Lazy as Lazy
 import Data.Char
 import Data.List as L
-
 import Data.Binary as B
 import Data.Binary.Get as B
 import Data.Binary.Put as B
 import Data.Serialize as S
-
 import Text.PrettyPrint
-
+import Text.PrettyPrint.Class
 
 {-----------------------------------------------------------------------
 --  Piece attributes
@@ -147,12 +143,11 @@ instance Binary BlockIx where
     putIntB ixOffset
     putIntB ixLength
 
--- | Format block index in human readable form.
-ppBlockIx :: BlockIx -> Doc
-ppBlockIx BlockIx {..} =
-  "piece  = " <> int ixPiece  <> "," <+>
-  "offset = " <> int ixOffset <> "," <+>
-  "length = " <> int ixLength
+instance Pretty BlockIx where
+  pretty BlockIx {..} =
+    "piece  = " <> int ixPiece  <> "," <+>
+    "offset = " <> int ixOffset <> "," <+>
+    "length = " <> int ixLength
 
 -- | Get location of payload bytes in the torrent content.
 blockIxRange :: (Num a, Integral a) => PieceSize -> BlockIx -> (a, a)
@@ -178,10 +173,10 @@ data Block payload = Block {
   , blkData   :: !payload
   } deriving (Show, Eq)
 
--- | Format block in human readable form. Payload is ommitted.
-ppBlock :: Block Lazy.ByteString -> Doc
-ppBlock = ppBlockIx . blockIx
-{-# INLINE ppBlock #-}
+-- | Payload is ommitted.
+instance Pretty (Block Lazy.ByteString) where
+  pretty = pretty . blockIx
+  {-# INLINE pretty #-}
 
 -- | Get size of block /payload/ in bytes.
 blockSize :: Block Lazy.ByteString -> BlockSize

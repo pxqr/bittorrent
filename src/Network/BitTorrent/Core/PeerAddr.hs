@@ -19,7 +19,6 @@ module Network.BitTorrent.Core.PeerAddr
        , defaultPorts
        , peerSockAddr
        , connectToPeer
-       , ppPeer
        ) where
 
 import Control.Applicative
@@ -34,6 +33,7 @@ import Data.Typeable
 import Data.Word
 import Network.Socket
 import Text.PrettyPrint
+import Text.PrettyPrint.Class
 
 import Data.Torrent.Client
 import Network.BitTorrent.Core.PeerId
@@ -89,6 +89,13 @@ instance Serialize PeerAddr where
   get = PeerAddr Nothing <$> get <*> get
   {-# INLINE get #-}
 
+instance Pretty PeerAddr where
+  pretty p @ PeerAddr {..}
+    | Just pid <- peerID = pretty (clientInfo pid) <+> "at" <+> paddr
+    |     otherwise      = paddr
+    where
+      paddr = text (show (peerSockAddr p))
+
 -- | Ports typically reserved for bittorrent P2P listener.
 defaultPorts :: [PortNumber]
 defaultPorts =  [6881..6889]
@@ -117,11 +124,3 @@ connectToPeer p = do
   sock <- socket AF_INET Stream Network.Socket.defaultProtocol
   connect sock (peerSockAddr p)
   return sock
-
--- | Pretty print peer address in human readable form.
-ppPeer :: PeerAddr -> Doc
-ppPeer p @ PeerAddr {..}
-  | Just pid <- peerID = ppClientInfo (clientInfo pid) <+> "at" <+> paddr
-  |     otherwise      = paddr
-  where
-    paddr = text (show (peerSockAddr p))

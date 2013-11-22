@@ -43,6 +43,8 @@ import Data.Serialize as S
 import Data.Ratio
 import Data.URLEncoded
 import Data.Word
+import Text.PrettyPrint as PP
+import Text.PrettyPrint.Class
 
 
 -- | Progress data is considered as dynamic within one client
@@ -99,6 +101,12 @@ instance URLEncode Progress where
     , s "downloaded" %=  _downloaded
     ]
     where s :: String -> String;  s = id; {-# INLINE s #-}
+
+instance Pretty Progress where
+  pretty Progress {..} =
+    "/\\"  <+> PP.text (show _uploaded)   $$
+    "\\/"  <+> PP.text (show _downloaded) $$
+    "left" <+> PP.text (show _left)
 
 -- | Initial progress is used when there are no session before.
 --

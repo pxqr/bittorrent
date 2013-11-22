@@ -22,10 +22,7 @@
 --
 module Data.Torrent.Client
        ( ClientImpl (..)
-       , ppClientImpl
-       , ppVersion
        , ClientInfo (..)
-       , ppClientInfo
        , libClientInfo
        ) where
 
@@ -41,6 +38,7 @@ import Data.String
 import Data.Text as T
 import Data.Version
 import Text.PrettyPrint hiding ((<>))
+import Text.PrettyPrint.Class
 import Text.Read (readMaybe)
 import Paths_bittorrent (version)
 
@@ -125,9 +123,8 @@ instance IsString ClientImpl where
       alist = L.map mk [minBound..maxBound]
       mk  x = (L.tail $ show x, x)
 
--- | Format client implementation info in human-readable form.
-ppClientImpl :: ClientImpl -> Doc
-ppClientImpl = text . L.tail . show
+instance Pretty ClientImpl where
+  pretty = text . L.tail . show
 
 -- | Just the '0' version.
 instance Default Version where
@@ -141,9 +138,8 @@ instance IsString Version where
     where
       chunkNums = sequence . L.map readMaybe . L.linesBy ('.' ==)
 
--- | Format client implementation version in human-readable form.
-ppVersion :: Version -> Doc
-ppVersion = text . showVersion
+instance Pretty Version where
+  pretty = text . showVersion
 
 -- | The all sensible infomation that can be obtained from a peer
 -- identifier or torrent /createdBy/ field.
@@ -164,10 +160,8 @@ instance IsString ClientInfo where
     where
       (impl, _ver) = L.span ((/=) '-') str
 
--- | Format client info in human-readable form.
-ppClientInfo :: ClientInfo -> Doc
-ppClientInfo ClientInfo {..} =
-  ppClientImpl ciImpl <+> "version" <+> ppVersion ciVersion
+instance Pretty ClientInfo where
+  pretty ClientInfo {..} = pretty ciImpl <+> "version" <+> pretty ciVersion
 
 -- | Client info of this (the bittorrent library) package. Normally,
 -- applications should introduce its own idenitifiers, otherwise they

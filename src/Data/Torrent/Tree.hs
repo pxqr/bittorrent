@@ -55,6 +55,8 @@ build MultiFile {..} = Dir $ M.singleton liDirName files
 --decompress :: DirTree () -> [FileInfo ()]
 --decompress = undefined
 
+-- TODO pretty print
+
 -- | Lookup file by path.
 lookup :: [FilePath] -> DirTree a -> Maybe (DirTree a)
 lookup []        t      = Just t

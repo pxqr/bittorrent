@@ -24,7 +24,6 @@ module Data.Torrent.Layout
 
          -- * Single file info
        , FileInfo (..)
-       , ppFileInfo
 
          -- ** Lens
        , fileLength
@@ -33,7 +32,6 @@ module Data.Torrent.Layout
 
          -- * File layout
        , LayoutInfo (..)
-       , ppLayoutInfo
        , joinFilePath
 
          -- ** Lens
@@ -78,6 +76,7 @@ import Data.Text as T
 import Data.Text.Encoding as T
 import Data.Typeable
 import Text.PrettyPrint as PP
+import Text.PrettyPrint.Class
 import System.FilePath
 import System.Posix.Types
 
@@ -175,13 +174,12 @@ instance BEncode (FileInfo ByteString) where
   fromBEncode = fromDict getFileInfoSingle
   {-# INLINE fromBEncode #-}
 
--- | Format 'FileInfo' in human-readable form.
-ppFileInfo :: FileInfo ByteString -> Doc
-ppFileInfo FileInfo {..} =
+instance Pretty (FileInfo BS.ByteString) where
+  pretty FileInfo {..} =
        "Path: " <> text (T.unpack (T.decodeUtf8 fiName))
     $$ "Size: " <> text (show fiLength)
     $$ maybe PP.empty ppMD5 fiMD5Sum
-  where
+   where
     ppMD5 md5 = "MD5 : " <> text (show (InfoHash md5))
 
 -- | Join file path.
@@ -242,10 +240,9 @@ instance BEncode LayoutInfo where
   toBEncode   = toDict . (`putLayoutInfo` endDict)
   fromBEncode = fromDict getLayoutInfo
 
--- | Format 'LayoutInfo' in human readable form.
-ppLayoutInfo :: LayoutInfo -> Doc
-ppLayoutInfo SingleFile {..} = ppFileInfo liFile
-ppLayoutInfo MultiFile  {..} = vcat $ L.map (ppFileInfo . joinFilePath) liFiles
+instance Pretty LayoutInfo where
+  pretty SingleFile {..} = pretty liFile
+  pretty MultiFile  {..} = vcat $ L.map (pretty . joinFilePath) liFiles
 
 -- | Test if this is single file torrent.
 isSingleFile :: LayoutInfo -> Bool
