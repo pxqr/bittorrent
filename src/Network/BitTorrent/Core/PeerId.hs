@@ -285,4 +285,4 @@ clientInfo pid = either (const def) id $ runGet getCI (getPeerId pid)
     getClientImpl    = parseImpl   <$> getByteString 2
     getClientVersion = mkVer       <$> getByteString 4
       where
-        mkVer bs = ClientVersion $ Version [fromMaybe 0 $ readMaybe $ BC.unpack bs] []
+        mkVer bs = Version [fromMaybe 0 $ readMaybe $ BC.unpack bs] []

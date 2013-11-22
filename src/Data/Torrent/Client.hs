@@ -21,15 +21,9 @@
 --   done using 'Network.BitTorrent.Extension'!
 --
 module Data.Torrent.Client
-       ( -- * Client implementation
-         ClientImpl (..)
+       ( ClientImpl (..)
        , ppClientImpl
-
-         -- * Client version
-       , ClientVersion (..)
-       , ppClientVersion
-
-         -- * Client information
+       , ppVersion
        , ClientInfo (..)
        , ppClientInfo
        , libClientInfo
@@ -122,23 +116,19 @@ instance Default ClientImpl where
 ppClientImpl :: ClientImpl -> Doc
 ppClientImpl = text . L.tail . show
 
--- | Version of client software, normally extracted from peer id.
-newtype ClientVersion = ClientVersion { getClientVersion :: Version }
-  deriving (Show, Eq, Ord)
-
 -- | Just the '0' version.
-instance Default ClientVersion where
-  def = ClientVersion $ Version [0] []
+instance Default Version where
+  def = Version [0] []
 
 -- | Format client implementation version in human-readable form.
-ppClientVersion :: ClientVersion -> Doc
-ppClientVersion = text . showVersion . getClientVersion
+ppVersion :: Version -> Doc
+ppVersion = text . showVersion
 
 -- | The all sensible infomation that can be obtained from a peer
 -- identifier or torrent /createdBy/ field.
 data ClientInfo = ClientInfo {
     ciImpl    :: ClientImpl
-  , ciVersion :: ClientVersion
+  , ciVersion :: Version
   } deriving (Show, Eq, Ord)
 
 -- | Unrecognized client implementation.
@@ -148,14 +138,14 @@ instance Default ClientInfo where
 -- | Format client info in human-readable form.
 ppClientInfo :: ClientInfo -> Doc
 ppClientInfo ClientInfo {..} =
-  ppClientImpl ciImpl <+> "version" <+> ppClientVersion ciVersion
+  ppClientImpl ciImpl <+> "version" <+> ppVersion ciVersion
 
 -- | Client info of this (the bittorrent library) package. Normally,
 -- applications should introduce its own idenitifiers, otherwise they
 -- can use 'libClientInfo' value.
 --
 libClientInfo :: ClientInfo
-libClientInfo = ClientInfo IlibHSbittorrent (ClientVersion version)
+libClientInfo = ClientInfo IlibHSbittorrent version
 
 {-----------------------------------------------------------------------
 --  For torrent file
@@ -164,7 +154,7 @@ libClientInfo = ClientInfo IlibHSbittorrent (ClientVersion version)
 renderImpl :: ClientImpl -> Text
 renderImpl = T.pack . L.tail . show
 
-renderVersion :: ClientVersion -> Text
+renderVersion :: Version -> Text
 renderVersion = undefined
 
 renderClientInfo :: ClientInfo -> Text
