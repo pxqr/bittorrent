@@ -49,6 +49,7 @@ import Data.List as L
 import Data.Maybe       (fromMaybe)
 import Data.Monoid
 import Data.Serialize as S
+import Data.String
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
 import Data.URLEncoded
@@ -73,6 +74,14 @@ instance Serialize PeerId where
 
 instance URLShow PeerId where
   urlShow = BC.unpack . getPeerId
+
+instance IsString PeerId where
+  fromString str
+      | BS.length bs == 20 = PeerId bs
+      |      otherwise     = error $ "Peer id should be 20 bytes long: "
+                                  ++ show str
+    where
+      bs = fromString str
 
 -- | Format peer id in human readable form.
 ppPeerId :: PeerId -> Doc
