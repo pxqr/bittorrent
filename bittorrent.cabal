@@ -141,6 +141,9 @@ test-suite spec
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   main-is:             Spec.hs
+  other-modules:       Data.Torrent.MagnetSpec
+                       Data.Torrent.InfoHashSpec
+                       Data.Torrent.MetainfoSpec
   build-depends:       base == 4.*
                      , bytestring
                      , directory
