@@ -25,23 +25,20 @@
 {-# OPTIONS -fno-warn-orphans           #-}
 module Network.BitTorrent.Tracker.Message
        ( -- * Announce
+         -- ** Request
          Event(..)
        , AnnounceQuery(..)
+       , encodeRequest
+
+         -- ** Response
        , PeerList (..)
        , AnnounceInfo(..)
-
-         -- ** Defaults
        , defaultNumWant
-       , defaultPorts
 
          -- * Scrape
        , ScrapeQuery
        , ScrapeInfo(..)
        , Scrape
-
-         -- * TODO
-       , Tracker(..)
-       , scrapeOne
        )
        where
 
@@ -212,10 +209,16 @@ instance Serialize AnnounceQuery where
       , reqEvent      = ev
       }
 
+encodeRequest :: URI -> AnnounceQuery -> URI
+encodeRequest announceURI req = URL.urlEncode req
+                    `addToURI`      announceURI
+                    `addHashToURI`  reqInfoHash req
+
 {-----------------------------------------------------------------------
 --  Announce response
 -----------------------------------------------------------------------}
 
+-- | For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
 data PeerList
   =        PeerList { getPeerList :: [PeerAddr] }
   | CompactPeerList { getPeerList :: [PeerAddr] }
@@ -323,23 +326,15 @@ instance Serialize AnnounceInfo where
       , respPeers       = PeerList peers
       }
 
--- TODO move this somewhere else
--- | Ports typically reserved for bittorrent P2P listener.
-defaultPorts :: [PortNumber]
-defaultPorts =  [6881..6889]
-
 -- | Above 25, new peers are highly unlikely to increase download
 --   speed.  Even 30 peers is /plenty/, the official client version 3
 --   in fact only actively forms new connections if it has less than
 --   30 peers and will refuse connections if it has 55.
 --
---   So the default value is set to 50 because usually 30-50% of peers
---   are not responding.
+--   <https://wiki.theory.org/BitTorrent_Tracker_Protocol#Basic_Tracker_Announce_Request>
 --
 defaultNumWant :: Int
 defaultNumWant = 50
-
--- default value here: <https://wiki.theory.org/BitTorrent_Tracker_Protocol>
 
 {-----------------------------------------------------------------------
   Scrape message
@@ -384,7 +379,7 @@ instance BEncode ScrapeInfo where
                <*>! "incomplete"
                <*>? "name"
 
--- | UDP tracker protocol complatble encoding.
+-- | UDP tracker protocol compatible encoding.
 instance Serialize ScrapeInfo where
   put ScrapeInfo {..} = do
     putWord32be $ fromIntegral siComplete
@@ -402,16 +397,3 @@ instance Serialize ScrapeInfo where
       , siIncomplete = fromIntegral leechers
       , siName       = Nothing
       }
-
--- | Set of tracker RPCs.
-class Tracker s where
-  connect  :: URI -> IO s
-  announce :: s -> AnnounceQuery -> IO AnnounceInfo
-  scrape   :: s -> ScrapeQuery   -> IO Scrape
-
--- | More particular version of 'scrape', just for one torrent.
---
-scrapeOne :: Tracker t => t -> InfoHash -> IO ScrapeInfo
-scrapeOne uri ih = scrape uri [ih] >>= maybe err return . M.lookup ih
-  where
-    err = throwIO $ userError "unable to find info hash in response dict"

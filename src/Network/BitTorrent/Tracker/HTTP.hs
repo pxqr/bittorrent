@@ -17,7 +17,7 @@ module Network.BitTorrent.Tracker.HTTP
        ( HTTPTracker
 
          -- * Extra
-       , scrapeURL
+--       , scrapeURL
        ) where
 
 import Control.Exception
@@ -25,13 +25,27 @@ import Data.BEncode
 import Data.ByteString as B
 import Data.ByteString.Char8 as BC
 import Data.List as L
+import Data.Map as M
 import Data.Monoid
 import Data.URLEncoded as URL
 import Network.URI
 import Network.HTTP
 
-import Network.BitTorrent.Tracker.Protocol
+import Data.Torrent.InfoHash
+import Network.BitTorrent.Tracker.Message
 
+-- | Set of tracker RPCs.
+class Tracker s where
+  connect  :: URI -> IO s
+  announce :: s -> AnnounceQuery -> IO AnnounceInfo
+  scrape   :: s -> ScrapeQuery   -> IO Scrape
+
+-- | More particular version of 'scrape', just for one torrent.
+--
+scrapeOne :: Tracker t => t -> InfoHash -> IO ScrapeInfo
+scrapeOne uri ih = scrape uri [ih] >>= maybe err return . M.lookup ih
+  where
+    err = throwIO $ userError "unable to find info hash in response dict"
 
 data HTTPTracker = HTTPTracker
   { announceURI :: URI
@@ -40,16 +54,11 @@ data HTTPTracker = HTTPTracker
 instance Tracker HTTPTracker where
   connect  = return . HTTPTracker
   announce = announceHTTP
-  scrape   = scrapeHTTP
+--  scrape   = scrapeHTTP
 
 {-----------------------------------------------------------------------
   Announce
 -----------------------------------------------------------------------}
-
-encodeRequest :: URI -> AnnounceQuery -> URI
-encodeRequest announceURI req = URL.urlEncode req
-                    `addToURI`      announceURI
-                    `addHashToURI`  reqInfoHash req
 
 mkGET :: URI -> Request ByteString
 mkGET uri = Request uri GET [] ""
@@ -64,14 +73,14 @@ announceHTTP HTTPTracker {..} req = do
 
     rawResp  <- simpleHTTP r
     respBody <- getResponseBody rawResp
-    checkResult $ decoded respBody
+    checkResult $ decode respBody
   where
     checkResult (Left err)
       = ioError $ userError $ err ++ " in tracker response"
     checkResult (Right (Failure err))
       = ioError $ userError $ show err ++ " in tracker response"
     checkResult (Right resp)          = return resp
-
+{-
 {-----------------------------------------------------------------------
   Scrape
 -----------------------------------------------------------------------}
@@ -109,8 +118,9 @@ scrapeHTTP HTTPTracker {..} ihs
   | Just uri <- scrapeURL announceURI ihs = do
     rawResp  <- simpleHTTP (Request uri GET [] "")
     respBody <- getResponseBody rawResp
-    case decoded (BC.pack respBody) of
+    case decode (BC.pack respBody) of
       Left  e -> throwIO $ userError $ e ++ " in scrape response"
       Right r -> return r
 
   | otherwise = throwIO $ userError "Tracker do not support scraping"
+-}

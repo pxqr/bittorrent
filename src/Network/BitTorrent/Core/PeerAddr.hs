@@ -16,6 +16,7 @@
 module Network.BitTorrent.Core.PeerAddr
        ( -- * Peer address
          PeerAddr(..)
+       , defaultPorts
        , peerSockAddr
        , connectToPeer
        , ppPeer
@@ -81,11 +82,16 @@ instance BEncode PeerAddr where
 -- 'peerId' is always 'Nothing'.
 --
 --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
+--
 instance Serialize PeerAddr where
   put PeerAddr {..} = put peerID >> put peerPort
   {-# INLINE put #-}
   get = PeerAddr Nothing <$> get <*> get
   {-# INLINE get #-}
+
+-- | Ports typically reserved for bittorrent P2P listener.
+defaultPorts :: [PortNumber]
+defaultPorts =  [6881..6889]
 
 -- TODO make platform independent, clarify htonl
 
