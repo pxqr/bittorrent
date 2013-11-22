@@ -34,10 +34,14 @@ import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.Default
 import Data.List as L
+import Data.List.Split as L
+import Data.Maybe
 import Data.Monoid
+import Data.String
 import Data.Text as T
 import Data.Version
 import Text.PrettyPrint hiding ((<>))
+import Text.Read (readMaybe)
 import Paths_bittorrent (version)
 
 
@@ -111,6 +115,15 @@ data ClientImpl =
 -- | Used to represent a not recognized implementation
 instance Default ClientImpl where
   def = IUnknown
+  {-# INLINE def #-}
+
+instance IsString ClientImpl where
+  fromString str
+    | Just impl <- L.lookup str alist = impl
+    | otherwise = error $ "fromString: not recognized " ++ str
+    where
+      alist = L.map mk [minBound..maxBound]
+      mk  x = (L.tail $ show x, x)
 
 -- | Format client implementation info in human-readable form.
 ppClientImpl :: ClientImpl -> Doc
@@ -119,6 +132,14 @@ ppClientImpl = text . L.tail . show
 -- | Just the '0' version.
 instance Default Version where
   def = Version [0] []
+  {-# INLINE def #-}
+
+instance IsString Version where
+  fromString str
+    | Just nums <- chunkNums str = Version nums []
+    | otherwise = error $ "fromString: invalid version string " ++ str
+    where
+      chunkNums = sequence . L.map readMaybe . L.linesBy ('.' ==)
 
 -- | Format client implementation version in human-readable form.
 ppVersion :: Version -> Doc
@@ -134,6 +155,14 @@ data ClientInfo = ClientInfo {
 -- | Unrecognized client implementation.
 instance Default ClientInfo where
   def = ClientInfo def def
+  {-# INLINE def #-}
+
+instance IsString ClientInfo where
+  fromString str
+    | _ : ver <- _ver = ClientInfo (fromString impl) (fromString ver)
+    | otherwise = error $ "fromString: invalid client info string" ++ str
+    where
+      (impl, _ver) = L.span ((/=) '-') str
 
 -- | Format client info in human-readable form.
 ppClientInfo :: ClientInfo -> Doc

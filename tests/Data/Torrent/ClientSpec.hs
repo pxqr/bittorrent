@@ -10,7 +10,5 @@ spec :: Spec
 spec = do
   describe "client info" $ do
     it "decode azureus encoded peer id" $ do
-      clientInfo "-AZ2060-xxxxxxxxxxxx" `shouldBe`
-        ClientInfo IAzureus (Version [2060] [])
-      clientInfo "-BS0000-xxxxxxxxxxxx" `shouldBe`
-        ClientInfo IBTSlave (Version [0] [])
+      clientInfo "-AZ2060-xxxxxxxxxxxx" `shouldBe` "Azureus-2060"
+      clientInfo "-BS0000-xxxxxxxxxxxx" `shouldBe` "BTSlave-0"

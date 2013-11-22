@@ -98,6 +98,7 @@ library
                      , data-default
                      , IntervalMap
                      , intset
+                     , split
                      , text        >= 0.11.0
                      , unordered-containers
                      , vector
