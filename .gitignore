@@ -1,6 +1,7 @@
 dist
 cabal-dev
 tmp
+upload-docs
 *.aux
 *.eventlog
 *.hp
