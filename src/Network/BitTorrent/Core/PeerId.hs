@@ -39,12 +39,14 @@ import Control.Applicative
 import Data.Aeson
 import Data.BEncode as BE
 import Data.ByteString as BS
+import Data.ByteString.Internal as BS
 import Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Builder as BS
 import Data.Default
 import Data.Foldable    (foldMap)
 import Data.List as L
+import Data.List.Split as L
 import Data.Maybe       (fromMaybe)
 import Data.Monoid
 import Data.Serialize as S
@@ -279,9 +281,20 @@ parseImpl = f . BC.unpack
 --
 clientInfo :: PeerId -> ClientInfo
 clientInfo pid = either (const def) id $ runGet getCI (getPeerId pid)
-  where -- TODO other styles
-    getCI = getWord8 >> ClientInfo <$> getClientImpl <*> getClientVersion
-    getClientImpl    = parseImpl   <$> getByteString 2
-    getClientVersion = mkVer       <$> getByteString 4
+  where
+    getCI    = do
+      leading <- BS.w2c <$> getWord8
+      case leading of
+        '-' -> ClientInfo <$> getAzureusImpl <*> getAzureusVersion
+        'M' -> ClientInfo <$> pure IMainline <*> getMainlineVersion
+        _   -> pure def
+
+    getMainlineVersion = do
+      str <- BC.unpack <$> getByteString 7
+      let mnums = L.filter (not . L.null) $ L.linesBy ('-' ==) str
+      return $ Version (fromMaybe [] $ sequence $ L.map readMaybe mnums) []
+
+    getAzureusImpl    = parseImpl <$> getByteString 2
+    getAzureusVersion = mkVer     <$> getByteString 4
       where
         mkVer bs = Version [fromMaybe 0 $ readMaybe $ BC.unpack bs] []

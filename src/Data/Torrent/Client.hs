@@ -50,6 +50,7 @@ import Paths_bittorrent (version)
 --
 data ClientImpl =
    IUnknown
+ | IMainline
  | IAres
  | IArctic
  | IAvicora
