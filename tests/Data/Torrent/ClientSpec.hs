@@ -17,3 +17,8 @@ spec = do
     it "decode Shad0w style peer id" $ do
       clientInfo "S58B-----xxxxxxxxxxx" `shouldBe` "Shadow-5.8.11"
       clientInfo "T58B-----xxxxxxxxxxx" `shouldBe` "BitTornado-5.8.11"
+
+    it "decode bitcomet style peer id" $ do
+      clientInfo "exbc01xxxxxxxxxxxxxx" `shouldBe` "BitComet-48.49"
+      clientInfo "FUTB01xxxxxxxxxxxxxx" `shouldBe` "BitComet-48.49"
+      clientInfo "exbc01LORDxxxxxxxxxx" `shouldBe` "BitLord-48.49"

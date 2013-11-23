@@ -287,6 +287,8 @@ clientInfo pid = either (const def) id $ runGet getCI (getPeerId pid)
       case leading of
         '-' -> ClientInfo <$> getAzureusImpl <*> getAzureusVersion
         'M' -> ClientInfo <$> pure IMainline <*> getMainlineVersion
+        'e' -> ClientInfo <$> getBitCometImpl <*> getBitCometVersion
+        'F' -> ClientInfo <$> getBitCometImpl <*> getBitCometVersion
         c   -> ClientInfo <$> pure (getShadowImpl c) <*> getShadowVersion
 
     getMainlineVersion = do
@@ -298,6 +300,21 @@ clientInfo pid = either (const def) id $ runGet getCI (getPeerId pid)
     getAzureusVersion = mkVer     <$> getByteString 4
       where
         mkVer bs = Version [fromMaybe 0 $ readMaybe $ BC.unpack bs] []
+
+    getBitCometImpl = do
+      bs <- getByteString 3
+      lookAhead $ do
+        _  <- getByteString 2
+        lr <- getByteString 4
+        return $
+          if lr == "LORD" then IBitLord  else
+          if bs == "UTB"  then IBitComet else
+          if bs == "xbc"  then IBitComet else def
+
+    getBitCometVersion = do
+      x <- getWord8
+      y <- getWord8
+      return $ Version [fromIntegral x, fromIntegral y] []
 
     getShadowImpl 'A' = IABC
     getShadowImpl 'O' = IOspreyPermaseed
