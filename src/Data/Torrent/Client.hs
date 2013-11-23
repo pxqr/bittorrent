@@ -64,6 +64,7 @@ data ClientImpl =
 -- 'U' - UPnP NAT Bit Torrent
  | IBitLord
  | IOpera
+ | IMLdonkey
 
  | IAres
  | IArctic

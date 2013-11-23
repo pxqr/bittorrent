@@ -247,6 +247,7 @@ parseImpl = f . BC.unpack
   f "MO" = IMonoTorrent
   f "MP" = IMooPolice
   f "MR" = IMiro
+  f "ML" = IMLdonkey
   f "MT" = IMoonlightTorrent
   f "NX" = INetTransport
   f "PD" = IPando

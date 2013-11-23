@@ -25,3 +25,6 @@ spec = do
 
     it "decode opera style peer id" $ do
       clientInfo "OP0123xxxxxxxxxxxxxx" `shouldBe` "Opera-123"
+
+    it "decode ML donkey style peer id" $ do
+      clientInfo "-ML2.7.2-xxxxxxxxxxx" `shouldBe` "MLdonkey-0"
