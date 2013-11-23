@@ -63,6 +63,7 @@ data ClientImpl =
 -- UPnP(!) Bit Torrent !???
 -- 'U' - UPnP NAT Bit Torrent
  | IBitLord
+ | IOpera
 
  | IAres
  | IArctic

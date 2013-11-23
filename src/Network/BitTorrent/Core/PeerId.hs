@@ -275,6 +275,8 @@ parseImpl = f . BC.unpack
   f "ZT" = IZipTorrent
   f _    = IUnknown
 
+-- TODO use regexps
+
 -- | Tries to extract meaningful information from peer ID bytes. If
 -- peer id uses unknown coding style then client info returned is
 -- 'def'.
@@ -289,7 +291,13 @@ clientInfo pid = either (const def) id $ runGet getCI (getPeerId pid)
         'M' -> ClientInfo <$> pure IMainline <*> getMainlineVersion
         'e' -> ClientInfo <$> getBitCometImpl <*> getBitCometVersion
         'F' -> ClientInfo <$> getBitCometImpl <*> getBitCometVersion
-        c   -> ClientInfo <$> pure (getShadowImpl c) <*> getShadowVersion
+        c   -> do
+          c1 <- w2c <$> lookAhead getWord8
+          if c1 == 'P'
+            then do
+                 _ <- getWord8
+                 ClientInfo <$> pure IOpera            <*> getOperaVersion
+            else ClientInfo <$> pure (getShadowImpl c) <*> getShadowVersion
 
     getMainlineVersion = do
       str <- BC.unpack <$> getByteString 7
@@ -315,6 +323,10 @@ clientInfo pid = either (const def) id $ runGet getCI (getPeerId pid)
       x <- getWord8
       y <- getWord8
       return $ Version [fromIntegral x, fromIntegral y] []
+
+    getOperaVersion = do
+      str <- BC.unpack <$> getByteString 4
+      return $ Version [fromMaybe 0 $ readMaybe str] []
 
     getShadowImpl 'A' = IABC
     getShadowImpl 'O' = IOspreyPermaseed

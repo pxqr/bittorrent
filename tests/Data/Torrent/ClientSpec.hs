@@ -22,3 +22,6 @@ spec = do
       clientInfo "exbc01xxxxxxxxxxxxxx" `shouldBe` "BitComet-48.49"
       clientInfo "FUTB01xxxxxxxxxxxxxx" `shouldBe` "BitComet-48.49"
       clientInfo "exbc01LORDxxxxxxxxxx" `shouldBe` "BitLord-48.49"
+
+    it "decode opera style peer id" $ do
+      clientInfo "OP0123xxxxxxxxxxxxxx" `shouldBe` "Opera-123"
