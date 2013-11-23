@@ -50,7 +50,19 @@ import Paths_bittorrent (version)
 --
 data ClientImpl =
    IUnknown
+
  | IMainline
+
+ | IABC
+ | IOspreyPermaseed
+ | IBTQueue
+ | ITribler
+ | IShadow
+ | IBitTornado
+
+-- UPnP(!) Bit Torrent !???
+-- 'U' - UPnP NAT Bit Torrent
+
  | IAres
  | IArctic
  | IAvicora

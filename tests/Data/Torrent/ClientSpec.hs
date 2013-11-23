@@ -1,9 +1,6 @@
+-- | see <http://bittorrent.org/beps/bep_0020.html>
 module Data.Torrent.ClientSpec (spec) where
-
-import Data.Version
 import Test.Hspec
-
-import Data.Torrent.Client
 import Network.BitTorrent.Core.PeerId
 
 spec :: Spec
@@ -16,3 +13,7 @@ spec = do
     it "decode azureus encoded peer id" $ do
       clientInfo "-AZ2060-xxxxxxxxxxxx" `shouldBe` "Azureus-2060"
       clientInfo "-BS0000-xxxxxxxxxxxx" `shouldBe` "BTSlave-0"
+
+    it "decode Shad0w style peer id" $ do
+      clientInfo "S58B-----xxxxxxxxxxx" `shouldBe` "Shadow-5.8.11"
+      clientInfo "T58B-----xxxxxxxxxxx" `shouldBe` "BitTornado-5.8.11"

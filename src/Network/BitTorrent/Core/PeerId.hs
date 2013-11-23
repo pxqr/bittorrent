@@ -47,7 +47,7 @@ import Data.Default
 import Data.Foldable    (foldMap)
 import Data.List as L
 import Data.List.Split as L
-import Data.Maybe       (fromMaybe)
+import Data.Maybe       (fromMaybe, catMaybes)
 import Data.Monoid
 import Data.Serialize as S
 import Data.String
@@ -287,7 +287,7 @@ clientInfo pid = either (const def) id $ runGet getCI (getPeerId pid)
       case leading of
         '-' -> ClientInfo <$> getAzureusImpl <*> getAzureusVersion
         'M' -> ClientInfo <$> pure IMainline <*> getMainlineVersion
-        _   -> pure def
+        c   -> ClientInfo <$> pure (getShadowImpl c) <*> getShadowVersion
 
     getMainlineVersion = do
       str <- BC.unpack <$> getByteString 7
@@ -298,3 +298,22 @@ clientInfo pid = either (const def) id $ runGet getCI (getPeerId pid)
     getAzureusVersion = mkVer     <$> getByteString 4
       where
         mkVer bs = Version [fromMaybe 0 $ readMaybe $ BC.unpack bs] []
+
+    getShadowImpl 'A' = IABC
+    getShadowImpl 'O' = IOspreyPermaseed
+    getShadowImpl 'Q' = IBTQueue
+    getShadowImpl 'R' = ITribler
+    getShadowImpl 'S' = IShadow
+    getShadowImpl 'T' = IBitTornado
+    getShadowImpl  _  = IUnknown
+
+    decodeShadowVerNr :: Char -> Maybe Int
+    decodeShadowVerNr c
+      | '0' < c && c <= '9' = Just  (fromEnum c - fromEnum '0')
+      | 'A' < c && c <= 'Z' = Just ((fromEnum c - fromEnum 'A') + 10)
+      | 'a' < c && c <= 'z' = Just ((fromEnum c - fromEnum 'a') + 36)
+      |        otherwise    = Nothing
+
+    getShadowVersion = do
+      str <- BC.unpack <$> getByteString 5
+      return $ Version (catMaybes $ L.map decodeShadowVerNr str) []
