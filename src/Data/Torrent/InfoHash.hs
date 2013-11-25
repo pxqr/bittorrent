@@ -22,6 +22,7 @@ module Data.Torrent.InfoHash
 
        , addHashToURI
 
+         -- * Internal
        , Data.Torrent.InfoHash.hash
        , Data.Torrent.InfoHash.hashlazy
        ) where
@@ -111,7 +112,7 @@ instance Pretty InfoHash where
 
 -- | Tries both base16 and base32 while decoding info hash.
 textToInfoHash :: Text -> Maybe InfoHash
-textToInfoHash text
+textToInfoHash t
     |      hashLen == 32   = Just $ InfoHash $ Base32.decode hashStr
     |      hashLen == 40   = let (ihStr, inv) = Base16.decode hashStr
                              in if BS.length inv == 0
@@ -120,7 +121,7 @@ textToInfoHash text
     |        otherwise     = Nothing
   where
     hashLen = BS.length hashStr
-    hashStr = T.encodeUtf8 text
+    hashStr = T.encodeUtf8 t
 
 -- | Hex encode infohash to text, full length.
 longHex :: InfoHash -> Text
