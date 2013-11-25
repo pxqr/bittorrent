@@ -1,3 +1,10 @@
+2013-11-25  Sam Truzjan  <pxqr.sta@gmail.com>
+
+	* Version 0.0.0.3
+	* use Pretty class from pretty-class package;
+	* Data.Torrent.Client.hs:
+	* /tests/: fixed;
+
 2013-11-21  Sam Truzjan  <pxqr.sta@gmail.com>
 
 	Version 0.0.0.2

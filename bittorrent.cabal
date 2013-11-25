@@ -1,5 +1,5 @@
 name:                  bittorrent
-version:               0.0.0.2
+version:               0.0.0.3
 license:               BSD3
 license-file:          LICENSE
 author:                Sam Truzjan
@@ -33,7 +33,7 @@ source-repository this
   type:                git
   location:            git://github.com/cobit/bittorrent.git
   branch:              master
-  tag:                 v0.0.0.2
+  tag:                 v0.0.0.3
 
 library
   default-language:    Haskell2010
@@ -59,8 +59,8 @@ library
 --                     , Network.BitTorrent.Extension
 --                     , Network.BitTorrent.Peer
 --                     , Network.BitTorrent.Tracker
-                     , Network.BitTorrent.Tracker.Message
-                     , Network.BitTorrent.Tracker.HTTP
+--                     , Network.BitTorrent.Tracker.Message
+--                     , Network.BitTorrent.Tracker.HTTP
 --                     , Network.BitTorrent.Tracker.UDP
 --                     , Network.BitTorrent.Exchange
 --                     , Network.BitTorrent.Exchange.Protocol
