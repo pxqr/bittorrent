@@ -8,9 +8,8 @@
 --  'PeerID' represent self assigned peer identificator. Ideally each
 --  host in the network should have unique peer id to avoid
 --  collisions, therefore for peer ID generation we use good entropy
---  source. (FIX not really) Peer ID is sent in /tracker request/,
---  sent and received in /peer handshakes/ and used in /distributed
---  hash table/ queries.
+--  source. Peer ID is sent in /tracker request/, sent and received in
+--  /peer handshakes/ and used in DHT queries.
 --
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Network.BitTorrent.Core.PeerId
@@ -29,7 +28,7 @@ module Network.BitTorrent.Core.PeerId
          -- * Decoding
        , clientInfo
 
-         -- ** Extra
+         -- * Extra
        , byteStringPadded
        , defaultClientId
        , defaultVersionNumber
@@ -155,12 +154,12 @@ shadowStyle cid ver rnd = PeerId $ BL.toStrict $ BS.toLazyByteString $
       byteStringPadded rnd 15 '0'
 
 
--- | "HS" - 2 bytes long client identifier.
+-- | 'HS'- 2 bytes long client identifier.
 defaultClientId :: ByteString
 defaultClientId = "HS"
 
 -- | Gives exactly 4 bytes long version number for any version of the
--- package.  Version is taken from .cabal.
+-- package.  Version is taken from .cabal file.
 defaultVersionNumber :: ByteString
 defaultVersionNumber = BS.take 4 $ BC.pack $ foldMap show $
                          versionBranch version
@@ -173,14 +172,13 @@ defaultVersionNumber = BS.take 4 $ BC.pack $ foldMap show $
 --
 --     * 6 bytes   : first 6 characters from picoseconds obtained with %q.
 --
---     * 1 bytes   : character '.' for readability.
+--     * 1 byte    : character \'.\' for readability.
 --
 --     * 9..* bytes: number of whole seconds since the Unix epoch
 --     (!)REVERSED.
 --
 --   Can be used both with shadow and azureus style encoding. This
---   format is used to make the ID's readable(for debugging) and more
---   or less random.
+--   format is used to make the ID's readable for debugging purposes.
 --
 timestamp :: IO ByteString
 timestamp = (BC.pack . format) <$> getCurrentTime
@@ -189,19 +187,20 @@ timestamp = (BC.pack . format) <$> getCurrentTime
                L.take 9 (L.reverse (formatTime defaultTimeLocale "%s" t))
 
 -- | Gives 15 character long random bytestring. This is more robust
--- method for generation of random part of peer ID than timestamp.
+-- method for generation of random part of peer ID than 'timestamp'.
 entropy :: IO ByteString
 entropy = getEntropy 15
 
 -- NOTE: entropy generates incorrrect peer id
 
--- |  Here we use Azureus-style encoding with the following args:
+-- |  Here we use 'azureusStyle' encoding with the following args:
 --
---      * 'HS' for the client id.
+--      * 'HS' for the client id; ('defaultClientId')
 --
---      * Version of the package for the version number
+--      * Version of the package for the version number;
+--      ('defaultVersionNumber')
 --
---      * UTC time day ++ day time for the random number.
+--      * UTC time day ++ day time for the random number. ('timestamp')
 --
 genPeerId :: IO PeerId
 genPeerId = azureusStyle defaultClientId defaultVersionNumber <$> timestamp
