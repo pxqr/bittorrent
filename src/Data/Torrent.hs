@@ -104,9 +104,14 @@ import Data.Torrent.Piece
 -- | Info part of the .torrent file contain info about each content file.
 data InfoDict = InfoDict
   { idInfoHash     :: !InfoHash
-      -- ^ SHA1 hash of the (other) 'DictInfo' fields.
+    -- ^ SHA1 hash of the (other) 'DictInfo' fields.
+
   , idLayoutInfo   :: !LayoutInfo
+    -- ^ File layout (name, size, etc) information.
+
   , idPieceInfo    :: !PieceInfo
+    -- ^ Content validation information.
+
   , idPrivate      :: !Bool
     -- ^ If set the client MUST publish its presence to get other
     -- peers ONLY via the trackers explicity described in the
