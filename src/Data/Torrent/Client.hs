@@ -16,7 +16,7 @@
 --   <http://bittorrent.org/beps/bep_0020.html>
 --
 --
---   NOTE: Do _not_ use this information to control client
+--   NOTE: Do /not/ use this information to control client
 --   capabilities (such as supported enchancements), this should be
 --   done using 'Network.BitTorrent.Extension'!
 --
@@ -43,9 +43,9 @@ import Text.Read (readMaybe)
 import Paths_bittorrent (version)
 
 
--- | List of registered client versions + IlibHSbittorrent (this
--- package) + Unknown (for not recognized software). All names are
--- prefixed by "I" because some of them starts from lowercase letter
+-- | List of registered client versions + 'IlibHSbittorrent' (this
+-- package) + 'IUnknown' (for not recognized software). All names are
+-- prefixed by \"I\" because some of them starts from lowercase letter
 -- but that is not a valid Haskell constructor name.
 --
 data ClientImpl =
@@ -131,6 +131,7 @@ instance Default ClientImpl where
   def = IUnknown
   {-# INLINE def #-}
 
+-- | Example: @\"BitLet\" == 'IBitLet'@
 instance IsString ClientImpl where
   fromString str
     | Just impl <- L.lookup str alist = impl
@@ -139,6 +140,7 @@ instance IsString ClientImpl where
       alist = L.map mk [minBound..maxBound]
       mk  x = (L.tail $ show x, x)
 
+-- | Example: @pretty 'IBitLet' == \"IBitLet\"@
 instance Pretty ClientImpl where
   pretty = text . L.tail . show
 
@@ -147,6 +149,9 @@ instance Default Version where
   def = Version [0] []
   {-# INLINE def #-}
 
+-- | For dot delimited version strings.
+--   Example: @fromString \"0.1.0.2\" == Version [0, 1, 0, 2]@
+--
 instance IsString Version where
   fromString str
     | Just nums <- chunkNums str = Version nums []
@@ -169,6 +174,7 @@ instance Default ClientInfo where
   def = ClientInfo def def
   {-# INLINE def #-}
 
+-- | Example: @\"BitComet-1.2\" == ClientInfo IBitComet (Version [1, 2] [])@
 instance IsString ClientInfo where
   fromString str
     | _ : ver <- _ver = ClientInfo (fromString impl) (fromString ver)
