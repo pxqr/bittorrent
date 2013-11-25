@@ -3,6 +3,7 @@ module Data.Torrent.MagnetSpec (spec) where
 
 import Control.Applicative
 import Data.Maybe
+import Data.Monoid
 import Test.Hspec
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
@@ -23,7 +24,7 @@ instance Arbitrary URI where
 instance Arbitrary Magnet where
   arbitrary = Magnet <$> arbitrary <*> arbitrary
     <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
-    <*> arbitrary <*> arbitrary <*> pure (error "arbitrary magnet")
+    <*> arbitrary <*> arbitrary <*> pure mempty
 
 magnetEncoding :: Magnet -> Bool
 magnetEncoding m = parseMagnet (renderMagnet m) == Just m

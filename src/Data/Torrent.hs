@@ -26,6 +26,7 @@
 module Data.Torrent
        ( -- * Info dictionary
          InfoDict (..)
+       , infoDictionary
 
          -- ** Lenses
        , infohash
@@ -131,6 +132,13 @@ instance Hashable InfoDict where
   hash = Hashable.hash . idInfoHash
   {-# INLINE hash #-}
 
+-- | Smart constructor: add a info hash to info dictionary.
+infoDictionary :: LayoutInfo -> PieceInfo -> Bool -> InfoDict
+infoDictionary li pinfo private = InfoDict ih li pinfo private
+  where
+    ih = IH.hashlazy $ encode $ InfoDict fake_ih li pinfo private
+    fake_ih = InfoHash ""
+
 getPrivate :: Get Bool
 getPrivate = (Just True ==) <$>? "private"
 
@@ -155,8 +163,8 @@ instance BEncode InfoDict where
 ppPrivacy :: Bool -> Doc
 ppPrivacy privacy = "Privacy: " <> if privacy then "private" else "public"
 
-ppAdditionalInfo :: InfoDict -> Doc
-ppAdditionalInfo layout = PP.empty
+--ppAdditionalInfo :: InfoDict -> Doc
+--ppAdditionalInfo layout = PP.empty
 
 instance Pretty InfoDict where
   pretty InfoDict {..} =
@@ -245,6 +253,9 @@ instance BEncode URI where
   fromBEncode (BString s) | Just url <- parseURI (BC.unpack s) = return url
   fromBEncode b           = decodingError $ "url <" ++ show b ++ ">"
   {-# INLINE fromBEncode #-}
+
+--pico2uni :: Pico -> Uni
+--pico2uni = undefined
 
 -- TODO move to bencoding
 instance BEncode POSIXTime where

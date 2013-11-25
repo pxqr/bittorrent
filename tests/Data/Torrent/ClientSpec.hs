@@ -28,3 +28,6 @@ spec = do
 
     it "decode ML donkey style peer id" $ do
       clientInfo "-ML2.7.2-xxxxxxxxxxx" `shouldBe` "MLdonkey-0"
+
+-- TODO XBT, Bits on Wheels, Queen Bee, BitTyrant, TorrenTopia,
+-- BitSpirit, Rufus, G3 Torrent, FlashGet

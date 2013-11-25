@@ -25,6 +25,7 @@ module Data.Torrent.Piece
        , isPiece
 
          -- * Piece control
+       , HashArray (..)
        , PieceInfo (..)
        , pieceCount
 
@@ -138,6 +139,7 @@ isPiece pieceLen blk @ (Block i offset _) =
 -- Piece control
 -----------------------------------------------------------------------}
 
+-- | A flat array of SHA1 sums of each piece.
 newtype HashArray = HashArray { unHashArray :: ByteString }
                     deriving (Show, Read, Eq, BEncode)
 
