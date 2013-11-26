@@ -59,7 +59,7 @@ library
 --                     , Network.BitTorrent.Extension
 --                     , Network.BitTorrent.Peer
 --                     , Network.BitTorrent.Tracker
---                     , Network.BitTorrent.Tracker.Message
+                     , Network.BitTorrent.Tracker.Message
 --                     , Network.BitTorrent.Tracker.HTTP
 --                     , Network.BitTorrent.Tracker.UDP
 --                     , Network.BitTorrent.Exchange
@@ -98,7 +98,7 @@ library
                      , containers  >= 0.4
                      , data-default
                      , IntervalMap
---                     , intset
+                     , intset
                      , split
                      , text        >= 0.11.0
                      , unordered-containers
@@ -111,7 +111,7 @@ library
                        -- Codecs & Serialization
                      , aeson
                      , base16-bytestring
-                     , base32-bytestring == 0.1.1.0
+                     , base32-bytestring
                      , base64-bytestring
                      , bencoding   >= 0.4
                      , binary
@@ -125,7 +125,7 @@ library
                        -- Network
                      , network     >= 2.4
                      , HTTP        >= 4000.2
---                     , krpc        >= 0.3
+                     , krpc        >= 0.3
 
                        -- System
                      , directory   >= 1

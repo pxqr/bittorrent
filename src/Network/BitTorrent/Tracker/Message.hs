@@ -6,7 +6,7 @@
 --   Portability :  portable
 --
 --   Every tracker should support announce query. This query is used
---   to discover peers within swarm and have two-fold effect:
+--   to discover peers within a swarm and have two-fold effect:
 --
 --     * peer doing announce discover other peers using peer list from
 --     the response to the announce query.
@@ -14,8 +14,8 @@
 --     * tracker store peer information and use it in the succeeding
 --     requests made by other peers, until the peer info expires.
 --
---   By convention most trackers support another form of request --
---   scrape query -- which queries the state of a given torrent (or
+--   By convention most trackers support another form of request —
+--   scrape query — which queries the state of a given torrent (or
 --   a list of torrents) that the tracker is managing.
 --
 {-# LANGUAGE FlexibleInstances          #-}
@@ -77,7 +77,7 @@ import Network.BitTorrent.Core.PeerAddr
 --  Events
 -----------------------------------------------------------------------}
 
--- | Events used to specify which kind of tracker request is performed.
+-- | Events used to specify which kind of announce query is performed.
 data Event = Started
              -- ^ For the first request: when a peer join the swarm.
            | Stopped
@@ -127,32 +127,34 @@ getEvent = do
 --   the torrent. The most important, requests are used by the tracker
 --   to keep track lists of active peer for a particular torrent.
 --
-data AnnounceQuery = AnnounceQuery {
-     reqInfoHash   :: !InfoHash
-     -- ^ Hash of info part of the torrent usually obtained from
+data AnnounceQuery = AnnounceQuery
+   {
+     -- | Hash of info part of the torrent usually obtained from
      -- 'Torrent'.
+     reqInfoHash   :: !InfoHash
 
+     -- | ID of the peer doing request.
    , reqPeerId     :: !PeerId
-     -- ^ ID of the peer doing request.
 
+     -- | Port to listen to for connections from other
+     -- peers. Tracker should respond with this port when
+     -- some /other/ peer request the tracker with the same info hash.
+     -- Normally, this port is choosed from 'defaultPorts'.
    , reqPort       :: !PortNumber
-     -- ^ Port to listen to for connections from other
-     -- peers. Normally, tracker should respond with this port when
-     -- some peer request the tracker with the same info hash.
 
+     -- | Current progress of peer doing request.
    , reqProgress   :: !Progress
-     -- ^ Current progress of peer doing request.
 
-   , reqIP         :: Maybe HostAddress
-     -- ^ The peer IP. Needed only when client communicated with
+     -- | The peer IP. Needed only when client communicated with
      -- tracker throught a proxy.
+   , reqIP         :: Maybe HostAddress
 
-   , reqNumWant    :: Maybe Int
-     -- ^ Number of peers that the peers wants to receive from. See
+     -- | Number of peers that the peers wants to receive from. See
      -- note for 'defaultNumWant'.
+   , reqNumWant    :: Maybe Int
 
+     -- | If not specified, the request is regular periodic request.
    , reqEvent      :: Maybe Event
-      -- ^ If not specified, the request is regular periodic request.
    } deriving (Show, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceQuery)
@@ -208,11 +210,12 @@ instance Serialize AnnounceQuery where
       , reqPort       = port
       , reqProgress   = progress
       , reqIP         = if ip == 0 then Nothing else Just ip
-      , reqNumWant    = if want == -1 then Nothing else Just (fromIntegral want)
+      , reqNumWant    = if want == -1 then Nothing
+                        else Just (fromIntegral want)
       , reqEvent      = ev
       }
 
--- | Encoding announce query and add it to the base tracker URL.
+-- | Encode announce query and add it to the base tracker URL.
 renderAnnounceQuery :: URI -> AnnounceQuery -> URI
 renderAnnounceQuery announceURI req
   =               URL.urlEncode req
@@ -230,7 +233,7 @@ data QueryParam
     deriving (Show, Eq, Ord, Enum)
 
 data ParamParseFailure
-  = Missing QueryParam -- ^ param not found in query string
+  = Missing QueryParam -- ^ param not found in query string;
   | Invalid QueryParam -- ^ param present but not valid.
 
 type ParamResult = Either ParamParseFailure
@@ -255,7 +258,7 @@ paramName ParamInfoHash = "info_hash"
 paramName ParamPeerId   = "peer_id"
 paramName ParamPort     = "port"
 
--- | Parse announce request from a query string.
+-- | Parse announce request from a decoded query string.
 parseAnnounceQuery :: [(Text, Text)] -> Either ParamParseFailure AnnounceQuery
 parseAnnounceQuery params = AnnounceQuery
     <$> reqParam ParamInfoHash textToInfoHash    params
@@ -280,11 +283,17 @@ parseAnnounceQuery params = AnnounceQuery
     numwant  = undefined
     event    = undefined
 
+-- TODO add extension datatype
+
 {-----------------------------------------------------------------------
 --  Announce response
 -----------------------------------------------------------------------}
 
--- | For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
+-- | Tracker can return peer list in either compact(BEP23) or not
+-- compact form.
+--
+--   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
+--
 data PeerList
   =        PeerList { getPeerList :: [PeerAddr] }
   | CompactPeerList { getPeerList :: [PeerAddr] }
@@ -408,10 +417,12 @@ missingOffset = 101
 invalidOffset :: Int
 invalidOffset = 150
 
--- | Get
+-- | Get HTTP response error code from a announce params parse
+-- failure.
 --
 --   For more info see:
 --   <https://wiki.theory.org/BitTorrent_Tracker_Protocol#Response_Codes>
+--
 paramFailureCode :: ParamParseFailure -> Int
 paramFailureCode (Missing param) = missingOffset + fromEnum param
 paramFailureCode (Invalid param) = invalidOffset + fromEnum param
