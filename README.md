@@ -1,14 +1,8 @@
 ### Synopsis
 
 A library for making Haskell applications which use bittorrent
-protocol easy. This package aims to be a fast thin layer and at the
-same time provide both:
-
-* Concise high level API for typical usage scenarious.
-* More straightforward API if you need more fine grained control.
-
-Currently it provides serialization and deserealization of core
-datatypes, some widely used routines and core types.
+protocol easy. Currently it provides serialization and deserealization
+of core datatypes, some widely used routines and core types.
 
 ### Status
 
@@ -26,9 +20,7 @@ For documentation see haddock generated documentation.
 [2]: https://travis-ci.org/cobit/bittorrent
 
 
-### Maintainer
-
-This library is written and maintained by Sam T. <pxqr.sta@gmail.com>
+### Maintainer <pxqr.sta@gmail.com>
 
 Feel free to report bugs and suggestions via
 [github issue tracker][issues] or the mail.
