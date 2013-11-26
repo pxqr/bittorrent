@@ -2,6 +2,7 @@ module Network.BitTorrent.Core.PeerIdSpec (spec) where
 import Control.Applicative
 import Test.Hspec
 import Test.QuickCheck
+import Test.QuickCheck.Instances
 import Network.BitTorrent.Core.PeerId
 
 

@@ -10,17 +10,17 @@ import Network
 import Network.URI
 import Test.Hspec
 import Test.QuickCheck
-import Network.HTTP.Types.URI
+--import Network.HTTP.Types.URI
 
-import Data.Torrent.InfoHashSpec hiding (spec)
-import Data.Torrent.ProgressSpec hiding (spec)
-import Network.BitTorrent.Core.PeerIdSpec hiding (spec)
+import Data.Torrent.InfoHashSpec ()
+import Data.Torrent.ProgressSpec ()
+import Network.BitTorrent.Core.PeerIdSpec ()
 
 import Network.BitTorrent.Tracker.Message
 
 
-prop_bencode :: Eq a => BEncode a => a -> Bool
-prop_bencode a = BE.decode (BL.toStrict (BE.encode a)) == return a
+--prop_bencode :: Eq a => BEncode a => a -> Bool
+--prop_bencode a = BE.decode (BL.toStrict (BE.encode a)) == return a
 
 --prop_urlencode :: Eq a => URLDecoded a => URLEncoded a => a -> Bool
 --prop_urlencode a = urlDecode (T.pack (urlEncode a)) == a
