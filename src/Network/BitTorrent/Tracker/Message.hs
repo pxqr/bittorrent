@@ -417,6 +417,8 @@ missingOffset = 101
 invalidOffset :: Int
 invalidOffset = 150
 
+-- TODO use Network.HTTP.Types.Status
+
 -- | Get HTTP response error code from a announce params parse
 -- failure.
 --

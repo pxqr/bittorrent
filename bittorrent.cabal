@@ -143,10 +143,13 @@ test-suite spec
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   main-is:             Spec.hs
-  other-modules:       Data.Torrent.MagnetSpec
+  other-modules:       Data.Torrent.ClientSpec
                        Data.Torrent.InfoHashSpec
+                       Data.Torrent.MagnetSpec
                        Data.Torrent.MetainfoSpec
-                       Data.Torrent.ClientSpec
+                       Data.Torrent.ProgressSpec
+                       Network.BitTorrent.Core.PeerIdSpec
+                       Network.BitTorrent.Tracker.MessageSpec
   build-depends:       base == 4.*
                      , bytestring
                      , directory
@@ -161,7 +164,7 @@ test-suite spec
                      , hspec
                      , QuickCheck
                      , quickcheck-instances
-
+                     , http-types
                      , bencoding
                      , bittorrent
   ghc-options:         -Wall -fno-warn-orphans
