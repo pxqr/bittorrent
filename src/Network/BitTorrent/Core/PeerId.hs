@@ -24,14 +24,11 @@ module Network.BitTorrent.Core.PeerId
          -- * Encoding
        , azureusStyle
        , shadowStyle
+       , defaultClientId
+       , defaultVersionNumber
 
          -- * Decoding
        , clientInfo
-
-         -- * Extra
-       , byteStringPadded
-       , defaultClientId
-       , defaultVersionNumber
        ) where
 
 import Control.Applicative
