@@ -63,7 +63,7 @@ library
 --                     , Network.BitTorrent.Tracker.HTTP
 --                     , Network.BitTorrent.Tracker.UDP
 --                     , Network.BitTorrent.Exchange
---                     , Network.BitTorrent.Exchange.Protocol
+                     , Network.BitTorrent.Exchange.Protocol
 --                     , Network.BitTorrent.DHT
 --                     , Network.BitTorrent.DHT.Protocol
 --                     , Network.BitTorrent.Sessions
@@ -155,6 +155,7 @@ test-suite spec
                      , directory
                      , filepath
                      , time
+                     , random
 
                      , aeson
                      , cereal

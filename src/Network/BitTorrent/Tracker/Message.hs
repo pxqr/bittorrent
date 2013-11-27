@@ -155,7 +155,7 @@ data AnnounceQuery = AnnounceQuery
 
      -- | If not specified, the request is regular periodic request.
    , reqEvent      :: Maybe Event
-   } deriving (Show, Typeable)
+   } deriving (Show, Eq, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceQuery)
 
@@ -233,8 +233,9 @@ data QueryParam
     deriving (Show, Eq, Ord, Enum)
 
 data ParamParseFailure
-  = Missing QueryParam -- ^ param not found in query string;
-  | Invalid QueryParam -- ^ param present but not valid.
+  = Missing QueryParam      -- ^ param not found in query string;
+  | Invalid QueryParam Text -- ^ param present but not valid.
+    deriving (Show, Eq)
 
 type ParamResult = Either ParamParseFailure
 
@@ -271,11 +272,11 @@ parseAnnounceQuery params = AnnounceQuery
   where
     withError e = maybe (Left e) Right
     reqParam param p = withError (Missing param) . L.lookup (paramName param)
-                   >=> withError (Invalid param) . p
+                   >=> \x -> withError (Invalid param x) (p x)
 
     optParam param p ps
       | Just x <- L.lookup (paramName param) ps
-      = pure <$> withError (Invalid param) (p x)
+      = pure <$> withError (Invalid param x) (p x)
       | otherwise = pure Nothing
 
     progress = undefined
@@ -426,8 +427,8 @@ invalidOffset = 150
 --   <https://wiki.theory.org/BitTorrent_Tracker_Protocol#Response_Codes>
 --
 paramFailureCode :: ParamParseFailure -> Int
-paramFailureCode (Missing param) = missingOffset + fromEnum param
-paramFailureCode (Invalid param) = invalidOffset + fromEnum param
+paramFailureCode (Missing param  ) = missingOffset + fromEnum param
+paramFailureCode (Invalid param _) = invalidOffset + fromEnum param
 
 {-----------------------------------------------------------------------
   Scrape message
