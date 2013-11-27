@@ -29,17 +29,20 @@
 {-# OPTIONS  -fno-warn-orphans #-}
 module Network.BitTorrent.Exchange.Protocol
        ( -- * Initial handshake
-         Handshake(..), ppHandshake
-       , handshake, handshakeCaps
-       , recvHandshake, sendHandshake
+         Handshake(..)
+       , handshake
+       , handshakeCaps
+       , recvHandshake
+       , sendHandshake
 
          -- ** Defaults
-       , defaultHandshake, defaultBTProtocol, defaultReserved
+       , defaultHandshake
+       , defaultBTProtocol
+       , defaultReserved
        , handshakeMaxSize
 
          -- * Regular messages
        , Message(..)
-       , ppMessage
 
          -- * control
        , PeerStatus(..)
@@ -58,31 +61,29 @@ import Control.Applicative
 import Control.Exception
 import Control.Monad
 import Control.Lens
-
 import Data.Aeson.TH
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as Lazy
-import Data.Default
-import Data.List as L
-import Data.Word
-
 import Data.Binary as B
 import Data.Binary.Get as B
 import Data.Binary.Put as B
+import Data.ByteString as BS
+import Data.ByteString.Char8 as BC
+import Data.ByteString.Lazy  as BL
+import Data.Default
+import Data.List as L
 import Data.Serialize as S
-
-import Text.PrettyPrint
-
+import Data.Word
 import Network
 import Network.Socket.ByteString
+import Text.PrettyPrint
+import Text.PrettyPrint.Class
 
 import Data.Torrent.Bitfield
 import Data.Torrent.Block
+import Data.Torrent.InfoHash
 import Data.Torrent
 import Network.BitTorrent.Extension
-import Network.BitTorrent.Peer
+import Network.BitTorrent.Core.PeerId
+import Network.BitTorrent.Core.PeerAddr
 
 
 getInt :: S.Get Int
@@ -110,7 +111,7 @@ putIntB = B.putWord32be . fromIntegral
 --
 data Handshake = Handshake {
     -- | Identifier of the protocol.
-    hsProtocol    :: ByteString
+    hsProtocol    :: BS.ByteString
 
     -- | Reserved bytes used to specify supported BEP's.
   , hsReserved    :: Capabilities
@@ -131,7 +132,7 @@ data Handshake = Handshake {
 
 instance Serialize Handshake where
   put hs = do
-    S.putWord8 (fromIntegral (B.length (hsProtocol hs)))
+    S.putWord8 (fromIntegral (BS.length (hsProtocol hs)))
     S.putByteString (hsProtocol hs)
     S.putWord64be   (hsReserved hs)
     S.put (hsInfoHash hs)
@@ -144,14 +145,14 @@ instance Serialize Handshake where
               <*> S.get
               <*> S.get
 
+instance Pretty Handshake where
+  pretty Handshake {..}
+    = text (BC.unpack hsProtocol) <+> pretty (clientInfo hsPeerId)
+
 -- | Extract capabilities from a peer handshake message.
 handshakeCaps :: Handshake -> Capabilities
 handshakeCaps = hsReserved
 
--- | Format handshake in human readable form.
-ppHandshake :: Handshake -> Doc
-ppHandshake Handshake {..} =
-  text (BC.unpack hsProtocol) <+> ppClientInfo (clientInfo hsPeerId)
 
 -- | Get handshake message size in bytes from the length of protocol
 -- string.
@@ -163,7 +164,7 @@ handshakeMaxSize :: Int
 handshakeMaxSize = handshakeSize 255
 
 -- | Default protocol string "BitTorrent protocol" as is.
-defaultBTProtocol :: ByteString
+defaultBTProtocol :: BS.ByteString
 defaultBTProtocol = "BitTorrent protocol"
 
 -- | Default reserved word is 0.
@@ -181,14 +182,14 @@ sendHandshake sock hs = sendAll sock (S.encode hs)
 recvHandshake :: Socket -> IO Handshake
 recvHandshake sock = do
     header <- recv sock 1
-    unless (B.length header == 1) $
+    unless (BS.length header == 1) $
       throw $ userError "Unable to receive handshake header."
 
-    let protocolLen = B.head header
+    let protocolLen = BS.head header
     let restLen     = handshakeSize protocolLen - 1
 
     body <- recv sock restLen
-    let resp = B.cons protocolLen body
+    let resp = BS.cons protocolLen body
     either (throwIO . userError) return $ S.decode resp
 
 -- | Handshaking with a peer specified by the second argument.
@@ -211,6 +212,7 @@ handshake sock hs = do
 --   extension then the client MUST close the connection.
 --
 data Message = KeepAlive
+               -- TODO data PeerStatusUpdate = Choke | Unchoke | Interested | NotInterested
              | Choke
              | Unchoke
              | Interested
@@ -232,7 +234,7 @@ data Message = KeepAlive
              | Request  !BlockIx
 
                -- | Response for a request for a block.
-             | Piece    !Block
+             | Piece    !(Block BL.ByteString)
 
                -- | Used to cancel block requests. It is typically
                -- used during "End Game".
@@ -240,6 +242,7 @@ data Message = KeepAlive
 
              | Port     !PortNumber
 
+               -- TODO data FastMessage = HaveAll | HaveNone | ...
                -- | BEP 6: Then peer have all pieces it might send the
                --   'HaveAll' message instead of 'Bitfield'
                --   message. Used to save bandwidth.
@@ -264,6 +267,19 @@ data Message = KeepAlive
                -- you're choked." Used to shorten starting phase.
              | AllowedFast !PieceIx
                deriving (Show, Eq)
+
+instance Default Message where
+  def = KeepAlive
+  {-# INLINE def #-}
+
+-- | Payload bytes are omitted.
+instance Pretty Message where
+  pretty (Bitfield _)       = "Bitfield"
+  pretty (Piece blk)        = "Piece"    <+> pretty blk
+  pretty (Cancel i )        = "Cancel"   <+> pretty i
+  pretty (SuggestPiece pix) = "Suggest"  <+> int pix
+  pretty (RejectRequest i ) = "Reject"   <+> pretty i
+  pretty  msg               = text (show msg)
 
 instance Serialize Message where
   get = do
@@ -294,7 +310,7 @@ instance Serialize Message where
                 ++ "remaining available bytes: " ++ show rm
 
     where
-      getBlock :: Int -> S.Get Block
+      getBlock :: Int -> S.Get (Block BL.ByteString)
       getBlock len = Block <$> getInt <*> getInt <*> S.getLazyByteString (fromIntegral len)
       {-# INLINE getBlock #-}
 
@@ -307,11 +323,11 @@ instance Serialize Message where
   put (Have i)      = putInt 5  >> S.putWord8 0x04 >> putInt i
   put (Bitfield bf) = putInt l  >> S.putWord8 0x05 >> S.putLazyByteString b
     where b = toBitmap bf
-          l = succ (fromIntegral (Lazy.length b))
+          l = succ (fromIntegral (BL.length b))
           {-# INLINE l #-}
   put (Request blk) = putInt 13 >> S.putWord8 0x06 >> S.put blk
   put (Piece   blk) = putInt l  >> S.putWord8 0x07 >> putBlock
-    where l = 9 + fromIntegral (Lazy.length (blkData blk))
+    where l = 9 + fromIntegral (BL.length (blkData blk))
           {-# INLINE l #-}
           putBlock = do putInt (blkPiece blk)
                         putInt (blkOffset  blk)
@@ -351,7 +367,7 @@ instance Binary Message where
           0x11 -> AllowedFast   <$> getIntB
           _    -> fail $ "unknown message ID: " ++ show mid
     where
-      getBlock :: Int -> B.Get Block
+      getBlock :: Int -> B.Get (Block BL.ByteString)
       getBlock len = Block <$> getIntB <*> getIntB
                            <*> B.getLazyByteString (fromIntegral len)
       {-# INLINE getBlock #-}
@@ -364,11 +380,11 @@ instance Binary Message where
   put (Have i)      = putIntB 5  >> B.putWord8 0x04 >> putIntB i
   put (Bitfield bf) = putIntB l  >> B.putWord8 0x05 >> B.putLazyByteString b
     where b = toBitmap bf
-          l = succ (fromIntegral (Lazy.length b))
+          l = succ (fromIntegral (BL.length b))
           {-# INLINE l #-}
   put (Request blk) = putIntB 13 >> B.putWord8 0x06 >> B.put blk
   put (Piece   blk) = putIntB l  >> B.putWord8 0x07 >> putBlock
-    where l = 9 + fromIntegral (Lazy.length (blkData blk))
+    where l = 9 + fromIntegral (BL.length (blkData blk))
           {-# INLINE l #-}
           putBlock = do putIntB (blkPiece blk)
                         putIntB (blkOffset  blk)
@@ -382,18 +398,6 @@ instance Binary Message where
   put (SuggestPiece pix) = putIntB 5  >> B.putWord8 0x0D >> putIntB pix
   put (RejectRequest i ) = putIntB 13 >> B.putWord8 0x10 >> B.put i
   put (AllowedFast   i ) = putIntB 5  >> B.putWord8 0x11 >> putIntB i
-
--- | Format messages in human readable form. Note that output is
---   compact and suitable for logging: only useful information but not
---   payload bytes.
---
-ppMessage :: Message -> Doc
-ppMessage (Bitfield _)       = "Bitfield"
-ppMessage (Piece blk)        = "Piece"    <+> ppBlock blk
-ppMessage (Cancel i )        = "Cancel"   <+> ppBlockIx i
-ppMessage (SuggestPiece pix) = "Suggest"  <+> int pix
-ppMessage (RejectRequest i ) = "Reject"   <+> ppBlockIx i
-ppMessage msg = text (show msg)
 
 {-----------------------------------------------------------------------
     Peer Status

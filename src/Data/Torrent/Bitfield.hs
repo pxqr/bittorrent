@@ -83,13 +83,7 @@ import           Data.List (foldl')
 import           Data.Monoid
 import           Data.Ratio
 
-
--- | Pieces indexed from zero up to 'PieceCount' value.
-type PieceIx = Int
-
--- | Used to represent max set bound. Min set bound is always set to
--- zero.
-type PieceCount = Int
+import Data.Torrent.Piece
 
 -- TODO cache some operations
 
