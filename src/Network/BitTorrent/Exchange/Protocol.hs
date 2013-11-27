@@ -43,25 +43,11 @@ module Network.BitTorrent.Exchange.Protocol
 
          -- * Regular messages
        , Message(..)
-
-         -- * control
-       , PeerStatus(..)
-       , choking, interested
-
-       , SessionStatus(..)
-       , inverseStatus
-       , clientStatus, peerStatus
-       , canUpload, canDownload
-
-         -- ** Defaults
-       , defaultUnchokeSlots
        ) where
 
 import Control.Applicative
 import Control.Exception
 import Control.Monad
-import Control.Lens
-import Data.Aeson.TH
 import Data.Binary as B
 import Data.Binary.Get as B
 import Data.Binary.Put as B
@@ -69,9 +55,7 @@ import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy  as BL
 import Data.Default
-import Data.List as L
 import Data.Serialize as S
-import Data.Word
 import Network
 import Network.Socket.ByteString
 import Text.PrettyPrint
@@ -80,10 +64,9 @@ import Text.PrettyPrint.Class
 import Data.Torrent.Bitfield
 import Data.Torrent.Block
 import Data.Torrent.InfoHash
-import Data.Torrent
 import Network.BitTorrent.Extension
 import Network.BitTorrent.Core.PeerId
-import Network.BitTorrent.Core.PeerAddr
+import Network.BitTorrent.Core.PeerAddr ()
 
 
 getInt :: S.Get Int
@@ -398,49 +381,3 @@ instance Binary Message where
   put (SuggestPiece pix) = putIntB 5  >> B.putWord8 0x0D >> putIntB pix
   put (RejectRequest i ) = putIntB 13 >> B.putWord8 0x10 >> B.put i
   put (AllowedFast   i ) = putIntB 5  >> B.putWord8 0x11 >> putIntB i
-
-{-----------------------------------------------------------------------
-    Peer Status
------------------------------------------------------------------------}
-
--- |
-data PeerStatus = PeerStatus {
-    _choking    :: !Bool
-  , _interested :: !Bool
-  } deriving (Show, Eq)
-
-$(makeLenses ''PeerStatus)
-$(deriveJSON (L.dropWhile (== '_')) ''PeerStatus)
-
-instance Default PeerStatus where
-  def = PeerStatus True False
-
--- |
-data SessionStatus = SessionStatus {
-    _clientStatus :: !PeerStatus
-  , _peerStatus   :: !PeerStatus
-  } deriving (Show, Eq)
-
-$(makeLenses ''SessionStatus)
-$(deriveJSON (L.dropWhile (== '_')) ''SessionStatus)
-
-instance Default SessionStatus where
-  def = SessionStatus def def
-
--- | Can the /client/ transfer to the /peer/?
-canUpload :: SessionStatus -> Bool
-canUpload SessionStatus {..}
-  = _interested _peerStatus && not (_choking _clientStatus)
-
--- | Can the /client/ transfer from the /peer/?
-canDownload :: SessionStatus -> Bool
-canDownload SessionStatus {..}
-  = _interested _clientStatus && not (_choking _peerStatus)
-
-inverseStatus :: SessionStatus -> SessionStatus
-inverseStatus SessionStatus {..} = SessionStatus _peerStatus _clientStatus
-
--- | Indicates how many peers are allowed to download from the client
--- by default.
-defaultUnchokeSlots :: Int
-defaultUnchokeSlots = 4
