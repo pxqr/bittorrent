@@ -66,6 +66,7 @@ module Data.Torrent
 
 import Prelude hiding (sum)
 import Control.Applicative
+import qualified Crypto.Hash.SHA1 as C
 import Control.DeepSeq
 import Control.Exception
 import Control.Lens
@@ -79,6 +80,7 @@ import qualified Data.ByteString.Lazy  as BL
 import           Data.Char as Char
 import           Data.Hashable   as Hashable
 import qualified Data.List as L
+import           Data.Maybe
 import           Data.Text as T
 import Data.Time
 import Data.Time.Clock.POSIX
@@ -141,7 +143,7 @@ instance Hashable InfoDict where
 infoDictionary :: LayoutInfo -> PieceInfo -> Bool -> InfoDict
 infoDictionary li pinfo private = InfoDict ih li pinfo private
   where
-    ih = IH.hashlazy $ encode $ InfoDict fake_ih li pinfo private
+    ih = hashLazyIH $ encode $ InfoDict fake_ih li pinfo private
     fake_ih = "0123456789012345678901234567890123456789"
 
 getPrivate :: Get Bool
@@ -150,6 +152,12 @@ getPrivate = (Just True ==) <$>? "private"
 putPrivate :: Bool -> BDict -> BDict
 putPrivate False = id
 putPrivate True  = \ cont -> "private" .=! True .: cont
+
+-- | Hash lazy bytestring using SHA1 algorithm.
+hashLazyIH :: BL.ByteString -> InfoHash
+hashLazyIH = fromMaybe (error msg) . byteStringToInfoHash . C.hashlazy
+  where
+    msg = "Infohash.hash: impossible: SHA1 is always 20 bytes long"
 
 instance BEncode InfoDict where
   toBEncode InfoDict {..} = toDict $
@@ -163,7 +171,7 @@ instance BEncode InfoDict where
                   <*> getPieceInfo
                   <*> getPrivate
     where
-      ih = IH.hashlazy (encode dict)
+      ih = hashLazyIH (encode dict)
 
 ppPrivacy :: Bool -> Doc
 ppPrivacy privacy = "Privacy: " <> if privacy then "private" else "public"

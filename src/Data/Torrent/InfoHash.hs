@@ -21,15 +21,10 @@ module Data.Torrent.InfoHash
        , shortHex
 
        , addHashToURI
-
-         -- * Internal
-       , Data.Torrent.InfoHash.hash
-       , Data.Torrent.InfoHash.hashlazy
        ) where
 
 import Control.Applicative
 import Control.Monad
-import qualified Crypto.Hash.SHA1 as C
 import Data.Aeson
 import Data.BEncode
 import Data.ByteString as BS
@@ -150,14 +145,6 @@ shortHex = T.take 7 . longHex
 
 ppHex :: BS.ByteString -> BS.ByteString
 ppHex = BL.toStrict . B.toLazyByteString . B.byteStringHexFixed
-
--- | Hash strict bytestring using SHA1 algorithm.
-hash :: BS.ByteString -> InfoHash
-hash = InfoHash . C.hash
-
--- | Hash lazy bytestring using SHA1 algorithm.
-hashlazy :: BL.ByteString -> InfoHash
-hashlazy = InfoHash . C.hashlazy
 
 -- | Add query info hash parameter to uri.
 --

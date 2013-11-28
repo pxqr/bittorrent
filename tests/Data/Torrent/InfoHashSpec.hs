@@ -2,6 +2,8 @@
 module Data.Torrent.InfoHashSpec (spec) where
 
 import Control.Applicative
+import Data.ByteString as BS
+import Data.Maybe
 import System.FilePath
 import Test.Hspec
 import Test.QuickCheck
@@ -12,7 +14,9 @@ import Data.Torrent.InfoHash as IH
 
 
 instance Arbitrary InfoHash where
-  arbitrary = IH.hash <$> arbitrary
+  arbitrary = do
+    bs <- BS.pack <$> vectorOf 20 arbitrary
+    pure $ fromMaybe (error "arbitrary infohash") $ byteStringToInfoHash bs
 
 type TestPair = (FilePath, String)
 
