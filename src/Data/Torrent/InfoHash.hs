@@ -70,14 +70,42 @@ newtype InfoHash = InfoHash { getInfoHash :: BS.ByteString }
 infoHashLen :: Int
 infoHashLen = 20
 
+-- | Meaningless placeholder value.
 instance Default InfoHash where
   def = "0123456789012345678901234567890123456789"
 
--- | for hex encoded strings
-instance Show InfoHash where
-  show = render . pretty
+-- | Hash raw bytes. (no encoding)
+instance Hashable InfoHash where
+  hash (InfoHash ih) = Hashable.hash ih
+  {-# INLINE hash #-}
 
--- | for hex encoded strings
+-- | Convert to\/from raw bencoded string. (no encoding)
+instance BEncode InfoHash where
+  toBEncode = toBEncode . getInfoHash
+  fromBEncode be = InfoHash <$> fromBEncode be
+
+-- | Convert to\/from raw bytestring. (no encoding)
+instance Serialize InfoHash where
+  put (InfoHash ih) = putByteString ih
+  {-# INLINE put #-}
+
+  get = InfoHash <$> getBytes 20
+  {-# INLINE get #-}
+
+-- | Convert to raw query value. (no encoding)
+instance QueryValueLike InfoHash where
+  toQueryValue (InfoHash ih) = Just ih
+  {-# INLINE toQueryValue #-}
+
+-- | Convert to base16 encoded string.
+instance Show InfoHash where
+  show (InfoHash ih) = BC.unpack (Base16.encode ih)
+
+-- | Convert to base16 encoded Doc string.
+instance Pretty InfoHash where
+  pretty = text . show
+
+-- | Read base16 encoded string.
 instance Read InfoHash where
   readsPrec _ = readP_to_S $ do
       str <- replicateM 40 (satisfy isHexDigit)
@@ -88,44 +116,6 @@ instance Read InfoHash where
 
       pair (a : b : xs) = (a, b) : pair xs
       pair _            = []
-
--- | for base16/base32 encoded strings
-instance IsString InfoHash where
-  fromString str = fromMaybe err $ textToInfoHash $ T.pack str
-    where
-      err = error $ "fromString: invalid infohash string" ++ str
-
-instance Hashable InfoHash where
-  hash = Hashable.hash . getInfoHash
-  {-# INLINE hash #-}
-
--- | Raw bytes.
-instance BEncode InfoHash where
-  toBEncode = toBEncode . getInfoHash
-  fromBEncode be = InfoHash <$> fromBEncode be
-
--- | Raw bytes.
-instance Serialize InfoHash where
-  put = putByteString . getInfoHash
-  get = InfoHash <$> getBytes 20
-
--- | base16 encoded string.
-instance ToJSON InfoHash where
-  toJSON (InfoHash ih) = String $ T.decodeUtf8 $ Base16.encode ih
-
--- | Can be base16 or base32 encoded string.
-instance FromJSON InfoHash where
-  parseJSON = withText "JSON" $ -- TODO
-    maybe (fail "could not parse InfoHash") pure . textToInfoHash
-
--- | Raw bytes.
-instance QueryValueLike InfoHash where
-  toQueryValue (InfoHash ih) = Just ih
-  {-# INLINE toQueryValue #-}
-
--- | base16 encoded.
-instance Pretty InfoHash where
-  pretty = text . T.unpack . longHex
 
 -- | Convert raw bytes to info hash.
 instance Convertible BS.ByteString InfoHash where
@@ -154,6 +144,21 @@ instance Convertible Text InfoHash where
     where
       hashLen = BS.length hashStr
       hashStr = T.encodeUtf8 t
+
+-- | Decode from base16\/base32\/base64 encoded string.
+instance IsString InfoHash where
+  fromString str = fromMaybe err $ textToInfoHash $ T.pack str
+    where
+      err = error $ "fromString: invalid infohash string" ++ str
+
+-- | Convert to base16 encoded JSON string.
+instance ToJSON InfoHash where
+  toJSON (InfoHash ih) = String $ T.decodeUtf8 $ Base16.encode ih
+
+-- | Convert from base16\/base32\/base64 encoded JSON string.
+instance FromJSON InfoHash where
+  parseJSON = withText "JSON" $ -- TODO
+    maybe (fail "could not parse InfoHash") pure . textToInfoHash
 
 ignoreErrorMsg :: Either a b -> Maybe b
 ignoreErrorMsg = either (const Nothing) Just
