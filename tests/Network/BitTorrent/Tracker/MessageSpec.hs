@@ -15,7 +15,6 @@ import Test.Hspec
 import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Network.HTTP.Types.URI
-import System.Random
 
 import Data.Torrent.InfoHashSpec ()
 import Data.Torrent.ProgressSpec ()

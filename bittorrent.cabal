@@ -160,7 +160,6 @@ test-suite spec
                      , directory
                      , filepath
                      , time
-                     , random
 
                      , aeson
                      , cereal
