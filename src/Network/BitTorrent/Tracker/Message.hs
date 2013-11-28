@@ -164,30 +164,25 @@ data AnnounceQuery = AnnounceQuery
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceQuery)
 
--- instance URLShow PortNumber where
---  urlShow = urlShow . fromEnum
+instance QueryValueLike PortNumber where
+  toQueryValue = toQueryValue . show . fromEnum
 
--- instance URLShow Word32 where
---  urlShow = show
---  {-# INLINE urlShow #-}
+instance QueryValueLike Word32 where
+  toQueryValue = toQueryValue . show
 
-
---instance URLEncode AnnounceQuery where
---  urlEncode AnnounceQuery {..} = mconcat
---      [ -- s "peer_id"    %=  reqPeerId
---        s "port"       %=  reqPort
---      , urlEncode reqProgress
---      , s "ip"         %=? reqIP
---      , s "numwant"    %=? reqNumWant
---      , s "event"      %=? reqEvent
---      ]
---    where s :: String -> String;  s = id; {-# INLINE s #-}
+instance QueryValueLike Int where
+  toQueryValue = toQueryValue . show
 
 -- | HTTP tracker protocol compatible encoding.
 instance QueryLike AnnounceQuery where
   toQuery AnnounceQuery {..} =
+      toQuery reqProgress ++
       [ ("info_hash", toQueryValue reqInfoHash)
       , ("peer_id"  , toQueryValue reqPeerId)
+      , ("port"     , toQueryValue reqPort)
+      , ("ip"       , toQueryValue reqIP)
+      , ("numwant"  , toQueryValue reqNumWant)
+      , ("event"    , toQueryValue reqEvent)
       ]
 
 -- | UDP tracker protocol compatible encoding.
@@ -232,7 +227,7 @@ instance Serialize AnnounceQuery where
 
 -- | Encode announce query and add it to the base tracker URL.
 renderAnnounceQuery :: AnnounceQuery -> SimpleQuery
-renderAnnounceQuery req = undefined
+renderAnnounceQuery = filterMaybes . toQuery
   where
     filterMaybes :: [(a, Maybe b)] -> [(a, b)]
     filterMaybes = catMaybes . L.map f
