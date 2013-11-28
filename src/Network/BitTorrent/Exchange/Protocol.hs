@@ -188,73 +188,88 @@ handshake sock hs = do
     Regular messages
 -----------------------------------------------------------------------}
 
+data StatusUpdate
+  = Choke
+  | Unchoke
+  | Interested
+  | NotInterested
+    deriving (Show, Eq, Ord, Enum, Bounded)
+
+data RegularMessage =
+    -- | Zero-based index of a piece that has just been successfully
+    -- downloaded and verified via the hash.
+    Have    ! PieceIx
+
+    -- | The bitfield message may only be sent immediately after the
+    -- handshaking sequence is complete, and before any other message
+    -- are sent. If client have no pieces then bitfield need not to be
+    -- sent.
+  | Bitfield !Bitfield
+
+    -- | Request for a particular block. If a client is requested a
+    -- block that another peer do not have the peer might not answer
+    -- at all.
+  | Request ! BlockIx
+
+    -- | Response to a request for a block.
+  | Piece   !(Block BL.ByteString)
+
+    -- | Used to cancel block requests. It is typically used during
+    -- "End Game".
+  | Cancel  !BlockIx
+    deriving (Show, Eq)
+
+data DHTMessage
+  = Port !PortNumber
+    deriving (Show, Eq)
+
+-- | BEP6 messages.
+data FastMessage =
+    -- | If a peer have all pieces it might send the 'HaveAll' message
+    -- instead of 'Bitfield' message. Used to save bandwidth.
+    HaveAll
+
+    -- | If a peer have no pieces it might send 'HaveNone' message
+    -- intead of 'Bitfield' message. Used to save bandwidth.
+  | HaveNone
+
+    -- | This is an advisory message meaning "you might like to
+    -- download this piece." Used to avoid excessive disk seeks and
+    -- amount of IO.
+  | SuggestPiece  !PieceIx
+
+    -- | Notifies a requesting peer that its request will not be satisfied.
+  | RejectRequest !BlockIx
+
+    -- | This is an advisory messsage meaning "if you ask for this
+    -- piece, I'll give it to you even if you're choked." Used to
+    -- shorten starting phase.
+  | AllowedFast   !PieceIx
+    deriving (Show, Eq)
+
+-- TODO make Network.BitTorrent.Exchange.Session
+
 -- | Messages used in communication between peers.
 --
 --   Note: If some extensions are disabled (not present in extension
 --   mask) and client receive message used by the disabled
 --   extension then the client MUST close the connection.
 --
-data Message = KeepAlive
-               -- TODO data PeerStatusUpdate = Choke | Unchoke | Interested | NotInterested
-             | Choke
-             | Unchoke
-             | Interested
-             | NotInterested
+data Message
+    -- core
+  = KeepAlive
+  | Status   !StatusUpdate
+  | Regular  !RegularMessage
 
-               -- | Zero-based index of a piece that has just been
-               -- successfully downloaded and verified via the hash.
-             | Have     !PieceIx
-
-               -- | The bitfield message may only be sent immediately
-               -- after the handshaking sequence is complete, and
-               -- before any other message are sent. If client have no
-               -- pieces then bitfield need not to be sent.
-             | Bitfield !Bitfield
-
-               -- | Request for a particular block. If a client is
-               -- requested a block that another peer do not have the
-               -- peer might not answer at all.
-             | Request  !BlockIx
-
-               -- | Response for a request for a block.
-             | Piece    !(Block BL.ByteString)
-
-               -- | Used to cancel block requests. It is typically
-               -- used during "End Game".
-             | Cancel   !BlockIx
-
-             | Port     !PortNumber
-
-               -- TODO data FastMessage = HaveAll | HaveNone | ...
-               -- | BEP 6: Then peer have all pieces it might send the
-               --   'HaveAll' message instead of 'Bitfield'
-               --   message. Used to save bandwidth.
-             | HaveAll
-
-               -- | BEP 6: Then peer have no pieces it might send
-               -- 'HaveNone' message intead of 'Bitfield'
-               -- message. Used to save bandwidth.
-             | HaveNone
-
-               -- | BEP 6: This is an advisory message meaning "you
-               -- might like to download this piece." Used to avoid
-               -- excessive disk seeks and amount of IO.
-             | SuggestPiece !PieceIx
-
-               -- | BEP 6: Notifies a requesting peer that its request
-               -- will not be satisfied.
-             | RejectRequest !BlockIx
-
-               -- | BEP 6: This is an advisory messsage meaning "if
-               -- you ask for this piece, I'll give it to you even if
-               -- you're choked." Used to shorten starting phase.
-             | AllowedFast !PieceIx
-               deriving (Show, Eq)
+    -- extensions
+  | DHT      !DHTMessage
+  | Fast     !FastMessage
+    deriving (Show, Eq)
 
 instance Default Message where
   def = KeepAlive
   {-# INLINE def #-}
-
+{-
 -- | Payload bytes are omitted.
 instance Pretty Message where
   pretty (Bitfield _)       = "Bitfield"
@@ -282,9 +297,9 @@ instance Serialize Message where
           0x07 -> Piece    <$> getBlock (len - 9)
           0x08 -> Cancel   <$> S.get
           0x09 -> Port <$> S.get
+          0x0D -> SuggestPiece  <$> getInt
           0x0E -> return HaveAll
           0x0F -> return HaveNone
-          0x0D -> SuggestPiece  <$> getInt
           0x10 -> RejectRequest <$> S.get
           0x11 -> AllowedFast   <$> getInt
           _    -> do
@@ -324,7 +339,8 @@ instance Serialize Message where
   put (SuggestPiece pix) = putInt 5  >> S.putWord8 0x0D >> putInt pix
   put (RejectRequest i ) = putInt 13 >> S.putWord8 0x10 >> S.put i
   put (AllowedFast   i ) = putInt 5  >> S.putWord8 0x11 >> putInt i
-
+-}
+{-
 instance Binary Message where
   get = do
     len <- getIntB
@@ -381,3 +397,4 @@ instance Binary Message where
   put (SuggestPiece pix) = putIntB 5  >> B.putWord8 0x0D >> putIntB pix
   put (RejectRequest i ) = putIntB 13 >> B.putWord8 0x10 >> B.put i
   put (AllowedFast   i ) = putIntB 5  >> B.putWord8 0x11 >> putIntB i
+-}

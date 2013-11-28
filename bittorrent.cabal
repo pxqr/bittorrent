@@ -64,6 +64,7 @@ library
 --                     , Network.BitTorrent.Tracker.UDP
 --                     , Network.BitTorrent.Exchange
                      , Network.BitTorrent.Exchange.Protocol
+                     , Network.BitTorrent.Exchange.Message.Extended
                      , Network.BitTorrent.Exchange.Status
 --                     , Network.BitTorrent.DHT
 --                     , Network.BitTorrent.DHT.Protocol
@@ -126,6 +127,7 @@ library
                        -- Network
                      , network     >= 2.4
                      , HTTP        >= 4000.2
+                     , http-types  >= 0.7
                      , krpc        >= 0.3
 
                        -- System
