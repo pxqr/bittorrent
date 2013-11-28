@@ -51,6 +51,7 @@ library
                      , Data.Torrent.Piece
                      , Data.Torrent.Progress
                      , Data.Torrent.Tree
+                     , Data.Torrent.URN
                      , Network.BitTorrent.Core.PeerId
                      , Network.BitTorrent.Core.PeerAddr
 --                     , System.IO.MMap.Fixed
@@ -74,8 +75,10 @@ library
 
   build-depends:       base       == 4.*
                      , bits-extras
+                     , convertible
                      , pretty
                      , pretty-class
+                     , urlencoded
 
                        -- Control
                      , deepseq
@@ -118,7 +121,6 @@ library
                      , bencoding   >= 0.4
                      , binary
                      , cereal      >= 0.3
-                     , urlencoded  >= 0.4
 
                        -- Time
                      , old-locale  >= 1.0
