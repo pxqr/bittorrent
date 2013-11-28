@@ -9,7 +9,6 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Network.URI
 
-import Data.Torrent.InfoHash
 import Data.Torrent.Magnet
 import Data.Torrent.InfoHashSpec ()
 
@@ -36,10 +35,10 @@ spec = do
 
     it "parse base32" $ do
       let magnet = "magnet:?xt=urn:btih:CT76LXJDDCH5LS2TUHKH6EUJ3NYKX4Y6"
-      let ih = InfoHash "\DC4\255\229\221#\CAN\143\213\203S\161\212\DEL\DC2\137\219p\171\243\RS"
+      let ih = "CT76LXJDDCH5LS2TUHKH6EUJ3NYKX4Y6"
       parseMagnet magnet `shouldBe` Just (nullMagnet ih)
 
     it "parse base16" $ do
       let magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
-      let ih     = InfoHash "\SOH#Eg\137\171\205\239\SOH#Eg\137\171\205\239\SOH#Eg"
+      let ih = "0123456789abcdef0123456789abcdef01234567"
       parseMagnet magnet `shouldBe` Just (nullMagnet ih)

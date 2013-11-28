@@ -10,8 +10,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Torrent.InfoHash
-       ( -- * Info hash
-         InfoHash(..)
+       ( InfoHash
 
          -- * Parsing
        , byteStringToInfoHash
@@ -42,6 +41,7 @@ import qualified Data.ByteString.Lazy.Builder as B
 import qualified Data.ByteString.Lazy.Builder.ASCII as B
 import Data.Char
 import Data.List       as L
+import Data.Maybe
 import Data.Hashable   as Hashable
 import Data.URLEncoded as URL
 import Data.Serialize
@@ -85,14 +85,11 @@ instance Read InfoHash where
       pair (a : b : xs) = (a, b) : pair xs
       pair _            = []
 
--- | for base16 (hex) encoded strings
+-- | for base16/base32 encoded strings
 instance IsString InfoHash where
-  fromString str
-    | L.length str == 40
-    , (ihStr, inv) <- Base16.decode $ BC.pack str
-    = if BS.length inv == 0 then InfoHash ihStr
-                      else error "fromString: invalid infohash string"
-    |       otherwise    = error "fromString: invalid infohash string length"
+  fromString str = fromMaybe err $ textToInfoHash $ T.pack str
+    where
+      err = error $ "fromString: invalid infohash string" ++ str
 
 instance Hashable InfoHash where
   hash = Hashable.hash . getInfoHash

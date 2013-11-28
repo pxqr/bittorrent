@@ -68,6 +68,7 @@ import Data.Aeson.Types (FromJSON, ToJSON)
 import Data.BEncode
 import Data.BEncode.Types
 import Data.ByteString as BS
+import Data.ByteString.Base16 as Base16
 import Data.ByteString.Char8 as BC
 import Data.Char as Char
 import Data.Foldable as F
@@ -81,7 +82,6 @@ import System.FilePath
 import System.Posix.Types
 
 import Data.Torrent.Block
-import Data.Torrent.InfoHash
 
 
 {-----------------------------------------------------------------------
@@ -180,7 +180,7 @@ instance Pretty (FileInfo BS.ByteString) where
     $$ "Size: " <> text (show fiLength)
     $$ maybe PP.empty ppMD5 fiMD5Sum
    where
-    ppMD5 md5 = "MD5 : " <> text (show (InfoHash md5))
+    ppMD5 md5 = "MD5 : " <> text (show (Base16.encode md5))
 
 -- | Join file path.
 joinFilePath :: FileInfo [ByteString] -> FileInfo ByteString

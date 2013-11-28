@@ -142,7 +142,7 @@ infoDictionary :: LayoutInfo -> PieceInfo -> Bool -> InfoDict
 infoDictionary li pinfo private = InfoDict ih li pinfo private
   where
     ih = IH.hashlazy $ encode $ InfoDict fake_ih li pinfo private
-    fake_ih = InfoHash ""
+    fake_ih = "0123456789012345678901234567890123456789"
 
 getPrivate :: Get Bool
 getPrivate = (Just True ==) <$>? "private"
