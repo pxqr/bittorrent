@@ -9,6 +9,8 @@
 --
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 module Data.Torrent.InfoHash
        ( InfoHash
 
@@ -29,20 +31,21 @@ import Data.Aeson
 import Data.BEncode
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
-import Data.ByteString.Lazy  as BL
 import Data.ByteString.Base16 as Base16
 import Data.ByteString.Base32 as Base32
-import qualified Data.ByteString.Lazy.Builder as B
-import qualified Data.ByteString.Lazy.Builder.ASCII as B
+import Data.ByteString.Base64 as Base64
 import Data.Char
+import Data.Convertible.Base
+import Data.Default
 import Data.List       as L
 import Data.Maybe
 import Data.Hashable   as Hashable
-import Data.URLEncoded as URL
 import Data.Serialize
 import Data.String
 import Data.Text as T
 import Data.Text.Encoding as T
+import Data.Typeable
+import Network.HTTP.Types.QueryLike
 import Network.URI
 import Numeric
 import Text.ParserCombinators.ReadP as P
@@ -62,7 +65,13 @@ import Text.PrettyPrint.Class
 
 -- | Exactly 20 bytes long SHA1 hash of the info part of torrent file.
 newtype InfoHash = InfoHash { getInfoHash :: BS.ByteString }
-                   deriving (Eq, Ord)
+                   deriving (Eq, Ord, Typeable)
+
+infoHashLen :: Int
+infoHashLen = 20
+
+instance Default InfoHash where
+  def = "0123456789012345678901234567890123456789"
 
 -- | for hex encoded strings
 instance Show InfoHash where
@@ -88,52 +97,76 @@ instance IsString InfoHash where
 
 instance Hashable InfoHash where
   hash = Hashable.hash . getInfoHash
+  {-# INLINE hash #-}
 
+-- | Raw bytes.
 instance BEncode InfoHash where
   toBEncode = toBEncode . getInfoHash
   fromBEncode be = InfoHash <$> fromBEncode be
 
+-- | Raw bytes.
 instance Serialize InfoHash where
   put = putByteString . getInfoHash
   get = InfoHash <$> getBytes 20
 
--- | Represented as base16 encoded string.
+-- | base16 encoded string.
 instance ToJSON InfoHash where
   toJSON (InfoHash ih) = String $ T.decodeUtf8 $ Base16.encode ih
 
 -- | Can be base16 or base32 encoded string.
 instance FromJSON InfoHash where
-  parseJSON = withText "JSON" $
+  parseJSON = withText "JSON" $ -- TODO
     maybe (fail "could not parse InfoHash") pure . textToInfoHash
 
-instance URLShow InfoHash where
-  urlShow = show
+-- | Raw bytes.
+instance QueryValueLike InfoHash where
+  toQueryValue (InfoHash ih) = Just ih
+  {-# INLINE toQueryValue #-}
 
 -- | base16 encoded.
 instance Pretty InfoHash where
-  pretty = text . BC.unpack . ppHex . getInfoHash
-
-infoHashLen :: Int
-infoHashLen = 20
+  pretty = text . T.unpack . longHex
 
 -- | Convert raw bytes to info hash.
-byteStringToInfoHash :: BS.ByteString -> Maybe InfoHash
-byteStringToInfoHash bs
-  | BS.length bs == infoHashLen = Just (InfoHash bs)
-  |          otherwise          = Nothing
+instance Convertible BS.ByteString InfoHash where
+  safeConvert bs
+    | BS.length bs == infoHashLen = pure (InfoHash bs)
+    |          otherwise          = convError "invalid length" bs
 
--- | Tries both base16 and base32 while decoding info hash.
+-- | Parse infohash from base16\/base32\/base64 encoded string.
+instance Convertible Text InfoHash where
+  safeConvert t
+      |      hashLen <= 28   =
+        case Base64.decode hashStr of
+          Left  msg   -> convError ("invalid base64 encoding" ++ msg) t
+          Right ihStr -> pure $ InfoHash ihStr
+
+      |      hashLen == 32   = pure $ InfoHash $ Base32.decode hashStr
+-- TODO FIX Base32.decode can return 'undefined'
+
+      |      hashLen == 40   =
+        let (ihStr, inv) = Base16.decode hashStr
+        in if BS.length inv == 0
+           then pure $ InfoHash ihStr
+           else convError "invalid base16 encoding" t
+
+      |        otherwise     = convError "invalid length" t
+    where
+      hashLen = BS.length hashStr
+      hashStr = T.encodeUtf8 t
+
+ignoreErrorMsg :: Either a b -> Maybe b
+ignoreErrorMsg = either (const Nothing) Just
+
+-- | TODO remove from API
+byteStringToInfoHash :: BS.ByteString -> Maybe InfoHash
+byteStringToInfoHash = ignoreErrorMsg . safeConvert
+
+-- | Tries both base16 and base32 while decoding info hash. To Use
+-- 'safeConvert' to find out
+--
 textToInfoHash :: Text -> Maybe InfoHash
-textToInfoHash t
-    |      hashLen == 32   = Just $ InfoHash $ Base32.decode hashStr
-    |      hashLen == 40   = let (ihStr, inv) = Base16.decode hashStr
-                             in if BS.length inv == 0
-                                then Just $ InfoHash ihStr
-                                else Nothing
-    |        otherwise     = Nothing
-  where
-    hashLen = BS.length hashStr
-    hashStr = T.encodeUtf8 t
+textToInfoHash = ignoreErrorMsg . safeConvert
 
 -- | Hex encode infohash to text, full length.
 longHex :: InfoHash -> Text
@@ -143,10 +176,9 @@ longHex = T.decodeUtf8 . Base16.encode . getInfoHash
 shortHex :: InfoHash -> Text
 shortHex = T.take 7 . longHex
 
-ppHex :: BS.ByteString -> BS.ByteString
-ppHex = BL.toStrict . B.toLazyByteString . B.byteStringHexFixed
-
--- | Add query info hash parameter to uri.
+-- | TODO remove from API
+--
+--   Add query info hash parameter to uri.
 --
 --   > info_hash=<url_encoded_info_hash>
 --
