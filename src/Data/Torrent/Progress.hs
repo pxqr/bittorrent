@@ -12,6 +12,7 @@
 --
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
+{-# OPTIONS -fno-warn-orphans #-}
 module Data.Torrent.Progress
        ( -- * Progress
          Progress (..)
@@ -36,13 +37,15 @@ module Data.Torrent.Progress
 import Control.Applicative
 import Control.Lens hiding ((%=))
 import Data.Aeson.TH
+import Data.ByteString.Lazy.Builder  as BS
+import Data.ByteString.Lazy.Builder.ASCII as BS
 import Data.Default
 import Data.List as L
 import Data.Monoid
 import Data.Serialize as S
 import Data.Ratio
-import Data.URLEncoded
 import Data.Word
+import Network.HTTP.Types.QueryLike
 import Text.PrettyPrint as PP
 import Text.PrettyPrint.Class
 
@@ -89,18 +92,19 @@ instance Monoid Progress where
     }
   {-# INLINE mappend #-}
 
-instance URLShow Word64 where
-  urlShow = show
-  {-# INLINE urlShow #-}
+instance QueryValueLike Builder where
+  toQueryValue = toQueryValue . BS.toLazyByteString
+
+instance QueryValueLike Word64 where
+  toQueryValue = toQueryValue . BS.word64Dec
 
 -- | HTTP Tracker protocol compatible encoding.
-instance URLEncode Progress where
-  urlEncode Progress {..} = mconcat
-    [ s "uploaded"   %=  _uploaded
-    , s "left"       %=  _left
-    , s "downloaded" %=  _downloaded
+instance QueryLike Progress where
+  toQuery Progress {..} =
+    [ ("uploaded"  , toQueryValue _uploaded)
+    , ("left"      , toQueryValue _left)
+    , ("downloaded", toQueryValue _downloaded)
     ]
-    where s :: String -> String;  s = id; {-# INLINE s #-}
 
 instance Pretty Progress where
   pretty Progress {..} =

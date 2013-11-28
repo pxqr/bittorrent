@@ -78,6 +78,7 @@ import           Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
 import qualified Data.ByteString.Lazy  as BL
 import           Data.Char as Char
+import           Data.Default
 import           Data.Hashable   as Hashable
 import qualified Data.List as L
 import           Data.Maybe
@@ -143,8 +144,7 @@ instance Hashable InfoDict where
 infoDictionary :: LayoutInfo -> PieceInfo -> Bool -> InfoDict
 infoDictionary li pinfo private = InfoDict ih li pinfo private
   where
-    ih = hashLazyIH $ encode $ InfoDict fake_ih li pinfo private
-    fake_ih = "0123456789012345678901234567890123456789"
+    ih = hashLazyIH $ encode $ InfoDict def li pinfo private
 
 getPrivate :: Get Bool
 getPrivate = (Just True ==) <$>? "private"

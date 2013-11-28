@@ -66,6 +66,7 @@ import Data.Typeable
 import Data.URLEncoded as URL
 import Data.Word
 import Network
+import Network.HTTP.Types.QueryLike
 import Network.HTTP.Types.URI hiding (urlEncode)
 import Network.Socket
 import Network.URI
@@ -173,14 +174,20 @@ instance URLShow Word32 where
 -- | HTTP tracker protocol compatible encoding.
 instance URLEncode AnnounceQuery where
   urlEncode AnnounceQuery {..} = mconcat
-      [ s "peer_id"    %=  reqPeerId
-      , s "port"       %=  reqPort
-      , urlEncode reqProgress
+      [ -- s "peer_id"    %=  reqPeerId
+        s "port"       %=  reqPort
+--      , urlEncode reqProgress
       , s "ip"         %=? reqIP
       , s "numwant"    %=? reqNumWant
       , s "event"      %=? reqEvent
       ]
     where s :: String -> String;  s = id; {-# INLINE s #-}
+
+instance QueryLike AnnounceQuery where
+  toQuery AnnounceQuery {..} =
+    [ ("info_hash", toQueryValue reqInfoHash)
+    , ("peer_id"  , toQueryValue reqPeerId)
+    ]
 
 -- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceQuery where

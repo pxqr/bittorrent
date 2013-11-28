@@ -46,12 +46,14 @@ import Data.List as L
 import Data.List.Split as L
 import Data.Maybe       (fromMaybe, catMaybes)
 import Data.Monoid
+import Data.Hashable
 import Data.Serialize as S
 import Data.String
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
 import Data.URLEncoded
 import Data.Version     (Version(Version), versionBranch)
+import Network.HTTP.Types.QueryLike
 import System.Entropy   (getEntropy)
 import System.Locale    (defaultTimeLocale)
 import Text.PrettyPrint hiding ((<>))
@@ -70,12 +72,17 @@ newtype PeerId = PeerId { getPeerId :: ByteString }
 peerIdLen :: Int
 peerIdLen = 20
 
+instance Hashable PeerId where
+  hash = hash . getPeerId
+  {-# INLINE hash #-}
+
 instance Serialize PeerId where
   put = putByteString . getPeerId
   get = PeerId <$> getBytes peerIdLen
 
-instance URLShow PeerId where
-  urlShow = BC.unpack . getPeerId
+instance QueryValueLike PeerId where
+  toQueryValue (PeerId pid) = Just pid
+  {-# INLINE toQueryValue #-}
 
 instance IsString PeerId where
   fromString str
