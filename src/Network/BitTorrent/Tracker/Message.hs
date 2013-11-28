@@ -36,7 +36,7 @@ module Network.BitTorrent.Tracker.Message
        , PeerList (..)
        , AnnounceInfo(..)
        , defaultNumWant
-       , paramFailureCode
+       , parseFailureStatus
 
          -- * Scrape
        , ScrapeQuery
@@ -68,6 +68,7 @@ import Data.Word
 import Network
 import Network.HTTP.Types.QueryLike
 import Network.HTTP.Types.URI hiding (urlEncode)
+import Network.HTTP.Types.Status
 import Network.Socket
 import Network.URI
 import Text.Read (readMaybe)
@@ -252,11 +253,11 @@ data QueryParam
     deriving (Show, Eq, Ord, Enum)
 
 data ParamParseFailure
-  = Missing QueryParam            -- ^ param not found in query string;
-  | Invalid QueryParam ByteString -- ^ param present but not valid.
+  = Missing QueryParam               -- ^ param not found in query string;
+  | Invalid QueryParam BS.ByteString -- ^ param present but not valid.
     deriving (Show, Eq)
 
-paramName :: QueryParam -> ByteString
+paramName :: QueryParam -> BS.ByteString
 paramName ParamInfoHash   = "info_hash"
 paramName ParamPeerId     = "peer_id"
 paramName ParamPort       = "port"
@@ -322,6 +323,7 @@ parseAnnounceQuery params = AnnounceQuery
   <*> optParam ParamEvent    params
 
 -- TODO add extension datatype
+type AnnounceRequest = ()
 
 {-----------------------------------------------------------------------
 --  Announce response
@@ -455,17 +457,27 @@ missingOffset = 101
 invalidOffset :: Int
 invalidOffset = 150
 
--- TODO use Network.HTTP.Types.Status
-
 -- | Get HTTP response error code from a announce params parse
 -- failure.
 --
 --   For more info see:
 --   <https://wiki.theory.org/BitTorrent_Tracker_Protocol#Response_Codes>
 --
-paramFailureCode :: ParamParseFailure -> Int
-paramFailureCode (Missing param  ) = missingOffset + fromEnum param
-paramFailureCode (Invalid param _) = invalidOffset + fromEnum param
+parseFailureCode :: ParamParseFailure -> Int
+parseFailureCode (Missing param  ) = missingOffset + fromEnum param
+parseFailureCode (Invalid param _) = invalidOffset + fromEnum param
+
+-- | Human readable message
+parseFailureMessage :: ParamParseFailure -> BS.ByteString
+parseFailureMessage e = BS.concat $ case e of
+  Missing p   -> ["Missing parameter: ", paramName p]
+  Invalid p v -> ["Invalid parameter: ", paramName p, " = ", v]
+
+parseFailureStatus :: ParamParseFailure -> Status
+parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
+
+type AnnounceResponse = Either Status AnnounceInfo -- TODO
+type TrackerResponse = () -- TODO
 
 {-----------------------------------------------------------------------
   Scrape message
