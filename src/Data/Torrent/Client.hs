@@ -26,13 +26,9 @@ module Data.Torrent.Client
        , libClientInfo
        ) where
 
-import Control.Applicative
-import Data.ByteString as BS
-import Data.ByteString.Char8 as BC
 import Data.Default
 import Data.List as L
 import Data.List.Split as L
-import Data.Maybe
 import Data.Monoid
 import Data.String
 import Data.Text as T
@@ -40,8 +36,11 @@ import Data.Version
 import Text.PrettyPrint hiding ((<>))
 import Text.PrettyPrint.Class
 import Text.Read (readMaybe)
-import Paths_bittorrent (version)
+-- import Paths_bittorrent (version)
 
+-- TODO FIXME
+version :: Version
+version = Version [0, 0, 0, 3] []
 
 -- | List of registered client versions + 'IlibHSbittorrent' (this
 -- package) + 'IUnknown' (for not recognized software). All names are

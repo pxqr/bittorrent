@@ -27,7 +27,7 @@
 --
 {-# LANGUAGE TemplateHaskell   #-}
 {-# OPTIONS  -fno-warn-orphans #-}
-module Network.BitTorrent.Exchange.Protocol
+module Network.BitTorrent.Exchange.Message
        ( -- * Initial handshake
          Handshake(..)
        , handshake

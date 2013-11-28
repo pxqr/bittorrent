@@ -52,25 +52,27 @@ library
                      , Data.Torrent.Progress
                      , Data.Torrent.Tree
                      , Data.Torrent.URN
+--                   , Network.BitTorrent
                      , Network.BitTorrent.Core.PeerId
                      , Network.BitTorrent.Core.PeerAddr
---                     , System.IO.MMap.Fixed
---                     , System.Torrent.Storage
---                       Network.BitTorrent
---                     , Network.BitTorrent.Extension
---                     , Network.BitTorrent.Peer
---                     , Network.BitTorrent.Tracker
+--                   , Network.BitTorrent.DHT
+--                   , Network.BitTorrent.DHT.Protocol
+--                   , Network.BitTorrent.DHT.Session
+--                   , Network.BitTorrent.Exchange
+--                   , Network.BitTorrent.Exchange.Message
+--                   , Network.BitTorrent.Exchange.Session
+--                   , Network.BitTorrent.Exchange.Status
+--                   , Network.BitTorrent.Exchange.Wire
+--                   , Network.BitTorrent.Extension
+--                   , Network.BitTorrent.Tracker
                      , Network.BitTorrent.Tracker.Message
---                     , Network.BitTorrent.Tracker.HTTP
---                     , Network.BitTorrent.Tracker.UDP
---                     , Network.BitTorrent.Exchange
---                     , Network.BitTorrent.Exchange.Protocol
---                     , Network.BitTorrent.Exchange.Message.Extended
---                     , Network.BitTorrent.Exchange.Status
---                     , Network.BitTorrent.DHT
---                     , Network.BitTorrent.DHT.Protocol
---                     , Network.BitTorrent.Sessions
--- Network.BitTorrent.Sessions.Types
+--                   , Network.BitTorrent.Tracker.HTTP
+--                   , Network.BitTorrent.Tracker.UDP
+--                   , Network.BitTorrent.Tracker.Session
+--                   , Network.BitTorrent.Session
+--                   , Network.BitTorrent.Session.Types
+--                   , System.IO.MMap.Fixed
+--                   , System.Torrent.Storage
   other-modules:       Paths_bittorrent
 
   build-depends:       base       == 4.*

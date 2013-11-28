@@ -58,7 +58,6 @@ import System.Locale    (defaultTimeLocale)
 import Text.PrettyPrint hiding ((<>))
 import Text.PrettyPrint.Class
 import Text.Read        (readMaybe)
-import Paths_bittorrent (version)
 
 import Data.Torrent.Client
 
@@ -173,7 +172,7 @@ defaultClientId = "HS"
 -- package.  Version is taken from .cabal file.
 defaultVersionNumber :: ByteString
 defaultVersionNumber = BS.take 4 $ BC.pack $ foldMap show $
-                         versionBranch version
+                         versionBranch $ ciVersion libClientInfo
 
 {-----------------------------------------------------------------------
 --  Generation
