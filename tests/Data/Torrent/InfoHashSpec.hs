@@ -3,6 +3,7 @@ module Data.Torrent.InfoHashSpec (spec) where
 
 import Control.Applicative
 import Data.ByteString as BS
+import Data.Convertible
 import Data.Maybe
 import System.FilePath
 import Test.Hspec
@@ -16,7 +17,7 @@ import Data.Torrent.InfoHash as IH
 instance Arbitrary InfoHash where
   arbitrary = do
     bs <- BS.pack <$> vectorOf 20 arbitrary
-    pure $ fromMaybe (error "arbitrary infohash") $ byteStringToInfoHash bs
+    pure $ either (const (error "arbitrary infohash")) id $ safeConvert bs
 
 type TestPair = (FilePath, String)
 

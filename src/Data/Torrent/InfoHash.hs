@@ -15,7 +15,6 @@ module Data.Torrent.InfoHash
        ( InfoHash
 
          -- * Parsing
-       , byteStringToInfoHash
        , textToInfoHash
 
          -- * Rendering
@@ -163,12 +162,9 @@ instance FromJSON InfoHash where
 ignoreErrorMsg :: Either a b -> Maybe b
 ignoreErrorMsg = either (const Nothing) Just
 
--- | TODO remove from API
-byteStringToInfoHash :: BS.ByteString -> Maybe InfoHash
-byteStringToInfoHash = ignoreErrorMsg . safeConvert
-
--- | Tries both base16 and base32 while decoding info hash. To Use
--- 'safeConvert' to find out
+-- | Tries both base16 and base32 while decoding info hash.
+--
+--  Use 'safeConvert' for detailed error messages.
 --
 textToInfoHash :: Text -> Maybe InfoHash
 textToInfoHash = ignoreErrorMsg . safeConvert

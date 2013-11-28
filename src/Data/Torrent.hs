@@ -78,10 +78,10 @@ import           Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
 import qualified Data.ByteString.Lazy  as BL
 import           Data.Char as Char
+import           Data.Convertible
 import           Data.Default
 import           Data.Hashable   as Hashable
 import qualified Data.List as L
-import           Data.Maybe
 import           Data.Text as T
 import Data.Time
 import Data.Time.Clock.POSIX
@@ -155,7 +155,7 @@ putPrivate True  = \ cont -> "private" .=! True .: cont
 
 -- | Hash lazy bytestring using SHA1 algorithm.
 hashLazyIH :: BL.ByteString -> InfoHash
-hashLazyIH = fromMaybe (error msg) . byteStringToInfoHash . C.hashlazy
+hashLazyIH = either (const (error msg)) id . safeConvert . C.hashlazy
   where
     msg = "Infohash.hash: impossible: SHA1 is always 20 bytes long"
 

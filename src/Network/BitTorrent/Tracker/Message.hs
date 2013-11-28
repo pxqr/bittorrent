@@ -55,6 +55,7 @@ import Data.BEncode.BDict as BE
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.Char as Char
+import Data.Convertible
 import Data.List as L
 import Data.Map  as M
 import Data.Maybe
@@ -265,7 +266,7 @@ class FromParam a where
   fromParam :: BS.ByteString -> Maybe a
 
 instance FromParam InfoHash where
-  fromParam = byteStringToInfoHash
+  fromParam = either (const Nothing) pure . safeConvert
 
 instance FromParam PeerId where
   fromParam = byteStringToPeerId
