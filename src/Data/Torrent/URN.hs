@@ -2,7 +2,7 @@
 --   Copyright   :  (c) Sam Truzjan 2013
 --   License     :  BSD3
 --   Maintainer  :  pxqr.sta@gmail.com
---   Stability   :  experimental
+--   Stability   :  provisional
 --   Portability :  portable
 --
 --   URN is pesistent location-independent identifier for
