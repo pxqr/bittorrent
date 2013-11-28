@@ -51,7 +51,6 @@ import Data.Serialize as S
 import Data.String
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
-import Data.URLEncoded
 import Data.Version     (Version(Version), versionBranch)
 import Network.HTTP.Types.QueryLike
 import System.Entropy   (getEntropy)

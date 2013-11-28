@@ -40,23 +40,11 @@ instance Arbitrary AnnounceQuery where
     <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
     <*> arbitrary <*> arbitrary <*> arbitrary
 
-baseURI :: URI
-baseURI = fromJust $ parseURI "http://a"
-
-parseUriQuery :: URI -> SimpleQuery
-parseUriQuery = filterMaybes . parseQuery . BC.pack . uriQuery
-  where
-    filterMaybes :: [(a, Maybe b)] -> [(a, b)]
-    filterMaybes = catMaybes . L.map f
-      where
-        f (a, Nothing) = Nothing
-        f (a, Just b ) = Just (a, b)
-
 spec :: Spec
 spec = do
   describe "Announce" $ do
     it "properly url encoded" $ property $ \ q ->
-      parseAnnounceQuery (parseUriQuery (renderAnnounceQuery baseURI q))
+      parseAnnounceQuery (renderAnnounceQuery q)
         `shouldBe` Right q
 
   describe "Scrape" $ do

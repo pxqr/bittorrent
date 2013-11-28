@@ -64,9 +64,9 @@ library
 --                     , Network.BitTorrent.Tracker.HTTP
 --                     , Network.BitTorrent.Tracker.UDP
 --                     , Network.BitTorrent.Exchange
-                     , Network.BitTorrent.Exchange.Protocol
-                     , Network.BitTorrent.Exchange.Message.Extended
-                     , Network.BitTorrent.Exchange.Status
+--                     , Network.BitTorrent.Exchange.Protocol
+--                     , Network.BitTorrent.Exchange.Message.Extended
+--                     , Network.BitTorrent.Exchange.Status
 --                     , Network.BitTorrent.DHT
 --                     , Network.BitTorrent.DHT.Protocol
 --                     , Network.BitTorrent.Sessions
@@ -78,7 +78,6 @@ library
                      , convertible
                      , pretty
                      , pretty-class
-                     , urlencoded
 
                        -- Control
                      , deepseq

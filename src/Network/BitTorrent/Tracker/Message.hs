@@ -64,7 +64,6 @@ import Data.Serialize as S hiding (Result)
 import Data.Text (Text)
 import Data.Text.Encoding
 import Data.Typeable
-import Data.URLEncoded as URL
 import Data.Word
 import Network
 import Network.HTTP.Types.QueryLike
@@ -95,11 +94,10 @@ data Event = Started
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''Event)
 
 -- | HTTP tracker protocol compatible encoding.
-instance URLShow Event where
-  urlShow e = urlShow (Char.toLower x : xs)
+instance QueryValueLike Event where
+  toQueryValue e = toQueryValue (Char.toLower x : xs)
     where
-      -- INVARIANT: this is always nonempty list
-      (x : xs) = show e
+      (x : xs) = show e -- INVARIANT: this is always nonempty list
 
 type EventId = Word32
 
@@ -165,30 +163,31 @@ data AnnounceQuery = AnnounceQuery
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceQuery)
 
-instance URLShow PortNumber where
-  urlShow = urlShow . fromEnum
+-- instance URLShow PortNumber where
+--  urlShow = urlShow . fromEnum
 
-instance URLShow Word32 where
-  urlShow = show
-  {-# INLINE urlShow #-}
+-- instance URLShow Word32 where
+--  urlShow = show
+--  {-# INLINE urlShow #-}
+
+
+--instance URLEncode AnnounceQuery where
+--  urlEncode AnnounceQuery {..} = mconcat
+--      [ -- s "peer_id"    %=  reqPeerId
+--        s "port"       %=  reqPort
+--      , urlEncode reqProgress
+--      , s "ip"         %=? reqIP
+--      , s "numwant"    %=? reqNumWant
+--      , s "event"      %=? reqEvent
+--      ]
+--    where s :: String -> String;  s = id; {-# INLINE s #-}
 
 -- | HTTP tracker protocol compatible encoding.
-instance URLEncode AnnounceQuery where
-  urlEncode AnnounceQuery {..} = mconcat
-      [ -- s "peer_id"    %=  reqPeerId
-        s "port"       %=  reqPort
---      , urlEncode reqProgress
-      , s "ip"         %=? reqIP
-      , s "numwant"    %=? reqNumWant
-      , s "event"      %=? reqEvent
-      ]
-    where s :: String -> String;  s = id; {-# INLINE s #-}
-
 instance QueryLike AnnounceQuery where
   toQuery AnnounceQuery {..} =
-    [ ("info_hash", toQueryValue reqInfoHash)
-    , ("peer_id"  , toQueryValue reqPeerId)
-    ]
+      [ ("info_hash", toQueryValue reqInfoHash)
+      , ("peer_id"  , toQueryValue reqPeerId)
+      ]
 
 -- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceQuery where
@@ -227,12 +226,18 @@ instance Serialize AnnounceQuery where
       , reqEvent      = ev
       }
 
+--renderAnnounceQueryBuilder :: AnnounceQuery -> BS.Builder
+--renderAnnounceQueryBuilder = undefined
+
 -- | Encode announce query and add it to the base tracker URL.
-renderAnnounceQuery :: URI -> AnnounceQuery -> URI
-renderAnnounceQuery announceURI req
-  =               URL.urlEncode req
-  `addToURI`      announceURI
-  `addHashToURI`  reqInfoHash req
+renderAnnounceQuery :: AnnounceQuery -> SimpleQuery
+renderAnnounceQuery req = undefined
+  where
+    filterMaybes :: [(a, Maybe b)] -> [(a, b)]
+    filterMaybes = catMaybes . L.map f
+      where
+        f (a, Nothing) = Nothing
+        f (a, Just b ) = Just (a, b)
 
 data QueryParam
   = ParamInfoHash
