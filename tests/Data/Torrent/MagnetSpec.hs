@@ -25,8 +25,8 @@ instance Arbitrary Magnet where
     <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
     <*> arbitrary <*> arbitrary <*> pure mempty
 
-magnetEncoding :: Magnet -> Bool
-magnetEncoding m = parseMagnet (renderMagnet m) == Just m
+magnetEncoding :: Magnet -> IO ()
+magnetEncoding m = parseMagnet (renderMagnet m) `shouldBe` Just m
 
 spec :: Spec
 spec = do
