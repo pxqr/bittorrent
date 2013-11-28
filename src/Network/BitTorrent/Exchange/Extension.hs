@@ -10,7 +10,7 @@
 --   See <http://www.bittorrent.org/beps/bep_0004.html> for more
 --   information.
 --
-module Network.BitTorrent.Extension
+module Network.BitTorrent.Exchange.Extension
        ( -- * Capabilities
          Capabilities
        , ppCaps, defaultCaps
