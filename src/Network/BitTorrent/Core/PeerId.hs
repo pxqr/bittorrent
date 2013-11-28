@@ -14,7 +14,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Network.BitTorrent.Core.PeerId
        ( -- * PeerId
-         PeerId (getPeerId)
+         PeerId
        , byteStringToPeerId
 
          -- * Generation
