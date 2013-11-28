@@ -52,6 +52,8 @@ import Data.Aeson (ToJSON(..), FromJSON(..))
 import Data.Aeson.TH
 import Data.BEncode as BE
 import Data.BEncode.BDict as BE
+import Data.ByteString as BS
+import Data.ByteString.Char8 as BC
 import Data.Char as Char
 import Data.List as L
 import Data.Map  as M
@@ -64,8 +66,10 @@ import Data.Typeable
 import Data.URLEncoded as URL
 import Data.Word
 import Network
-import Network.URI
+import Network.HTTP.Types.URI hiding (urlEncode)
 import Network.Socket
+import Network.URI
+import Text.Read (readMaybe)
 
 import Data.Torrent.InfoHash
 import Data.Torrent.Progress
@@ -226,63 +230,83 @@ data QueryParam
   = ParamInfoHash
   | ParamPeerId
   | ParamPort
-  | ParamProgress
+  | ParamUploaded
+  | ParamLeft
+  | ParamDownloaded
   | ParamIP
   | ParamNumWant
   | ParamEvent
     deriving (Show, Eq, Ord, Enum)
 
 data ParamParseFailure
-  = Missing QueryParam      -- ^ param not found in query string;
-  | Invalid QueryParam Text -- ^ param present but not valid.
+  = Missing QueryParam            -- ^ param not found in query string;
+  | Invalid QueryParam ByteString -- ^ param present but not valid.
     deriving (Show, Eq)
 
-type ParamResult = Either ParamParseFailure
+paramName :: QueryParam -> ByteString
+paramName ParamInfoHash   = "info_hash"
+paramName ParamPeerId     = "peer_id"
+paramName ParamPort       = "port"
+paramName ParamUploaded   = "uploaded"
+paramName ParamLeft       = "left"
+paramName ParamDownloaded = "downloaded"
+paramName ParamIP         = "ip"
+paramName ParamNumWant    = "numwant"
+paramName ParamEvent      = "event"
 
-textToPeerId :: Text -> Maybe PeerId
-textToPeerId = undefined
+class FromParam a where
+  fromParam :: BS.ByteString -> Maybe a
 
-textToPortNumber :: Text -> Maybe PortNumber
-textToPortNumber = undefined
+instance FromParam InfoHash where
+  fromParam = byteStringToInfoHash
 
-textToHostAddress :: Text -> Maybe HostAddress
-textToHostAddress = undefined
+instance FromParam PeerId where
+  fromParam = byteStringToPeerId
 
-textToNumWant :: Text -> Maybe Int
-textToNumWant = undefined
+instance FromParam Word32 where
+  fromParam = readMaybe . BC.unpack
 
-textToEvent :: Text -> Maybe Event
-textToEvent = undefined
+instance FromParam Word64 where
+  fromParam = readMaybe . BC.unpack
 
-paramName :: QueryParam -> Text
-paramName ParamInfoHash = "info_hash"
-paramName ParamPeerId   = "peer_id"
-paramName ParamPort     = "port"
+instance FromParam Int where
+  fromParam = readMaybe . BC.unpack
 
--- | Parse announce request from a decoded query string.
-parseAnnounceQuery :: [(Text, Text)] -> Either ParamParseFailure AnnounceQuery
+instance FromParam PortNumber where
+  fromParam bs = fromIntegral <$> (fromParam bs :: Maybe Word32)
+
+instance FromParam Event where
+  fromParam bs = case BC.uncons bs of
+    Nothing      -> Nothing
+    Just (x, xs) -> readMaybe $ BC.unpack $ BC.cons (Char.toUpper x) xs
+
+withError e = maybe (Left e) Right
+
+reqParam param xs = do
+  val <- withError (Missing param) $ L.lookup (paramName param) xs
+  withError (Invalid param val) (fromParam val)
+
+optParam param ps
+  | Just x <- L.lookup (paramName param) ps
+  = pure <$> withError (Invalid param x) (fromParam x)
+  | otherwise = pure Nothing
+
+parseProgress :: SimpleQuery -> Either ParamParseFailure Progress
+parseProgress params = Progress
+  <$> reqParam ParamDownloaded params
+  <*> reqParam ParamLeft       params
+  <*> reqParam ParamUploaded   params
+
+-- | Parse announce request from a query string.
+parseAnnounceQuery :: SimpleQuery -> Either ParamParseFailure AnnounceQuery
 parseAnnounceQuery params = AnnounceQuery
-    <$> reqParam ParamInfoHash textToInfoHash    params
-    <*> reqParam ParamPeerId   textToPeerId      params
-    <*> reqParam ParamPort     textToPortNumber  params
-    <*> progress params
-    <*> optParam ParamIP       textToHostAddress params
-    <*> optParam ParamNumWant  textToNumWant     params
-    <*> optParam ParamEvent    textToEvent       params
-  where
-    withError e = maybe (Left e) Right
-    reqParam param p = withError (Missing param) . L.lookup (paramName param)
-                   >=> \x -> withError (Invalid param x) (p x)
-
-    optParam param p ps
-      | Just x <- L.lookup (paramName param) ps
-      = pure <$> withError (Invalid param x) (p x)
-      | otherwise = pure Nothing
-
-    progress = undefined
-    ip       = undefined
-    numwant  = undefined
-    event    = undefined
+  <$> reqParam ParamInfoHash params
+  <*> reqParam ParamPeerId   params
+  <*> reqParam ParamPort     params
+  <*> parseProgress params
+  <*> optParam ParamIP       params
+  <*> optParam ParamNumWant  params
+  <*> optParam ParamEvent    params
 
 -- TODO add extension datatype
 

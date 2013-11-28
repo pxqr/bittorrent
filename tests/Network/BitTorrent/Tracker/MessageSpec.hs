@@ -44,8 +44,8 @@ instance Arbitrary AnnounceQuery where
 baseURI :: URI
 baseURI = fromJust $ parseURI "http://a"
 
-parseUriQuery :: URI -> [(Text, Text)]
-parseUriQuery = filterMaybes . parseQueryText . BC.pack . uriQuery
+parseUriQuery :: URI -> SimpleQuery
+parseUriQuery = filterMaybes . parseQuery . BC.pack . uriQuery
   where
     filterMaybes :: [(a, Maybe b)] -> [(a, b)]
     filterMaybes = catMaybes . L.map f
@@ -53,16 +53,10 @@ parseUriQuery = filterMaybes . parseQueryText . BC.pack . uriQuery
         f (a, Nothing) = Nothing
         f (a, Just b ) = Just (a, b)
 
-test = do
-  let q = unGen arbitrary (mkStdGen 0) 0
-  print $ renderAnnounceQuery baseURI q
-  print $ parseUriQuery $ renderAnnounceQuery baseURI q
-
 spec :: Spec
 spec = do
   describe "Announce" $ do
-    before test $
-      it "properly url encoded" $ property $ \ q ->
+    it "properly url encoded" $ property $ \ q ->
       parseAnnounceQuery (parseUriQuery (renderAnnounceQuery baseURI q))
         `shouldBe` Right q
 

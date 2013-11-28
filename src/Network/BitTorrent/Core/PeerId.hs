@@ -15,6 +15,7 @@
 module Network.BitTorrent.Core.PeerId
        ( -- * PeerId
          PeerId (getPeerId)
+       , byteStringToPeerId
 
          -- * Generation
        , genPeerId
@@ -60,29 +61,36 @@ import Paths_bittorrent (version)
 
 import Data.Torrent.Client
 
--- TODO use unpacked form (length is known statically)
+-- TODO use unpacked Word160 form (length is known statically)
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerId = PeerId { getPeerId :: ByteString }
                  deriving (Show, Eq, Ord, BEncode, ToJSON, FromJSON)
 
+peerIdLen :: Int
+peerIdLen = 20
+
 instance Serialize PeerId where
   put = putByteString . getPeerId
-  get = PeerId <$> getBytes 20
+  get = PeerId <$> getBytes peerIdLen
 
 instance URLShow PeerId where
   urlShow = BC.unpack . getPeerId
 
 instance IsString PeerId where
   fromString str
-      | BS.length bs == 20 = PeerId bs
-      |      otherwise     = error $ "Peer id should be 20 bytes long: "
-                                  ++ show str
+      | BS.length bs == peerIdLen = PeerId bs
+      | otherwise = error $ "Peer id should be 20 bytes long: " ++ show str
     where
       bs = fromString str
 
 instance Pretty PeerId where
   pretty = text . BC.unpack . getPeerId
+
+byteStringToPeerId :: BS.ByteString -> Maybe PeerId
+byteStringToPeerId bs
+  | BS.length bs == peerIdLen = Just (PeerId bs)
+  |          otherwise        = Nothing
 
 {-----------------------------------------------------------------------
 --  Encoding

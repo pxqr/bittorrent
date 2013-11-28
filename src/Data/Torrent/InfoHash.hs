@@ -14,6 +14,7 @@ module Data.Torrent.InfoHash
          InfoHash(..)
 
          -- * Parsing
+       , byteStringToInfoHash
        , textToInfoHash
 
          -- * Rendering
@@ -53,6 +54,16 @@ import Text.ParserCombinators.ReadP as P
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
 
+
+-- TODO
+--
+-- data Word160 = Word160 {-# UNPACK #-} !Word64
+--                        {-# UNPACK #-} !Word64
+--                        {-# UNPACK #-} !Word32
+--
+-- newtype InfoHash = InfoHash Word160
+--
+-- reason: bytestring have overhead = 8 words, while infohash have length 20 bytes
 
 -- | Exactly 20 bytes long SHA1 hash of the info part of torrent file.
 newtype InfoHash = InfoHash { getInfoHash :: BS.ByteString }
@@ -109,6 +120,15 @@ instance URLShow InfoHash where
 -- | base16 encoded.
 instance Pretty InfoHash where
   pretty = text . BC.unpack . ppHex . getInfoHash
+
+infoHashLen :: Int
+infoHashLen = 20
+
+-- | Convert raw bytes to info hash.
+byteStringToInfoHash :: BS.ByteString -> Maybe InfoHash
+byteStringToInfoHash bs
+  | BS.length bs == infoHashLen = Just (InfoHash bs)
+  |          otherwise          = Nothing
 
 -- | Tries both base16 and base32 while decoding info hash.
 textToInfoHash :: Text -> Maybe InfoHash
