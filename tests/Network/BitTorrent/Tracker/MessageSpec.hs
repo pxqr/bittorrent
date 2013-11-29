@@ -2,19 +2,10 @@
 module Network.BitTorrent.Tracker.MessageSpec (spec) where
 
 import Control.Applicative
-import Data.BEncode as BE
-import Data.ByteString.Char8 as BC
-import Data.ByteString.Lazy as BL
-import Data.List as L
-import Data.Maybe
 import Data.Word
-import Data.Text
 import Network
-import Network.URI
 import Test.Hspec
 import Test.QuickCheck
-import Test.QuickCheck.Gen
-import Network.HTTP.Types.URI
 
 import Data.Torrent.InfoHashSpec ()
 import Data.Torrent.ProgressSpec ()

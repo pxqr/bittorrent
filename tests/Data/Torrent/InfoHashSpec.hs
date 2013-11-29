@@ -4,7 +4,6 @@ module Data.Torrent.InfoHashSpec (spec) where
 import Control.Applicative
 import Data.ByteString as BS
 import Data.Convertible
-import Data.Maybe
 import System.FilePath
 import Test.Hspec
 import Test.QuickCheck
