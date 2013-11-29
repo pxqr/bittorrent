@@ -97,7 +97,6 @@ library
                      , conduit          >= 1.0
                      , network-conduit  >= 1.0
                      , cereal-conduit   >= 0.5
-                     , binary-conduit
 
                        -- Data & Data structures
                      , bytestring  >= 0.10.0.0
@@ -117,10 +116,9 @@ library
                        -- Codecs & Serialization
                      , aeson
                      , base16-bytestring
-                     , base32-bytestring
+                     , base32-bytestring >= 0.2
                      , base64-bytestring
                      , bencoding   >= 0.4
-                     , binary
                      , cereal      >= 0.3
 
                        -- Time

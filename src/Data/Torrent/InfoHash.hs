@@ -127,11 +127,13 @@ instance Convertible Text InfoHash where
   safeConvert t
       |      hashLen <= 28   =
         case Base64.decode hashStr of
-          Left  msg   -> convError ("invalid base64 encoding" ++ msg) t
+          Left  msg   -> convError ("invalid base64 encoding " ++ msg) t
           Right ihStr -> pure $ InfoHash ihStr
 
-      |      hashLen == 32   = pure $ InfoHash $ Base32.decode hashStr
--- TODO FIX Base32.decode can return 'undefined'
+      |      hashLen == 32   =
+        case Base32.decode hashStr of
+          Left  msg   -> convError msg t
+          Right ihStr -> pure $ InfoHash ihStr
 
       |      hashLen == 40   =
         let (ihStr, inv) = Base16.decode hashStr
@@ -146,9 +148,7 @@ instance Convertible Text InfoHash where
 
 -- | Decode from base16\/base32\/base64 encoded string.
 instance IsString InfoHash where
-  fromString str = fromMaybe err $ textToInfoHash $ T.pack str
-    where
-      err = error $ "fromString: invalid infohash string" ++ str
+  fromString = either (error . prettyConvertError) id . safeConvert . T.pack
 
 -- | Convert to base16 encoded JSON string.
 instance ToJSON InfoHash where
