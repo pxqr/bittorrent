@@ -161,27 +161,6 @@ data AnnounceQuery = AnnounceQuery
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceQuery)
 
-instance QueryValueLike PortNumber where
-  toQueryValue = toQueryValue . show . fromEnum
-
-instance QueryValueLike Word32 where
-  toQueryValue = toQueryValue . show
-
-instance QueryValueLike Int where
-  toQueryValue = toQueryValue . show
-
--- | HTTP tracker protocol compatible encoding.
-instance QueryLike AnnounceQuery where
-  toQuery AnnounceQuery {..} =
-      toQuery reqProgress ++
-      [ ("info_hash", toQueryValue reqInfoHash)
-      , ("peer_id"  , toQueryValue reqPeerId)
-      , ("port"     , toQueryValue reqPort)
-      , ("ip"       , toQueryValue reqIP)
-      , ("numwant"  , toQueryValue reqNumWant)
-      , ("event"    , toQueryValue reqEvent)
-      ]
-
 -- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceQuery where
   put AnnounceQuery {..} = do
@@ -219,6 +198,27 @@ instance Serialize AnnounceQuery where
       , reqEvent      = ev
       }
 
+instance QueryValueLike PortNumber where
+  toQueryValue = toQueryValue . show . fromEnum
+
+instance QueryValueLike Word32 where
+  toQueryValue = toQueryValue . show
+
+instance QueryValueLike Int where
+  toQueryValue = toQueryValue . show
+
+-- | HTTP tracker protocol compatible encoding.
+instance QueryLike AnnounceQuery where
+  toQuery AnnounceQuery {..} =
+      toQuery reqProgress ++
+      [ ("info_hash", toQueryValue reqInfoHash)
+      , ("peer_id"  , toQueryValue reqPeerId)
+      , ("port"     , toQueryValue reqPort)
+      , ("ip"       , toQueryValue reqIP)
+      , ("numwant"  , toQueryValue reqNumWant)
+      , ("event"    , toQueryValue reqEvent)
+      ]
+
 --renderAnnounceQueryBuilder :: AnnounceQuery -> BS.Builder
 --renderAnnounceQueryBuilder = undefined
 
@@ -243,11 +243,6 @@ data QueryParam
   | ParamNumWant
   | ParamEvent
     deriving (Show, Eq, Ord, Enum)
-
-data ParamParseFailure
-  = Missing QueryParam               -- ^ param not found in query string;
-  | Invalid QueryParam BS.ByteString -- ^ param present but not valid.
-    deriving (Show, Eq)
 
 paramName :: QueryParam -> BS.ByteString
 paramName ParamInfoHash   = "info_hash"
@@ -285,6 +280,11 @@ instance FromParam Event where
   fromParam bs = do
     (x, xs) <- BC.uncons bs
     readMaybe $ BC.unpack $ BC.cons (Char.toUpper x) xs
+
+data ParamParseFailure
+  = Missing QueryParam               -- ^ param not found in query string;
+  | Invalid QueryParam BS.ByteString -- ^ param present but not valid.
+    deriving (Show, Eq)
 
 type Result = Either ParamParseFailure
 
