@@ -84,14 +84,14 @@ library
                        -- Control
                      , deepseq
                      , lens
-                     , mtl
-                     , resourcet
-                     , transformers
+--                     , mtl
+--                     , resourcet
+--                     , transformers
 
                        -- Concurrency
-                     , SafeSemaphore
-                     , BoundedChan >= 1.0.1.0
-                     , stm         >= 2.4
+--                     , SafeSemaphore
+--                     , BoundedChan >= 1.0.1.0
+--                     , stm         >= 2.4
 
                        -- Streaming
                      , conduit          >= 1.0
@@ -127,15 +127,14 @@ library
 
                        -- Network
                      , network     >= 2.4
-                     , HTTP        >= 4000.2
                      , http-types  >= 0.7
-                     , krpc        >= 0.3
+--                     , krpc
 
                        -- System
                      , directory   >= 1
                      , entropy
                      , filepath    >= 1
-                     , mmap
+--                     , mmap
 
   ghc-options:         -Wall
   ghc-prof-options:
