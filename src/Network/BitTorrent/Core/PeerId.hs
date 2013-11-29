@@ -12,10 +12,11 @@
 --  /peer handshakes/ and used in DHT queries.
 --
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 module Network.BitTorrent.Core.PeerId
        ( -- * PeerId
          PeerId
-       , byteStringToPeerId
 
          -- * Generation
        , genPeerId
@@ -40,6 +41,7 @@ import Data.ByteString.Internal as BS
 import Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Builder as BS
+import Data.Convertible
 import Data.Default
 import Data.Foldable    (foldMap)
 import Data.List as L
@@ -51,6 +53,7 @@ import Data.Serialize as S
 import Data.String
 import Data.Time.Clock  (getCurrentTime)
 import Data.Time.Format (formatTime)
+import Data.Typeable
 import Data.Version     (Version(Version), versionBranch)
 import Network.HTTP.Types.QueryLike
 import System.Entropy   (getEntropy)
@@ -65,7 +68,7 @@ import Data.Torrent.Client
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerId = PeerId { getPeerId :: ByteString }
-                 deriving (Show, Eq, Ord, BEncode, ToJSON, FromJSON)
+  deriving (Show, Eq, Ord, BEncode, ToJSON, FromJSON, Typeable)
 
 peerIdLen :: Int
 peerIdLen = 20
@@ -92,10 +95,10 @@ instance IsString PeerId where
 instance Pretty PeerId where
   pretty = text . BC.unpack . getPeerId
 
-byteStringToPeerId :: BS.ByteString -> Maybe PeerId
-byteStringToPeerId bs
-  | BS.length bs == peerIdLen = Just (PeerId bs)
-  |          otherwise        = Nothing
+instance Convertible BS.ByteString PeerId where
+  safeConvert bs
+    | BS.length bs == peerIdLen = pure (PeerId bs)
+    |          otherwise        = convError "invalid length" bs
 
 {-----------------------------------------------------------------------
 --  Encoding

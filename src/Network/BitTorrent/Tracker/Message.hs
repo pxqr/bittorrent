@@ -267,7 +267,7 @@ instance FromParam InfoHash where
   fromParam = either (const Nothing) pure . safeConvert
 
 instance FromParam PeerId where
-  fromParam = byteStringToPeerId
+  fromParam = either (const Nothing) pure . safeConvert
 
 instance FromParam Word32 where
   fromParam = readMaybe . BC.unpack
@@ -282,9 +282,9 @@ instance FromParam PortNumber where
   fromParam bs = fromIntegral <$> (fromParam bs :: Maybe Word32)
 
 instance FromParam Event where
-  fromParam bs = case BC.uncons bs of
-    Nothing      -> Nothing
-    Just (x, xs) -> readMaybe $ BC.unpack $ BC.cons (Char.toUpper x) xs
+  fromParam bs = do
+    (x, xs) <- BC.uncons bs
+    readMaybe $ BC.unpack $ BC.cons (Char.toUpper x) xs
 
 type Result = Either ParamParseFailure
 
