@@ -20,8 +20,6 @@ module Data.Torrent.InfoHash
          -- * Rendering
        , longHex
        , shortHex
-
-       , addHashToURI
        ) where
 
 import Control.Applicative
@@ -37,7 +35,6 @@ import Data.Char
 import Data.Convertible.Base
 import Data.Default
 import Data.List       as L
-import Data.Maybe
 import Data.Hashable   as Hashable
 import Data.Serialize
 import Data.String
@@ -45,8 +42,6 @@ import Data.Text as T
 import Data.Text.Encoding as T
 import Data.Typeable
 import Network.HTTP.Types.QueryLike
-import Network.URI
-import Numeric
 import Text.ParserCombinators.ReadP as P
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
@@ -88,7 +83,7 @@ instance Serialize InfoHash where
   put (InfoHash ih) = putByteString ih
   {-# INLINE put #-}
 
-  get = InfoHash <$> getBytes 20
+  get = InfoHash <$> getBytes infoHashLen
   {-# INLINE get #-}
 
 -- | Convert to raw query value. (no encoding)
@@ -107,7 +102,7 @@ instance Pretty InfoHash where
 -- | Read base16 encoded string.
 instance Read InfoHash where
   readsPrec _ = readP_to_S $ do
-      str <- replicateM 40 (satisfy isHexDigit)
+      str <- replicateM (infoHashLen * 2) (satisfy isHexDigit)
       return $ InfoHash $ decodeIH str
     where
       decodeIH       = BS.pack . L.map fromHex . pair
@@ -173,30 +168,6 @@ textToInfoHash = ignoreErrorMsg . safeConvert
 longHex :: InfoHash -> Text
 longHex = T.decodeUtf8 . Base16.encode . getInfoHash
 
--- | The same as 'longHex', but 7 character long.
+-- | The same as 'longHex', but only first 7 characters.
 shortHex :: InfoHash -> Text
 shortHex = T.take 7 . longHex
-
--- | TODO remove from API
---
---   Add query info hash parameter to uri.
---
---   > info_hash=<url_encoded_info_hash>
---
-addHashToURI :: URI -> InfoHash -> URI
-addHashToURI uri s = uri {
-    uriQuery = uriQuery uri ++ mkPref (uriQuery uri) ++
-               "info_hash=" ++ rfc1738Encode (BC.unpack (getInfoHash s))
-  }
-  where
-    mkPref [] = "?"
-    mkPref ('?' : _) = "&"
-    mkPref _ = error "addHashToURI"
-
-    rfc1738Encode = L.concatMap (\c -> if unreservedS c then [c] else encodeHex c)
-      where
-        unreservedS = (`L.elem` chars)
-        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_./"
-        encodeHex c = '%' : pHex c
-        pHex c = let p = (showHex . ord $ c) ""
-                 in if L.length p == 1 then '0' : p else p
