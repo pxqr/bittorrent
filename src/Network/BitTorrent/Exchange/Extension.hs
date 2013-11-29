@@ -12,54 +12,59 @@
 --
 module Network.BitTorrent.Exchange.Extension
        ( -- * Capabilities
-         Capabilities
-       , ppCaps, defaultCaps
-       , enabledCaps
+         Caps
 
          -- * Extensions
        , Extension(..)
-       , defaultExtensions, ppExtension
-       , encodeExts, decodeExts
        ) where
 
 import Data.Bits
+import Data.Default
+import Data.Monoid
 import Data.Word
 import Text.PrettyPrint
+import Text.PrettyPrint.Class
 
+class (Enum a, Bounded a) => Capability a where
+  capMask :: a -> Word64
+  capRequires :: a -> Word64
 
-type Capabilities = Word64
+newtype Caps a = Caps Word64
 
-ppCaps :: Capabilities -> Doc
-ppCaps = hcat . punctuate ", " . map ppExtension . decodeExts
+instance (Pretty a, Capability a) => Pretty (Caps a) where
+  pretty = hcat . punctuate ", " . map pretty . toList
 
-defaultCaps :: Capabilities
-defaultCaps = 0
+instance Default (Caps a) where
+  def = Caps 0
+  {-# INLINE def #-}
 
-enabledCaps :: Capabilities -- ^ of the client.
-            -> Capabilities -- ^ of the peer.
-            -> Capabilities -- ^ should be considered as enabled.
-enabledCaps = (.&.)
+instance Monoid (Caps a) where
+  mempty  = Caps (-1)
+  {-# INLINE mempty #-}
 
+  mappend (Caps a) (Caps b) = Caps (a .&. b)
+  {-# INLINE mappend #-}
 
-data Extension = ExtDHT  -- ^ BEP 5
-               | ExtFast -- ^ BEP 6
-                 deriving (Show, Eq, Ord, Enum, Bounded)
+allowed :: Capability a => a -> Caps a -> Bool
+allowed = member
+fromList :: Capability a => [a] -> Caps a
+fromList = Caps . foldr (.&.) 0 . map capMask
 
-ppExtension :: Extension -> Doc
-ppExtension ExtDHT  = "DHT"
-ppExtension ExtFast = "Fast Extension"
-
-extensionMask :: Extension -> Word64
-extensionMask ExtDHT  = 0x01
-extensionMask ExtFast = 0x04
-
-defaultExtensions :: [Extension]
-defaultExtensions = []
-
-encodeExts :: [Extension] -> Capabilities
-encodeExts = foldr (.&.) 0 . map extensionMask
-
-decodeExts :: Capabilities -> [Extension]
-decodeExts rb = filter (testMask rb . extensionMask) [minBound..maxBound]
+toList :: Capability a => Caps a -> [a]
+toList (Caps rb) = filter (testMask rb . capMask) [minBound..maxBound]
   where
     testMask bits x = bits .&. x > 0
+
+
+data Extension
+  = ExtDHT  -- ^ BEP 5
+  | ExtFast -- ^ BEP 6
+    deriving (Show, Eq, Ord, Enum, Bounded)
+
+instance Pretty Extension where
+  pretty ExtDHT  = "DHT"
+  pretty ExtFast = "Fast Extension"
+
+instance Capability Extension where
+  capMask ExtDHT  = 0x01
+  capMask ExtFast = 0x04

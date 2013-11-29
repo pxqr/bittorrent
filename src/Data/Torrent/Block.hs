@@ -37,9 +37,6 @@ import Data.Aeson.TH
 import qualified Data.ByteString.Lazy as Lazy
 import Data.Char
 import Data.List as L
-import Data.Binary as B
-import Data.Binary.Get as B
-import Data.Binary.Put as B
 import Data.Serialize as S
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
@@ -110,14 +107,6 @@ putInt :: S.Putter Int
 putInt = S.putWord32be . fromIntegral
 {-# INLINE putInt #-}
 
-getIntB :: B.Get Int
-getIntB = fromIntegral <$> B.getWord32be
-{-# INLINE getIntB #-}
-
-putIntB :: Int -> B.Put
-putIntB = B.putWord32be . fromIntegral
-{-# INLINE putIntB #-}
-
 instance Serialize BlockIx where
   {-# SPECIALIZE instance Serialize BlockIx #-}
   get = BlockIx <$> getInt
@@ -130,18 +119,6 @@ instance Serialize BlockIx where
     putInt ixOffset
     putInt ixLength
   {-# INLINE put #-}
-
-instance Binary BlockIx where
-  {-# SPECIALIZE instance Binary BlockIx #-}
-  get = BlockIx <$> getIntB
-                <*> getIntB
-                <*> getIntB
-  {-# INLINE get #-}
-
-  put BlockIx {..} = do
-    putIntB ixPiece
-    putIntB ixOffset
-    putIntB ixLength
 
 instance Pretty BlockIx where
   pretty BlockIx {..} =

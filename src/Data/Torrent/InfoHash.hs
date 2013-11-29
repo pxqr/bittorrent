@@ -125,21 +125,21 @@ instance Convertible BS.ByteString InfoHash where
 -- | Parse infohash from base16\/base32\/base64 encoded string.
 instance Convertible Text InfoHash where
   safeConvert t
-      |      hashLen <= 28   =
+      | 26 <= hashLen && hashLen <= 28 =
         case Base64.decode hashStr of
           Left  msg   -> convError ("invalid base64 encoding " ++ msg) t
-          Right ihStr -> pure $ InfoHash ihStr
+          Right ihStr -> safeConvert ihStr
 
       |      hashLen == 32   =
         case Base32.decode hashStr of
           Left  msg   -> convError msg t
-          Right ihStr -> pure $ InfoHash ihStr
+          Right ihStr -> safeConvert ihStr
 
       |      hashLen == 40   =
         let (ihStr, inv) = Base16.decode hashStr
-        in if BS.length inv == 0
-           then pure $ InfoHash ihStr
-           else convError "invalid base16 encoding" t
+        in if BS.length inv /= 0
+           then convError "invalid base16 encoding" t
+           else safeConvert ihStr
 
       |        otherwise     = convError "invalid length" t
     where
@@ -156,8 +156,8 @@ instance ToJSON InfoHash where
 
 -- | Convert from base16\/base32\/base64 encoded JSON string.
 instance FromJSON InfoHash where
-  parseJSON = withText "JSON" $ -- TODO
-    maybe (fail "could not parse InfoHash") pure . textToInfoHash
+  parseJSON = withText "InfoHash" $
+    either (fail . prettyConvertError) pure . safeConvert
 
 ignoreErrorMsg :: Either a b -> Maybe b
 ignoreErrorMsg = either (const Nothing) Just
