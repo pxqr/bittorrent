@@ -5,7 +5,13 @@
 --   Stability   :  provisional
 --   Portability :  portable
 --
---   Parsing and rendering of magnet URIs.
+--   Magnet URI scheme is an standard defining Magnet links. Magnet
+--   links are refer to resources by hash, in particular magnet links
+--   can refer to torrent using corresponding infohash. In this way,
+--   magnet links can be used instead of torrent files.
+--
+--   This module provides bittorrent specific implementation of magnet
+--   links.
 --
 --   For more info see:
 --   <http://magnet-uri.sourceforge.net/magnet-draft-overview.txt>
@@ -59,32 +65,41 @@ import Data.Torrent.URN
 
 
 -- TODO multiple exact topics
--- TODO supplement
+-- TODO render/parse supplement for URI/query
 
 -- | An URI used to identify torrent.
 data Magnet = Magnet
-    { -- | Resource hash.
-      exactTopic  :: !InfoHash
+  { -- | Torrent infohash hash. Can be used in DHT queries if no
+    -- 'tracker' provided.
+    exactTopic  :: !InfoHash -- TODO InfoHash -> URN?
 
-      -- | Might be used to display name while waiting for metadata.
-    , displayName :: Maybe Text
+    -- | A filename for the file to download. Can be used to
+    -- display name while waiting for metadata.
+  , displayName :: Maybe Text
 
-      -- | Size of the resource in bytes.
-    , exactLength :: Maybe Integer
+    -- | Size of the resource in bytes.
+  , exactLength :: Maybe Integer
 
-    , manifest :: Maybe Text
+    -- | URI pointing to manifest, e.g. a list of further items.
+  , manifest :: Maybe Text
 
-      -- | Search string.
-    , keywordTopic :: Maybe Text
+    -- | Search string.
+  , keywordTopic :: Maybe Text
 
-    , acceptableSource :: Maybe URI
-    , exactSource      :: Maybe URI
+    -- | A source to be queried after not being able to find and
+    -- download the file in the bittorrent network in a defined
+    -- amount of time.
+  , acceptableSource :: Maybe URI
 
-    , tracker :: Maybe URI
+    -- | Direct link to the resource.
+  , exactSource      :: Maybe URI
 
-    , supplement :: Map Text Text
-    } deriving (Eq, Ord, Typeable)
+    -- | URI to the tracker.
+  , tracker :: Maybe URI
 
+    -- | Additional or experimental parameters.
+  , supplement :: Map Text Text
+  } deriving (Eq, Ord, Typeable)
 
 instance QueryValueLike Integer where
   toQueryValue = toQueryValue . show

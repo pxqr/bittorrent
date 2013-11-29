@@ -193,6 +193,7 @@ libClientInfo = ClientInfo IlibHSbittorrent version
 {-----------------------------------------------------------------------
 --  For torrent file
 -----------------------------------------------------------------------}
+-- TODO collect information about createdBy torrent field
 {-
 renderImpl :: ClientImpl -> Text
 renderImpl = T.pack . L.tail . show
