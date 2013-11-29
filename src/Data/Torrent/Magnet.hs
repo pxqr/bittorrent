@@ -18,6 +18,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
+{-# OPTIONS -fno-warn-orphans      #-}
 module Data.Torrent.Magnet
        ( -- * Magnet
          Magnet(..)

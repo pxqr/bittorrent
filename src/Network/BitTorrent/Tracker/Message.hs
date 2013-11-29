@@ -46,11 +46,10 @@ module Network.BitTorrent.Tracker.Message
        where
 
 import Control.Applicative
-import Control.Exception
 import Control.Monad
 import Data.Aeson (ToJSON(..), FromJSON(..))
 import Data.Aeson.TH
-import Data.BEncode as BE
+import Data.BEncode as BE hiding (Result)
 import Data.BEncode.BDict as BE
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
@@ -59,7 +58,6 @@ import Data.Convertible
 import Data.List as L
 import Data.Map  as M
 import Data.Maybe
-import Data.Monoid
 import Data.Serialize as S hiding (Result)
 import Data.Text (Text)
 import Data.Text.Encoding
@@ -70,7 +68,6 @@ import Network.HTTP.Types.QueryLike
 import Network.HTTP.Types.URI hiding (urlEncode)
 import Network.HTTP.Types.Status
 import Network.Socket
-import Network.URI
 import Text.Read (readMaybe)
 
 import Data.Torrent.InfoHash
@@ -232,7 +229,7 @@ renderAnnounceQuery = filterMaybes . toQuery
     filterMaybes :: [(a, Maybe b)] -> [(a, b)]
     filterMaybes = catMaybes . L.map f
       where
-        f (a, Nothing) = Nothing
+        f (_, Nothing) = Nothing
         f (a, Just b ) = Just (a, b)
 
 data QueryParam
@@ -289,18 +286,23 @@ instance FromParam Event where
     Nothing      -> Nothing
     Just (x, xs) -> readMaybe $ BC.unpack $ BC.cons (Char.toUpper x) xs
 
+type Result = Either ParamParseFailure
+
+withError :: ParamParseFailure -> Maybe a -> Result a
 withError e = maybe (Left e) Right
 
+reqParam :: FromParam a => QueryParam -> SimpleQuery -> Result a
 reqParam param xs = do
   val <- withError (Missing param) $ L.lookup (paramName param) xs
   withError (Invalid param val) (fromParam val)
 
+optParam :: FromParam a => QueryParam -> SimpleQuery -> Result (Maybe a)
 optParam param ps
   | Just x <- L.lookup (paramName param) ps
   = pure <$> withError (Invalid param x) (fromParam x)
   | otherwise = pure Nothing
 
-parseProgress :: SimpleQuery -> Either ParamParseFailure Progress
+parseProgress :: SimpleQuery -> Result Progress
 parseProgress params = Progress
   <$> reqParam ParamDownloaded params
   <*> reqParam ParamLeft       params
@@ -318,7 +320,7 @@ parseAnnounceQuery params = AnnounceQuery
   <*> optParam ParamEvent    params
 
 -- TODO add extension datatype
-type AnnounceRequest = ()
+--type AnnounceRequest = ()
 
 {-----------------------------------------------------------------------
 --  Announce response
@@ -471,8 +473,8 @@ parseFailureMessage e = BS.concat $ case e of
 parseFailureStatus :: ParamParseFailure -> Status
 parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
 
-type AnnounceResponse = Either Status AnnounceInfo -- TODO
-type TrackerResponse = () -- TODO
+--type AnnounceResponse = Either Status AnnounceInfo -- TODO
+--type TrackerResponse = () -- TODO
 
 {-----------------------------------------------------------------------
   Scrape message

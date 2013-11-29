@@ -20,6 +20,7 @@
 --   capabilities (such as supported enchancements), this should be
 --   done using 'Network.BitTorrent.Extension'!
 --
+{-# OPTIONS -fno-warn-orphans #-}
 module Data.Torrent.Client
        ( ClientImpl (..)
        , ClientInfo (..)
@@ -29,9 +30,7 @@ module Data.Torrent.Client
 import Data.Default
 import Data.List as L
 import Data.List.Split as L
-import Data.Monoid
 import Data.String
-import Data.Text as T
 import Data.Version
 import Text.PrettyPrint hiding ((<>))
 import Text.PrettyPrint.Class
@@ -194,7 +193,7 @@ libClientInfo = ClientInfo IlibHSbittorrent version
 {-----------------------------------------------------------------------
 --  For torrent file
 -----------------------------------------------------------------------}
-
+{-
 renderImpl :: ClientImpl -> Text
 renderImpl = T.pack . L.tail . show
 
@@ -206,7 +205,7 @@ renderClientInfo ClientInfo {..} = renderImpl ciImpl <> "/" <> renderVersion ciV
 
 parseClientInfo :: Text -> ClientImpl
 parseClientInfo t = undefined
-
+-}
 {-
 -- code used for generation; remove it later on
 

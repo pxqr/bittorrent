@@ -35,7 +35,6 @@ import Network.Socket
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
 
-import Data.Torrent.Client
 import Network.BitTorrent.Core.PeerId
 
 
