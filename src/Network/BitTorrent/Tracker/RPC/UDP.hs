@@ -30,7 +30,6 @@ import Control.Monad
 import Data.ByteString (ByteString)
 import Data.IORef
 import Data.List as L
-import Data.Map as M
 import Data.Maybe
 import Data.Monoid
 import Data.Serialize
@@ -94,7 +93,7 @@ data Request  = Connect
 
 data Response = Connected ConnectionId
               | Announced AnnounceInfo
-              | Scraped   [ScrapeInfo]
+              | Scraped   [ScrapeEntry]
               | Failed    Text
                 deriving Show
 
@@ -288,7 +287,7 @@ connectUDP tracker = do
   case resp of
     Connected cid -> return cid
     Failed    msg -> throwIO $ userError $ T.unpack msg
-    _             -> throwIO $ userError "message type mismatch"
+    _             -> throwIO $ userError "connect: response type mismatch"
 
 connect :: URI -> IO UDPTracker
 connect uri = do
@@ -313,12 +312,12 @@ announce ann tracker = do
     Announced info -> return info
     _              -> fail "announce: response type mismatch"
 
-scrape :: ScrapeQuery -> UDPTracker -> IO Scrape
+scrape :: ScrapeQuery -> UDPTracker -> IO ScrapeInfo
 scrape ihs tracker = do
   freshConnection tracker
   resp <- transaction tracker (Scrape ihs)
   case resp of
-    Scraped info -> return $ M.fromList $ L.zip ihs info
+    Scraped info -> return $ L.zip ihs info
     _            -> fail "scrape: response type mismatch"
 
 {-----------------------------------------------------------------------

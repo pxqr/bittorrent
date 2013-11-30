@@ -11,7 +11,7 @@ import Test.Hspec
 import Test.QuickCheck
 
 import Network.BitTorrent.Core.PeerAddr
-import Network.BitTorrent.Tracker.RPC.Message
+import Network.BitTorrent.Tracker.RPC.Message as Message
 import Network.BitTorrent.Tracker.RPC.UDP
 import Network.BitTorrent.Tracker.RPC.MessageSpec ()
 
@@ -27,6 +27,7 @@ trackerURIs =
 
 -- relation with query: peer id, numwant
 validateInfo :: AnnounceQuery -> AnnounceInfo -> Expectation
+validateInfo _ Message.Failure {..} = error "validateInfo: failure"
 validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
     respComplete    `shouldSatisfy` isJust
     respIncomplete  `shouldSatisfy` isJust
@@ -44,11 +45,10 @@ spec = do
     context (show uri) $ do
       describe "announce" $ do
         it "have valid response" $ do
-          query <- arbitrarySample
-          connect uri >>= announce query >>= validateInfo query
+          q <- arbitrarySample
+          connect uri >>= announce q >>= validateInfo q
 
       describe "scrape" $ do
         it "have valid response" $ do
           xs <- connect uri >>= scrape [def]
-          return ()
---          L.length xs `shouldSatisfy` (>= 1)
+          L.length xs `shouldSatisfy` (>= 1)

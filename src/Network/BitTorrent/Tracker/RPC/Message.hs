@@ -40,8 +40,8 @@ module Network.BitTorrent.Tracker.RPC.Message
 
          -- * Scrape
        , ScrapeQuery
-       , ScrapeInfo(..)
-       , Scrape
+       , ScrapeEntry (..)
+       , ScrapeInfo
        )
        where
 
@@ -56,7 +56,6 @@ import Data.ByteString.Char8 as BC
 import Data.Char as Char
 import Data.Convertible
 import Data.List as L
-import Data.Map  as M
 import Data.Maybe
 import Data.Serialize as S hiding (Result)
 import Data.Text (Text)
@@ -482,9 +481,8 @@ parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
 
 type ScrapeQuery = [InfoHash]
 
--- TODO rename to ScrapeEntry
 -- | Overall information about particular torrent.
-data ScrapeInfo = ScrapeInfo {
+data ScrapeEntry = ScrapeEntry {
     -- | Number of seeders - peers with the entire file.
     siComplete   :: {-# UNPACK #-} !Int
 
@@ -499,43 +497,35 @@ data ScrapeInfo = ScrapeInfo {
   , siName       :: !(Maybe Text)
   } deriving (Show, Eq, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
-
--- TODO hash map
--- TODO rename to ScrapeInfo
--- | Scrape info about a set of torrents.
-type Scrape = Map InfoHash ScrapeInfo
+$(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeEntry)
 
 -- | HTTP tracker protocol compatible encoding.
-instance BEncode ScrapeInfo where
-  toBEncode ScrapeInfo {..} = toDict $
+instance BEncode ScrapeEntry where
+  toBEncode ScrapeEntry {..} = toDict $
        "complete"   .=! siComplete
     .: "downloaded" .=! siDownloaded
     .: "incomplete" .=! siIncomplete
     .: "name"       .=? siName
     .: endDict
 
-  fromBEncode = fromDict $ do
-    ScrapeInfo <$>! "complete"
-               <*>! "downloaded"
-               <*>! "incomplete"
-               <*>? "name"
+  fromBEncode = fromDict $ ScrapeEntry
+    <$>! "complete"
+    <*>! "downloaded"
+    <*>! "incomplete"
+    <*>? "name"
 
 -- | UDP tracker protocol compatible encoding.
-instance Serialize ScrapeInfo where
-  put ScrapeInfo {..} = do
+instance Serialize ScrapeEntry where
+  put ScrapeEntry {..} = do
     putWord32be $ fromIntegral siComplete
     putWord32be $ fromIntegral siDownloaded
     putWord32be $ fromIntegral siIncomplete
 
-  get = do
-    seeders   <- getWord32be
-    downTimes <- getWord32be
-    leechers  <- getWord32be
+  get = ScrapeEntry
+    <$> (fromIntegral <$> getWord32be)
+    <*> (fromIntegral <$> getWord32be)
+    <*> (fromIntegral <$> getWord32be)
+    <*> pure Nothing
 
-    return $ ScrapeInfo {
-        siComplete   = fromIntegral seeders
-      , siDownloaded = fromIntegral downTimes
-      , siIncomplete = fromIntegral leechers
-      , siName       = Nothing
-      }
+-- | Scrape info about a set of torrents.
+type ScrapeInfo = [(InfoHash, ScrapeEntry)]
