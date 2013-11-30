@@ -15,13 +15,13 @@
 {-# LANGUAGE TypeFamilies               #-}
 module Network.BitTorrent.Tracker.RPC.UDP
        ( UDPTracker
+       , putTracker
+
+         -- * RPC
        , connect
        , announce
        , scrape
        , retransmission
-
-         -- * Debug
-       , putTracker
        ) where
 
 import Control.Applicative
@@ -246,8 +246,6 @@ call addr arg = bracket open close rpc
         throwIO $ userError "address mismatch"
       return res
 
--- TODO retransmissions
--- TODO blocking
 data UDPTracker = UDPTracker
     { trackerURI        :: URI
     , trackerConnection :: IORef Connection

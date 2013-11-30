@@ -67,7 +67,7 @@ library
 --                   , Network.BitTorrent.Tracker
 --                     , Network.BitTorrent.Tracker.RPC
                      , Network.BitTorrent.Tracker.RPC.Message
---                     , Network.BitTorrent.Tracker.RPC.HTTP
+                     , Network.BitTorrent.Tracker.RPC.HTTP
                      , Network.BitTorrent.Tracker.RPC.UDP
 --                   , Network.BitTorrent.Tracker.Session
 --                   , Network.BitTorrent.Session
@@ -86,7 +86,7 @@ library
                      , deepseq
                      , lens
 --                     , mtl
---                     , resourcet
+                     , resourcet
 --                     , transformers
 
                        -- Concurrency
@@ -155,6 +155,7 @@ test-suite spec
                        Data.Torrent.ProgressSpec
                        Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.Tracker.RPC.MessageSpec
+                       Network.BitTorrent.Tracker.RPC.HTTPSpec
                        Network.BitTorrent.Tracker.RPC.UDPSpec
   build-depends:       base == 4.*
                      , bytestring

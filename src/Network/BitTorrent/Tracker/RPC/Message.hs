@@ -25,21 +25,26 @@
 {-# OPTIONS -fno-warn-orphans           #-}
 module Network.BitTorrent.Tracker.RPC.Message
        ( -- * Announce
-         -- ** Request
+         -- ** Query
          Event(..)
        , AnnounceQuery(..)
        , renderAnnounceQuery
        , ParamParseFailure
        , parseAnnounceQuery
 
-         -- ** Response
+         -- ** Info
        , PeerList (..)
        , AnnounceInfo(..)
        , defaultNumWant
        , parseFailureStatus
 
          -- * Scrape
+         -- ** Query
        , ScrapeQuery
+       , renderScrapeQuery
+       , parseScrapeQuery
+
+         -- ** Info
        , ScrapeEntry (..)
        , ScrapeInfo
        )
@@ -218,8 +223,6 @@ instance QueryLike AnnounceQuery where
       , ("event"    , toQueryValue reqEvent)
       ]
 
---renderAnnounceQueryBuilder :: AnnounceQuery -> BS.Builder
---renderAnnounceQueryBuilder = undefined
 
 -- | Encode announce query and add it to the base tracker URL.
 renderAnnounceQuery :: AnnounceQuery -> SimpleQuery
@@ -480,6 +483,12 @@ parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
 -----------------------------------------------------------------------}
 
 type ScrapeQuery = [InfoHash]
+
+renderScrapeQuery :: ScrapeQuery -> SimpleQuery
+renderScrapeQuery = undefined
+
+parseScrapeQuery :: SimpleQuery -> ScrapeQuery
+parseScrapeQuery = undefined
 
 -- | Overall information about particular torrent.
 data ScrapeEntry = ScrapeEntry {
