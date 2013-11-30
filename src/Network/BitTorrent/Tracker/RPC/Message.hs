@@ -223,16 +223,15 @@ instance QueryLike AnnounceQuery where
       , ("event"    , toQueryValue reqEvent)
       ]
 
+filterMaybes :: [(a, Maybe b)] -> [(a, b)]
+filterMaybes = catMaybes . L.map f
+  where
+    f (_, Nothing) = Nothing
+    f (a, Just b ) = Just (a, b)
 
 -- | Encode announce query and add it to the base tracker URL.
 renderAnnounceQuery :: AnnounceQuery -> SimpleQuery
 renderAnnounceQuery = filterMaybes . toQuery
-  where
-    filterMaybes :: [(a, Maybe b)] -> [(a, b)]
-    filterMaybes = catMaybes . L.map f
-      where
-        f (_, Nothing) = Nothing
-        f (a, Just b ) = Just (a, b)
 
 data QueryParam
   = ParamInfoHash
@@ -481,11 +480,33 @@ parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
 
 type ScrapeQuery = [InfoHash]
 
+-- TODO
+-- data ScrapeQuery
+--  = ScrapeAll
+--  | ScrapeSingle InfoHash
+--  | ScrapeMulti (HashSet InfoHash)
+--    deriving (Show)
+--
+--  data ScrapeInfo
+--    = ScrapeAll   (HashMap InfoHash ScrapeEntry)
+--    | ScrapeSingle InfoHash ScrapeEntry
+--    | ScrapeMulti (HashMap InfoHash ScrapeEntry)
+--
+
+scrapeParam :: BS.ByteString
+scrapeParam = "info_hash"
+
+isScrapeParam :: BS.ByteString -> Bool
+isScrapeParam = (==) scrapeParam
+
 renderScrapeQuery :: ScrapeQuery -> SimpleQuery
-renderScrapeQuery = undefined
+renderScrapeQuery = filterMaybes . L.map mkPair
+  where
+    mkPair ih = (scrapeParam, toQueryValue ih)
 
 parseScrapeQuery :: SimpleQuery -> ScrapeQuery
-parseScrapeQuery = undefined
+parseScrapeQuery
+  = catMaybes . L.map (fromParam . snd) . L.filter (isScrapeParam . fst)
 
 -- | Overall information about particular torrent.
 data ScrapeEntry = ScrapeEntry {
