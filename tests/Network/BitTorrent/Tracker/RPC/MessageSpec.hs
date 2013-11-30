@@ -1,5 +1,5 @@
 {-# OPTIONS -fno-warn-orphans #-}
-module Network.BitTorrent.Tracker.MessageSpec (spec) where
+module Network.BitTorrent.Tracker.RPC.MessageSpec (spec) where
 
 import Control.Applicative
 import Data.Word
@@ -11,7 +11,7 @@ import Data.Torrent.InfoHashSpec ()
 import Data.Torrent.ProgressSpec ()
 import Network.BitTorrent.Core.PeerIdSpec ()
 
-import Network.BitTorrent.Tracker.Message
+import Network.BitTorrent.Tracker.RPC.Message
 
 
 --prop_bencode :: Eq a => BEncode a => a -> Bool

@@ -13,78 +13,50 @@
 --   For more information see:
 --   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
 --
-module Network.BitTorrent.Tracker.HTTP
-       ( HTTPTracker
-
-         -- * Extra
---       , scrapeURL
+module Network.BitTorrent.Tracker.RPC.HTTP
+       ( Connection
+       , connect
+       , announce
+       , scrape
        ) where
 
+import Control.Applicative
 import Control.Exception
-import Data.BEncode
+import Data.BEncode as BE
 import Data.ByteString as B
 import Data.ByteString.Char8 as BC
+import Data.ByteString.Lazy  as BL
 import Data.List as L
 import Data.Map as M
 import Data.Monoid
-import Data.URLEncoded as URL
 import Network.URI
-import Network.HTTP
+import Network.HTTP.Conduit
 
 import Data.Torrent.InfoHash
-import Network.BitTorrent.Tracker.Message
+import Network.BitTorrent.Tracker.RPC.Message
 
--- | Set of tracker RPCs.
-class Tracker s where
-  connect  :: URI -> IO s
-  announce :: s -> AnnounceQuery -> IO AnnounceInfo
-  scrape   :: s -> ScrapeQuery   -> IO Scrape
 
--- | More particular version of 'scrape', just for one torrent.
---
-scrapeOne :: Tracker t => t -> InfoHash -> IO ScrapeInfo
-scrapeOne uri ih = scrape uri [ih] >>= maybe err return . M.lookup ih
-  where
-    err = throwIO $ userError "unable to find info hash in response dict"
-
-data HTTPTracker = HTTPTracker
+data Connection = Connection
   { announceURI :: URI
   } deriving Show
 
-instance Tracker HTTPTracker where
-  connect  = return . HTTPTracker
-  announce = announceHTTP
---  scrape   = scrapeHTTP
-
-{-----------------------------------------------------------------------
-  Announce
------------------------------------------------------------------------}
-
-mkGET :: URI -> Request ByteString
-mkGET uri = Request uri GET [] ""
+connect :: URI -> IO Connection
+connect = return . Connection
 
 -- | Send request and receive response from the tracker specified in
 -- announce list. This function throws 'IOException' if it couldn't
 -- send request or receive response or decode response.
 --
-announceHTTP :: HTTPTracker -> AnnounceQuery -> IO AnnounceInfo
-announceHTTP HTTPTracker {..} req = do
-    let r = mkGET (renderAnnounceQuery announceURI req)
+announce :: AnnounceQuery -> Connection -> IO (Result AnnounceInfo)
+announce req = do
+  let uri = undefined
+  resp  <- BL.toStrict <$> simpleHttp uri
+  return $ BE.decode resp
 
-    rawResp  <- simpleHTTP r
-    respBody <- getResponseBody rawResp
-    checkResult $ decode respBody
-  where
-    checkResult (Left err)
-      = ioError $ userError $ err ++ " in tracker response"
-    checkResult (Right (Failure err))
-      = ioError $ userError $ show err ++ " in tracker response"
-    checkResult (Right resp)          = return resp
+scrape :: ScrapeQuery -> Connection -> IO (Result Scrape)
+scrape = undefined
+
 {-
-{-----------------------------------------------------------------------
-  Scrape
------------------------------------------------------------------------}
-
 -- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'
 --   gives 'Nothing' then tracker do not support scraping. The info hash
 --   list is used to restrict the tracker's report to that particular
@@ -123,4 +95,12 @@ scrapeHTTP HTTPTracker {..} ihs
       Right r -> return r
 
   | otherwise = throwIO $ userError "Tracker do not support scraping"
+
+-- | More particular version of 'scrape', just for one torrent.
+--
+scrapeOne :: Tracker t => t -> InfoHash -> IO ScrapeInfo
+scrapeOne uri ih = scrape uri [ih] >>= maybe err return . M.lookup ih
+  where
+    err = throwIO $ userError "unable to find info hash in response dict"
+
 -}

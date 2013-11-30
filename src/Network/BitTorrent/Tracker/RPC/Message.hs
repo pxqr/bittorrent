@@ -23,7 +23,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# OPTIONS -fno-warn-orphans           #-}
-module Network.BitTorrent.Tracker.Message
+module Network.BitTorrent.Tracker.RPC.Message
        ( -- * Announce
          -- ** Request
          Event(..)
@@ -132,7 +132,7 @@ getEvent = do
 data AnnounceQuery = AnnounceQuery
    {
      -- | Hash of info part of the torrent usually obtained from
-     -- 'Torrent'.
+     -- 'Torrent' or 'Magnet'.
      reqInfoHash   :: !InfoHash
 
      -- | ID of the peer doing request.

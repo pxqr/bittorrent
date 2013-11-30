@@ -13,8 +13,12 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies               #-}
-module Network.BitTorrent.Tracker.UDP
+module Network.BitTorrent.Tracker.RPC.UDP
        ( UDPTracker
+       , connect
+       , announce
+       , scrape
+       , retransmission
 
          -- * Debug
        , putTracker
@@ -42,7 +46,7 @@ import System.Entropy
 import System.Timeout
 import Numeric
 
-import Network.BitTorrent.Tracker.Protocol
+import Network.BitTorrent.Tracker.RPC.Message
 
 {-----------------------------------------------------------------------
   Tokens
@@ -301,16 +305,16 @@ freshConnection tracker @ UDPTracker {..} = do
     connId <- connectUDP tracker
     updateConnection connId tracker
 
-announceUDP :: UDPTracker -> AnnounceQuery -> IO AnnounceInfo
-announceUDP tracker ann = do
+announce :: UDPTracker -> AnnounceQuery -> IO AnnounceInfo
+announce tracker ann = do
   freshConnection tracker
   resp <- transaction tracker (Announce ann)
   case resp of
     Announced info -> return info
     _              -> fail "announce: response type mismatch"
 
-scrapeUDP :: UDPTracker -> ScrapeQuery -> IO Scrape
-scrapeUDP tracker scr = do
+scrape :: UDPTracker -> ScrapeQuery -> IO Scrape
+scrape tracker scr = do
   freshConnection tracker
   resp <- transaction tracker (Scrape scr)
   case resp of
@@ -338,10 +342,3 @@ retransmission action = go minTimeout
       |       otherwise         = do
         r <- timeout curTimeout action
         maybe (go (2 * curTimeout)) return r
-
-{----------------------------------------------------------------------}
-
-instance Tracker UDPTracker where
-  connect    = initialTracker
-  announce t = retransmission . announceUDP t
-  scrape   t = retransmission . scrapeUDP   t

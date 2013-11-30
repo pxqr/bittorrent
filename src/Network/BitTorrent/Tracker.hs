@@ -43,27 +43,6 @@ import Network.BitTorrent.Tracker.HTTP
 import Network.BitTorrent.Tracker.UDP
 
 {-----------------------------------------------------------------------
-    Generalized Tracker instance — UDP + HTTP
------------------------------------------------------------------------}
-
-data BitTracker = HTTPTr HTTPTracker
-                | UDPTr UDPTracker
-
-instance Tracker BitTracker where
-  connect uri @ URI {..}
-    | uriScheme == "udp:"  = UDPTr  <$> connect uri
-    | uriScheme == "http:" = HTTPTr <$> connect uri
-    |       otherwise      = throwIO $ userError msg
-    where
-      msg = "unknown tracker protocol scheme: " ++ show uriScheme
-
-  announce (HTTPTr t) = Tracker.announce t
-  announce (UDPTr  t) = Tracker.announce t
-
-  scrape (HTTPTr t) = scrape t
-  scrape (UDPTr  t) = scrape t
-
-{-----------------------------------------------------------------------
     Tracker connection
 -----------------------------------------------------------------------}
 
