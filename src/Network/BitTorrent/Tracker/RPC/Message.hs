@@ -482,6 +482,7 @@ parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
 
 type ScrapeQuery = [InfoHash]
 
+-- TODO rename to ScrapeEntry
 -- | Overall information about particular torrent.
 data ScrapeInfo = ScrapeInfo {
     -- | Number of seeders - peers with the entire file.
@@ -501,6 +502,7 @@ data ScrapeInfo = ScrapeInfo {
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeInfo)
 
 -- TODO hash map
+-- TODO rename to ScrapeInfo
 -- | Scrape info about a set of torrents.
 type Scrape = Map InfoHash ScrapeInfo
 

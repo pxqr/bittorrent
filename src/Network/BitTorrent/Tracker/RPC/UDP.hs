@@ -39,7 +39,7 @@ import Data.Text.Encoding
 import Data.Time
 import Data.Word
 import Text.Read (readMaybe)
-import Network.Socket hiding (Connected)
+import Network.Socket hiding (Connected, connect)
 import Network.Socket.ByteString as BS
 import Network.URI
 import System.Entropy
@@ -290,8 +290,8 @@ connectUDP tracker = do
     Failed    msg -> throwIO $ userError $ T.unpack msg
     _             -> throwIO $ userError "message type mismatch"
 
-initialTracker :: URI -> IO UDPTracker
-initialTracker uri = do
+connect :: URI -> IO UDPTracker
+connect uri = do
   tracker <- UDPTracker uri <$> (newIORef =<< initialConnection)
   connId  <- connectUDP tracker
   updateConnection connId tracker
@@ -305,20 +305,20 @@ freshConnection tracker @ UDPTracker {..} = do
     connId <- connectUDP tracker
     updateConnection connId tracker
 
-announce :: UDPTracker -> AnnounceQuery -> IO AnnounceInfo
-announce tracker ann = do
+announce :: AnnounceQuery -> UDPTracker -> IO AnnounceInfo
+announce ann tracker = do
   freshConnection tracker
   resp <- transaction tracker (Announce ann)
   case resp of
     Announced info -> return info
     _              -> fail "announce: response type mismatch"
 
-scrape :: UDPTracker -> ScrapeQuery -> IO Scrape
-scrape tracker scr = do
+scrape :: ScrapeQuery -> UDPTracker -> IO Scrape
+scrape ihs tracker = do
   freshConnection tracker
-  resp <- transaction tracker (Scrape scr)
+  resp <- transaction tracker (Scrape ihs)
   case resp of
-    Scraped info -> return $ M.fromList $ L.zip scr info
+    Scraped info -> return $ M.fromList $ L.zip ihs info
     _            -> fail "scrape: response type mismatch"
 
 {-----------------------------------------------------------------------
