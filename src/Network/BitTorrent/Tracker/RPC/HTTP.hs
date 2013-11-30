@@ -51,8 +51,15 @@ data Connection = Connection
 putConnection :: Connection -> IO ()
 putConnection = undefined
 
-connect :: URI -> IO Connection
-connect = undefined
+-- TODO share manager between several threads
+connect :: URI -> ResourceT IO Connection
+connect uri = do
+  (_, m) <- allocate (newManager def) closeManager
+  return Connection
+    { announceURI = uri
+    , manager     = m
+    , connProxy   = Nothing
+    }
 
 setSimpleQuery :: SimpleQuery -> Request m -> Request m
 setSimpleQuery q r = r

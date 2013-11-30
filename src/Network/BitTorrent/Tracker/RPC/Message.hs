@@ -475,9 +475,6 @@ parseFailureMessage e = BS.concat $ case e of
 parseFailureStatus :: ParamParseFailure -> Status
 parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
 
---type AnnounceResponse = Either Status AnnounceInfo -- TODO
---type TrackerResponse = () -- TODO
-
 {-----------------------------------------------------------------------
   Scrape message
 -----------------------------------------------------------------------}

@@ -170,6 +170,9 @@ test-suite spec
                      , network
                      , text
 
+                     , mtl
+                     , resourcet
+
                      , hspec
                      , QuickCheck
                      , quickcheck-instances

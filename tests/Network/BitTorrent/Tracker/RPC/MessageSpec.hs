@@ -1,7 +1,14 @@
+{-# LANGUAGE RecordWildCards  #-}
 {-# OPTIONS -fno-warn-orphans #-}
-module Network.BitTorrent.Tracker.RPC.MessageSpec (spec) where
+module Network.BitTorrent.Tracker.RPC.MessageSpec
+       ( spec
+       , validateInfo
+       , arbitrarySample
+       ) where
 
 import Control.Applicative
+import Data.List as L
+import Data.Maybe
 import Data.Word
 import Network
 import Test.Hspec
@@ -11,7 +18,8 @@ import Data.Torrent.InfoHashSpec ()
 import Data.Torrent.ProgressSpec ()
 import Network.BitTorrent.Core.PeerIdSpec ()
 
-import Network.BitTorrent.Tracker.RPC.Message
+import Network.BitTorrent.Tracker.RPC.Message as Message
+import Network.BitTorrent.Core.PeerAddr
 
 
 --prop_bencode :: Eq a => BEncode a => a -> Bool
@@ -30,6 +38,21 @@ instance Arbitrary AnnounceQuery where
   arbitrary = AnnounceQuery
     <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
     <*> arbitrary <*> arbitrary <*> arbitrary
+
+validateInfo :: AnnounceQuery -> AnnounceInfo -> Expectation
+validateInfo _ Message.Failure {..} = error "validateInfo: failure"
+validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
+    respComplete    `shouldSatisfy` isJust
+    respIncomplete  `shouldSatisfy` isJust
+    respMinInterval `shouldSatisfy` isNothing
+    respWarning     `shouldSatisfy` isNothing
+    peerList `shouldSatisfy` L.all (isNothing . peerID)
+    fromJust respComplete + fromJust respIncomplete `shouldBe` L.length peerList
+  where
+    peerList = getPeerList respPeers
+
+arbitrarySample :: Arbitrary a => IO a
+arbitrarySample = L.head <$> sample' arbitrary
 
 spec :: Spec
 spec = do
