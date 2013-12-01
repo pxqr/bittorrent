@@ -116,7 +116,7 @@ library
                      , hashable
 
                        -- Codecs & Serialization
-                     , aeson
+                     , aeson >= 0.6.2.0
                      , base16-bytestring
                      , base32-bytestring >= 0.2
                      , base64-bytestring

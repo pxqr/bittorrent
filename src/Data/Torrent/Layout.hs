@@ -125,7 +125,7 @@ data FileInfo a = FileInfo {
                , Functor, Foldable
                )
 
-$(deriveJSON (L.map Char.toLower . L.dropWhile isLower) ''FileInfo)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map Char.toLower . L.dropWhile isLower) } ''FileInfo)
 
 makeLensesFor
   [ ("fiLength", "fileLength")
@@ -210,7 +210,7 @@ data LayoutInfo
     , liDirName  :: !ByteString
     } deriving (Show, Read, Eq, Typeable)
 
-$(deriveJSON (L.map Char.toLower . L.dropWhile isLower) ''LayoutInfo)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map Char.toLower . L.dropWhile isLower) } ''LayoutInfo)
 
 makeLensesFor
   [ ("liFile"   , "singleFile" )

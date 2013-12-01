@@ -117,7 +117,7 @@ data Piece a = Piece
   , pieceData  :: !a
   } deriving (Show, Read, Eq, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''Piece)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''Piece)
 
 instance NFData (Piece a)
 
@@ -160,7 +160,7 @@ data PieceInfo = PieceInfo
     -- ^ Concatenation of all 20-byte SHA1 hash values.
   } deriving (Show, Read, Eq, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''PieceInfo)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''PieceInfo)
 
 -- | Number of bytes in each piece.
 makeLensesFor [("piPieceLength", "pieceLength")] ''PieceInfo

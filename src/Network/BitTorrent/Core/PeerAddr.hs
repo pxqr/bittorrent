@@ -62,7 +62,7 @@ data PeerAddr = PeerAddr {
     , peerPort :: {-# UNPACK #-} !PortNumber
     } deriving (Show, Eq, Ord, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''PeerAddr)
+$(deriveJSON defaultOptions { fieldLabelModifier = (L.map toLower . L.dropWhile isLower) } ''PeerAddr)
 
 -- | The tracker "announce query" compatible encoding.
 instance BEncode PeerAddr where

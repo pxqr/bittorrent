@@ -123,7 +123,7 @@ data InfoDict = InfoDict
     --   BEP 27: <http://www.bittorrent.org/beps/bep_0027.html>
   } deriving (Show, Read, Eq, Typeable)
 
-$(deriveJSON (L.map Char.toLower . L.dropWhile isLower) ''InfoDict)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map Char.toLower . L.dropWhile isLower) } ''InfoDict)
 
 makeLensesFor
   [ ("idInfoHash"  , "infohash"  )
@@ -239,7 +239,7 @@ instance ToJSON NominalDiffTime where
 instance FromJSON NominalDiffTime where
   parseJSON v = utcTimeToPOSIXSeconds <$> parseJSON v
 
-$(deriveJSON (L.map Char.toLower . L.dropWhile isLower) ''Torrent)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map Char.toLower . L.dropWhile isLower) } ''Torrent)
 
 makeLensesFor
   [ ("tAnnounce"    , "announce"    )
