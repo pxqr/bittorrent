@@ -56,7 +56,7 @@ data SessionStatus = SessionStatus {
   } deriving (Show, Eq)
 
 $(makeLenses ''SessionStatus)
-$(deriveJSON L.tail ''SessionStatus)
+$(deriveJSON defaultOptions { fieldLabelModifier = L.tail } ''SessionStatus)
 
 instance Default SessionStatus where
   def = SessionStatus def def
