@@ -137,8 +137,8 @@ instance NFData InfoDict where
   rnf InfoDict {..} = rnf idLayoutInfo
 
 instance Hashable InfoDict where
-  hash = Hashable.hash . idInfoHash
-  {-# INLINE hash #-}
+  hashWithSalt = Hashable.hashUsing idInfoHash
+  {-# INLINE hashWithSalt #-}
 
 -- | Smart constructor: add a info hash to info dictionary.
 infoDictionary :: LayoutInfo -> PieceInfo -> Bool -> InfoDict

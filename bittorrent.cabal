@@ -113,7 +113,7 @@ library
 
                        -- Hashing
                      , cryptohash == 0.10.*
-                     , hashable
+                     , hashable >= 1.2
 
                        -- Codecs & Serialization
                      , aeson >= 0.6.2.0
