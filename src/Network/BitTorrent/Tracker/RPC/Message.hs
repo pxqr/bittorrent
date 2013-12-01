@@ -32,10 +32,18 @@ module Network.BitTorrent.Tracker.RPC.Message
        , ParamParseFailure
        , parseAnnounceQuery
 
+         -- ** Request
+       , AnnounceQueryExt (..)
+       , AnnounceRequest  (..)
+       , parseAnnounceRequest
+       , renderAnnounceRequest
+
          -- ** Info
        , PeerList (..)
        , AnnounceInfo(..)
        , defaultNumWant
+       , defaultMaxNumWant
+       , defaultReannounceInterval
        , parseFailureStatus
 
          -- * Scrape
@@ -47,6 +55,9 @@ module Network.BitTorrent.Tracker.RPC.Message
          -- ** Info
        , ScrapeEntry (..)
        , ScrapeInfo
+
+         -- ** Extra
+       , queryToSimpleQuery
        )
        where
 
@@ -223,15 +234,15 @@ instance QueryLike AnnounceQuery where
       , ("event"    , toQueryValue reqEvent)
       ]
 
-filterMaybes :: [(a, Maybe b)] -> [(a, b)]
-filterMaybes = catMaybes . L.map f
+queryToSimpleQuery :: Query -> SimpleQuery
+queryToSimpleQuery = catMaybes . L.map f
   where
     f (_, Nothing) = Nothing
     f (a, Just b ) = Just (a, b)
 
 -- | Encode announce query and add it to the base tracker URL.
 renderAnnounceQuery :: AnnounceQuery -> SimpleQuery
-renderAnnounceQuery = filterMaybes . toQuery
+renderAnnounceQuery = queryToSimpleQuery . toQuery
 
 data QueryParam
   = ParamInfoHash
@@ -320,8 +331,27 @@ parseAnnounceQuery params = AnnounceQuery
   <*> optParam ParamNumWant  params
   <*> optParam ParamEvent    params
 
--- TODO add extension datatype
---type AnnounceRequest = ()
+data AnnounceQueryExt = AnnounceQueryExt
+  { extCompact  :: Maybe Bool -- | "compact" param
+  , extNoPeerId :: Maybe Bool -- | "no_peer_id" param
+  } deriving (Show, Eq, Typeable)
+
+parseAnnounceQueryExt :: SimpleQuery -> AnnounceQueryExt
+parseAnnounceQueryExt = undefined
+
+renderAnnounceQueryExt :: AnnounceQueryExt -> SimpleQuery
+renderAnnounceQueryExt = undefined
+
+data AnnounceRequest = AnnounceRequest
+  { announceQuery   :: AnnounceQuery
+  , announceAdvises :: AnnounceQueryExt
+  } deriving (Show, Eq, Typeable)
+
+parseAnnounceRequest :: SimpleQuery -> Either ParamParseFailure AnnounceRequest
+parseAnnounceRequest = undefined
+
+renderAnnounceRequest :: AnnounceRequest -> SimpleQuery
+renderAnnounceRequest = undefined
 
 {-----------------------------------------------------------------------
 --  Announce response
@@ -449,6 +479,13 @@ instance Serialize AnnounceInfo where
 defaultNumWant :: Int
 defaultNumWant = 50
 
+defaultMaxNumWant :: Int
+defaultMaxNumWant = 200
+
+defaultReannounceInterval :: Int
+defaultReannounceInterval = 30 * 60
+
+
 missingOffset :: Int
 missingOffset = 101
 
@@ -500,7 +537,7 @@ isScrapeParam :: BS.ByteString -> Bool
 isScrapeParam = (==) scrapeParam
 
 renderScrapeQuery :: ScrapeQuery -> SimpleQuery
-renderScrapeQuery = filterMaybes . L.map mkPair
+renderScrapeQuery = queryToSimpleQuery . L.map mkPair
   where
     mkPair ih = (scrapeParam, toQueryValue ih)
 

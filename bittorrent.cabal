@@ -59,21 +59,21 @@ library
 --                   , Network.BitTorrent.DHT.Protocol
 --                   , Network.BitTorrent.DHT.Session
 --                   , Network.BitTorrent.Exchange
-                     , Network.BitTorrent.Exchange.Assembler
-                     , Network.BitTorrent.Exchange.Message
+--                   , Network.BitTorrent.Exchange.Assembler
+--                   , Network.BitTorrent.Exchange.Message
 --                   , Network.BitTorrent.Exchange.Session
 --                     , Network.BitTorrent.Exchange.Status
 --                   , Network.BitTorrent.Exchange.Wire
 --                   , Network.BitTorrent.Extension
 --                   , Network.BitTorrent.Tracker
 --                     , Network.BitTorrent.Tracker.RPC
+                     , Network.BitTorrent.Tracker.Wai
                      , Network.BitTorrent.Tracker.RPC.Message
                      , Network.BitTorrent.Tracker.RPC.HTTP
                      , Network.BitTorrent.Tracker.RPC.UDP
 --                   , Network.BitTorrent.Tracker.Session
 --                   , Network.BitTorrent.Session
 --                   , Network.BitTorrent.Session.Types
---                   , System.IO.MMap.Fixed
 --                   , System.Torrent.Storage
   other-modules:       Paths_bittorrent
 
@@ -86,7 +86,6 @@ library
                        -- Control
                      , deepseq
                      , lens
---                     , mtl
                      , resourcet
 --                     , transformers
 
@@ -131,6 +130,7 @@ library
                      , network     >= 2.4
                      , http-types  >= 0.7
                      , http-conduit
+                     , wai
 --                     , krpc
 
                        -- System
