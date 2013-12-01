@@ -50,7 +50,7 @@ module Data.Torrent.Layout
        , blockCount
 
          -- * Flat file layout
-       , Layout
+       , FileLayout
        , flatLayout
        , accumOffsets
        , fileOffset
@@ -286,13 +286,13 @@ blockCount blkSize ci = contentLength ci `sizeInBase` blkSize
 --   coalesce all the files in the given order to get the linear block
 --   address space.
 --
-type Layout a = [(FilePath, a)]
+type FileLayout a = [(FilePath, a)]
 
 -- | Extract files layout from torrent info with the given root path.
 flatLayout
-  :: FilePath        -- ^ Root path for the all torrent files.
-  -> LayoutInfo      -- ^ Torrent content information.
-  -> Layout FileSize -- ^ The all file paths prefixed with the given root.
+  :: FilePath            -- ^ Root path for the all torrent files.
+  -> LayoutInfo          -- ^ Torrent content information.
+  -> FileLayout FileSize -- ^ The all file paths prefixed with the given root.
 flatLayout prefixPath SingleFile { liFile = FileInfo {..} }
     = [(prefixPath </> BC.unpack fiName, fiLength)]
 flatLayout prefixPath MultiFile  {..}     = L.map mkPath liFiles
@@ -303,14 +303,14 @@ flatLayout prefixPath MultiFile  {..}     = L.map mkPath liFiles
            </> joinPath (L.map BC.unpack fiName)
 
 -- | Calculate offset of each file based on its length, incrementally.
-accumOffsets :: Layout FileSize -> Layout FileOffset
+accumOffsets :: FileLayout FileSize -> FileLayout FileOffset
 accumOffsets = go 0
   where
     go !_ [] = []
     go !offset ((n, s) : xs) = (n, offset) : go (offset + s) xs
 
 -- | Gives global offset of a content file for a given full path.
-fileOffset :: FilePath -> Layout FileOffset -> Maybe FileOffset
+fileOffset :: FilePath -> FileLayout FileOffset -> Maybe FileOffset
 fileOffset = lookup
 {-# INLINE fileOffset #-}
 
