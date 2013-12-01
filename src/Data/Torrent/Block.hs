@@ -7,9 +7,11 @@
 --
 --   Blocks are used to transfer pieces.
 --
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Torrent.Block
        ( -- * Piece attributes
          PieceIx
@@ -38,6 +40,7 @@ import qualified Data.ByteString.Lazy as Lazy
 import Data.Char
 import Data.List as L
 import Data.Serialize as S
+import Data.Typeable
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
 
@@ -95,7 +98,7 @@ data BlockIx = BlockIx {
 
     -- | Block size starting from offset.
   , ixLength :: {-# UNPACK #-} !BlockSize
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''BlockIx)
 
@@ -148,7 +151,7 @@ data Block payload = Block {
 
     -- | Payload bytes.
   , blkData   :: !payload
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Functor, Typeable)
 
 -- | Payload is ommitted.
 instance Pretty (Block Lazy.ByteString) where

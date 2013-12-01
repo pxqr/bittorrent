@@ -7,8 +7,9 @@
 --
 --   Pieces are used to validate torrent content.
 --
-{-# LANGUAGE TemplateHaskell    #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Torrent.Piece
        ( -- * Piece attributes
@@ -115,7 +116,7 @@ data Piece a = Piece
 
     -- | Payload.
   , pieceData  :: !a
-  } deriving (Show, Read, Eq, Typeable)
+  } deriving (Show, Read, Eq, Functor, Typeable)
 
 $(deriveJSON (L.map toLower . L.dropWhile isLower) ''Piece)
 
