@@ -28,18 +28,24 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# OPTIONS  -fno-warn-orphans #-}
 module Network.BitTorrent.Exchange.Message
-       ( -- * Initial handshake
-         Handshake(..)
-       , handshake
-       , handshakeCaps
-       , recvHandshake
-       , sendHandshake
+       ( -- * Extensions
+         Extension (..)
+       , Caps
+       , requires
+       , allowed
+       , toCaps
+       , fromCaps
 
-         -- ** Defaults
+         -- * Handshake
+       , Handshake(..)
        , defaultHandshake
        , defaultBTProtocol
-       , defaultReserved
        , handshakeMaxSize
+
+         -- * TODO remove this section from this module
+       , handshake
+       , recvHandshake
+       , sendHandshake
 
          -- * Messages
        , Message        (..)
@@ -51,10 +57,13 @@ module Network.BitTorrent.Exchange.Message
 import Control.Applicative
 import Control.Exception
 import Control.Monad
+import Data.Bits
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy  as BL
 import Data.Default
+import Data.List as L
+import Data.Monoid
 import Data.Serialize as S
 import Data.Word
 import Network
@@ -67,7 +76,66 @@ import Data.Torrent.Block
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core.PeerId
 import Network.BitTorrent.Core.PeerAddr ()
-import Network.BitTorrent.Exchange.Extension
+
+{-----------------------------------------------------------------------
+--  Extensions
+-----------------------------------------------------------------------}
+
+--  | See <http://www.bittorrent.org/beps/bep_0004.html> for more
+--  information.
+--
+data Extension
+  = ExtDHT  -- ^ BEP 5
+  | ExtFast -- ^ BEP 6
+    deriving (Show, Eq, Ord, Enum, Bounded)
+
+instance Pretty Extension where
+  pretty ExtDHT  = "DHT"
+  pretty ExtFast = "Fast Extension"
+
+capMask :: Extension -> Caps
+capMask ExtDHT  = Caps 0x01
+capMask ExtFast = Caps 0x04
+
+{-----------------------------------------------------------------------
+--  Capabilities
+-----------------------------------------------------------------------}
+
+-- | A set of 'Extension's.
+newtype Caps = Caps { unCaps :: Word64 }
+  deriving (Show, Eq)
+
+instance Pretty Caps where
+  pretty = hcat . punctuate ", " . L.map pretty . fromCaps
+
+instance Default Caps where
+  def = Caps 0
+  {-# INLINE def #-}
+
+instance Monoid Caps where
+  mempty  = Caps (-1)
+  {-# INLINE mempty #-}
+
+  mappend (Caps a) (Caps b) = Caps (a .&. b)
+  {-# INLINE mappend #-}
+
+instance Serialize Caps where
+  put (Caps caps) = S.putWord64be caps
+  {-# INLINE put #-}
+
+  get = Caps <$> S.getWord64be
+  {-# INLINE get #-}
+
+allowed :: Caps -> Extension -> Bool
+allowed (Caps caps) = testMask . capMask
+  where
+    testMask (Caps bits) = (bits .&. caps) == bits
+
+toCaps :: [Extension] -> Caps
+toCaps = Caps . L.foldr (.|.) 0 . L.map (unCaps . capMask)
+
+fromCaps :: Caps -> [Extension]
+fromCaps caps = L.filter (allowed caps) [minBound..maxBound]
 
 {-----------------------------------------------------------------------
     Handshake
@@ -77,11 +145,11 @@ import Network.BitTorrent.Exchange.Extension
 -- to establish connection between peers.
 --
 data Handshake = Handshake {
-    -- | Identifier of the protocol.
+    -- | Identifier of the protocol. This is usually equal to defaultProtocol
     hsProtocol    :: BS.ByteString
 
     -- | Reserved bytes used to specify supported BEP's.
-  , hsReserved    :: Capabilities
+  , hsReserved    :: Caps
 
     -- | Info hash of the info part of the metainfo file. that is
     -- transmitted in tracker requests. Info hash of the initiator
@@ -98,28 +166,23 @@ data Handshake = Handshake {
   } deriving (Show, Eq)
 
 instance Serialize Handshake where
-  put hs = do
-    S.putWord8 (fromIntegral (BS.length (hsProtocol hs)))
-    S.putByteString (hsProtocol hs)
-    S.putWord64be   (hsReserved hs)
-    S.put (hsInfoHash hs)
-    S.put (hsPeerId hs)
+  put Handshake {..} = do
+    S.putWord8 (fromIntegral (BS.length hsProtocol))
+    S.putByteString hsProtocol
+    S.put hsReserved
+    S.put hsInfoHash
+    S.put hsPeerId
 
   get = do
     len  <- S.getWord8
     Handshake <$> S.getBytes (fromIntegral len)
-              <*> S.getWord64be
+              <*> S.get
               <*> S.get
               <*> S.get
 
 instance Pretty Handshake where
   pretty Handshake {..}
     = text (BC.unpack hsProtocol) <+> pretty (clientInfo hsPeerId)
-
--- | Extract capabilities from a peer handshake message.
-handshakeCaps :: Handshake -> Capabilities
-handshakeCaps = hsReserved
-
 
 -- | Get handshake message size in bytes from the length of protocol
 -- string.
@@ -128,21 +191,18 @@ handshakeSize n = 1 + fromIntegral n + 8 + 20 + 20
 
 -- | Maximum size of handshake message in bytes.
 handshakeMaxSize :: Int
-handshakeMaxSize = handshakeSize 255
+handshakeMaxSize = handshakeSize maxBound
 
 -- | Default protocol string "BitTorrent protocol" as is.
 defaultBTProtocol :: BS.ByteString
 defaultBTProtocol = "BitTorrent protocol"
 
--- | Default reserved word is 0.
-defaultReserved :: Word64
-defaultReserved = 0
-
 -- | Length of info hash and peer id is unchecked, so it /should/ be
 -- equal 20.
 defaultHandshake :: InfoHash -> PeerId -> Handshake
-defaultHandshake = Handshake defaultBTProtocol defaultReserved
+defaultHandshake = Handshake defaultBTProtocol def
 
+-- | TODO remove socket stuff to corresponding module
 sendHandshake :: Socket -> Handshake -> IO ()
 sendHandshake sock hs = sendAll sock (S.encode hs)
 
@@ -205,6 +265,14 @@ data RegularMessage =
     -- "End Game".
   | Cancel  !BlockIx
     deriving (Show, Eq)
+
+-- TODO
+-- data Availability = Have | Bitfield
+-- data Transfer
+--   = Request !BlockIx
+--   | Piece   !(Block BL.ByteString)
+--   | Cancel  !BlockIx
+
 
 instance Pretty RegularMessage where
   pretty (Have     ix ) = "Have"     <+> int ix
@@ -349,3 +417,11 @@ putFast  HaveNone          = putInt 1  >> S.putWord8 0x0F
 putFast (SuggestPiece pix) = putInt 5  >> S.putWord8 0x0D >> putInt pix
 putFast (RejectRequest i ) = putInt 13 >> S.putWord8 0x10 >> S.put i
 putFast (AllowedFast   i ) = putInt 5  >> S.putWord8 0x11 >> putInt i
+
+
+requires :: Message -> Maybe Extension
+requires  KeepAlive  = Nothing
+requires (Status  _) = Nothing
+requires (Regular _) = Nothing
+requires (Port    _) = Just ExtDHT
+requires (Fast    _) = Just ExtFast

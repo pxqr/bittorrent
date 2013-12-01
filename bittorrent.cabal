@@ -59,9 +59,10 @@ library
 --                   , Network.BitTorrent.DHT.Protocol
 --                   , Network.BitTorrent.DHT.Session
 --                   , Network.BitTorrent.Exchange
---                   , Network.BitTorrent.Exchange.Message
+                     , Network.BitTorrent.Exchange.Assembler
+                     , Network.BitTorrent.Exchange.Message
 --                   , Network.BitTorrent.Exchange.Session
---                   , Network.BitTorrent.Exchange.Status
+--                     , Network.BitTorrent.Exchange.Status
 --                   , Network.BitTorrent.Exchange.Wire
 --                   , Network.BitTorrent.Extension
 --                   , Network.BitTorrent.Tracker

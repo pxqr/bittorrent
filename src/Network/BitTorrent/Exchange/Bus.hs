@@ -34,6 +34,9 @@ flushPending = {-# SCC flushPending #-} do
     P2P monad
 -----------------------------------------------------------------------}
 
+filterMeaninless :: P2P Message Message
+filterMeaninless = undefined
+
 -- |
 --   Exceptions:
 --

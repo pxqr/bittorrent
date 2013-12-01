@@ -190,6 +190,7 @@ isSubsetOf a b = bfSet a `S.isSubsetOf` bfSet b
 -- download.
 type Frequency = Int
 
+-- TODO rename to availability
 -- | How many times each piece index occur in the given bitfield set.
 frequencies :: [Bitfield] -> Vector Frequency
 frequencies [] = V.fromList []

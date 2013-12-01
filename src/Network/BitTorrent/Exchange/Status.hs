@@ -4,6 +4,7 @@ module Network.BitTorrent.Exchange.Status
          PeerStatus(..)
        , choking
        , interested
+       , updateStatus
 
          -- * Session status
        , SessionStatus(..)
@@ -24,6 +25,9 @@ import Data.Aeson.TH
 import Data.List as L
 import Data.Default
 
+import Network.BitTorrent.Exchange.Message
+
+
 -- |
 data PeerStatus = PeerStatus {
     _choking    :: !Bool
@@ -35,6 +39,15 @@ $(deriveJSON L.tail ''PeerStatus)
 
 instance Default PeerStatus where
   def = PeerStatus True False
+
+updateStatus :: StatusUpdate -> PeerStatus -> PeerStatus
+updateStatus Choke         = choking    .~ True
+updateStatus Unchoke       = choking    .~ False
+updateStatus Interested    = interested .~ True
+updateStatus NotInterested = interested .~ False
+
+statusUpdates :: PeerStatus -> PeerStatus -> [StatusUpdate]
+statusUpdates a b = undefined
 
 -- |
 data SessionStatus = SessionStatus {
