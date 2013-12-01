@@ -35,7 +35,7 @@ data PeerStatus = PeerStatus {
   } deriving (Show, Eq)
 
 $(makeLenses ''PeerStatus)
-$(deriveJSON L.tail ''PeerStatus)
+$(deriveJSON defaultOptions { fieldLabelModifier = L.tail } ''PeerStatus)
 
 instance Default PeerStatus where
   def = PeerStatus True False
@@ -56,7 +56,7 @@ data SessionStatus = SessionStatus {
   } deriving (Show, Eq)
 
 $(makeLenses ''SessionStatus)
-$(deriveJSON L.tail ''SessionStatus)
+$(deriveJSON defaultOptions { fieldLabelModifier = L.tail } ''SessionStatus)
 
 instance Default SessionStatus where
   def = SessionStatus def def

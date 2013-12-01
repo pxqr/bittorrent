@@ -100,7 +100,7 @@ data BlockIx = BlockIx {
   , ixLength :: {-# UNPACK #-} !BlockSize
   } deriving (Show, Eq, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''BlockIx)
+$(deriveJSON defaultOptions { fieldLabelModifier = (L.map toLower . L.dropWhile isLower) } ''BlockIx)
 
 getInt :: S.Get Int
 getInt = fromIntegral <$> S.getWord32be

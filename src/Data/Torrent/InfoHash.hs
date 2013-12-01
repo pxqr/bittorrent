@@ -70,8 +70,8 @@ instance Default InfoHash where
 
 -- | Hash raw bytes. (no encoding)
 instance Hashable InfoHash where
-  hash (InfoHash ih) = Hashable.hash ih
-  {-# INLINE hash #-}
+  hashWithSalt s (InfoHash ih) = hashWithSalt s ih
+  {-# INLINE hashWithSalt #-}
 
 -- | Convert to\/from raw bencoded string. (no encoding)
 instance BEncode InfoHash where
