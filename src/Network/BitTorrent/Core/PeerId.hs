@@ -74,8 +74,8 @@ peerIdLen :: Int
 peerIdLen = 20
 
 instance Hashable PeerId where
-  hash = hash . getPeerId
-  {-# INLINE hash #-}
+  hashWithSalt = hashUsing getPeerId
+  {-# INLINE hashWithSalt #-}
 
 instance Serialize PeerId where
   put = putByteString . getPeerId

@@ -62,7 +62,7 @@ data Progress = Progress
   } deriving (Show, Read, Eq)
 
 $(makeLenses ''Progress)
-$(deriveJSON L.tail ''Progress)
+$(deriveJSON defaultOptions { fieldLabelModifier = L.tail } ''Progress)
 
 -- | UDP tracker compatible encoding.
 instance Serialize Progress where

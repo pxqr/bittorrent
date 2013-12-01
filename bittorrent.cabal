@@ -113,10 +113,10 @@ library
 
                        -- Hashing
                      , cryptohash == 0.10.*
-                     , hashable
+                     , hashable >= 1.2
 
                        -- Codecs & Serialization
-                     , aeson
+                     , aeson >= 0.6.2.0
                      , base16-bytestring
                      , base32-bytestring >= 0.2
                      , base64-bytestring

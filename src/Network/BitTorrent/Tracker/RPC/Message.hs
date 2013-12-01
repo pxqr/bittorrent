@@ -93,7 +93,7 @@ data Event = Started
              -- ^ To be sent when the peer completes a download.
              deriving (Show, Read, Eq, Ord, Enum, Bounded, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''Event)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''Event)
 
 -- | HTTP tracker protocol compatible encoding.
 instance QueryValueLike Event where
@@ -163,7 +163,7 @@ data AnnounceQuery = AnnounceQuery
    , reqEvent      :: Maybe Event
    } deriving (Show, Eq, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceQuery)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''AnnounceQuery)
 
 -- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceQuery where
@@ -386,7 +386,7 @@ data AnnounceInfo =
      , respWarning     :: !(Maybe Text)
      } deriving (Show, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''AnnounceInfo)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''AnnounceInfo)
 
 -- | HTTP tracker protocol compatible encoding.
 instance BEncode AnnounceInfo where
@@ -524,7 +524,7 @@ data ScrapeEntry = ScrapeEntry {
   , siName       :: !(Maybe Text)
   } deriving (Show, Eq, Typeable)
 
-$(deriveJSON (L.map toLower . L.dropWhile isLower) ''ScrapeEntry)
+$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''ScrapeEntry)
 
 -- | HTTP tracker protocol compatible encoding.
 instance BEncode ScrapeEntry where
