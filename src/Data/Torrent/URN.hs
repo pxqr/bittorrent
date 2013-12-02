@@ -72,7 +72,7 @@ instance Convertible URN InfoHash where
     |       otherwise      = safeConvert urnString
 
 -- | Make resource name for torrent with corresponding
--- infohash. Infohash is base16 (hex) encoded).
+-- infohash. Infohash is base16 (hex) encoded.
 --
 infohashURN :: InfoHash -> URN
 infohashURN = URN btih . longHex
