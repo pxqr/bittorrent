@@ -1,12 +1,3 @@
--- supported extensions:
---
---   no_peer_id - do not send peer id if no_peer_id=1 specified
---   http://www.bittorrent.org/beps/bep_0023.html
---
---   compact - compact=1 or compact=0
---   http://permalink.gmane.org/gmane.network.bit-torrent.general/4030
---
---
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.Tracker.Wai
        ( tracker

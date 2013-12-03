@@ -227,7 +227,7 @@ instance QueryValueLike Int where
 instance QueryLike AnnounceQuery where
   toQuery AnnounceQuery {..} =
       toQuery reqProgress ++
-      [ ("info_hash", toQueryValue reqInfoHash)
+      [ ("info_hash", toQueryValue reqInfoHash) -- TODO use 'paramName'
       , ("peer_id"  , toQueryValue reqPeerId)
       , ("port"     , toQueryValue reqPort)
       , ("ip"       , toQueryValue reqIP)
@@ -376,7 +376,7 @@ instance Default AnnounceQueryExt where
 
 instance QueryLike AnnounceQueryExt where
   toQuery AnnounceQueryExt {..} =
-      [ ("compact",    toQueryFlag <$> extCompact)
+      [ ("compact",    toQueryFlag <$> extCompact) -- TODO use 'paramName'
       , ("no_peer_id", toQueryFlag <$> extNoPeerId)
       ]
     where
