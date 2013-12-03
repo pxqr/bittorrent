@@ -234,13 +234,14 @@ instance QueryLike AnnounceQuery where
       , ("event"    , toQueryValue reqEvent)
       ]
 
+-- | Filter @param=value@ pairs with the unset value.
 queryToSimpleQuery :: Query -> SimpleQuery
 queryToSimpleQuery = catMaybes . L.map f
   where
     f (_, Nothing) = Nothing
     f (a, Just b ) = Just (a, b)
 
--- | Encode announce query and add it to the base tracker URL.
+-- | Encode announce query to query string.
 renderAnnounceQuery :: AnnounceQuery -> SimpleQuery
 renderAnnounceQuery = queryToSimpleQuery . toQuery
 
@@ -293,35 +294,40 @@ instance FromParam Event where
     (x, xs) <- BC.uncons bs
     readMaybe $ BC.unpack $ BC.cons (Char.toUpper x) xs
 
+-- | 'ParamParseFailure' represent errors can occur while parsing HTTP
+-- tracker requests. In case of failure, this can be used to provide
+-- more informative 'statusCode' and 'statusMessage' in tracker
+-- responses.
+--
 data ParamParseFailure
   = Missing QueryParam               -- ^ param not found in query string;
   | Invalid QueryParam BS.ByteString -- ^ param present but not valid.
     deriving (Show, Eq)
 
-type Result = Either ParamParseFailure
+type ParseResult = Either ParamParseFailure
 
-withError :: ParamParseFailure -> Maybe a -> Result a
+withError :: ParamParseFailure -> Maybe a -> ParseResult a
 withError e = maybe (Left e) Right
 
-reqParam :: FromParam a => QueryParam -> SimpleQuery -> Result a
+reqParam :: FromParam a => QueryParam -> SimpleQuery -> ParseResult a
 reqParam param xs = do
   val <- withError (Missing param) $ L.lookup (paramName param) xs
   withError (Invalid param val) (fromParam val)
 
-optParam :: FromParam a => QueryParam -> SimpleQuery -> Result (Maybe a)
+optParam :: FromParam a => QueryParam -> SimpleQuery -> ParseResult (Maybe a)
 optParam param ps
   | Just x <- L.lookup (paramName param) ps
   = pure <$> withError (Invalid param x) (fromParam x)
   | otherwise = pure Nothing
 
-parseProgress :: SimpleQuery -> Result Progress
+parseProgress :: SimpleQuery -> ParseResult Progress
 parseProgress params = Progress
   <$> reqParam ParamDownloaded params
   <*> reqParam ParamLeft       params
   <*> reqParam ParamUploaded   params
 
 -- | Parse announce request from a query string.
-parseAnnounceQuery :: SimpleQuery -> Either ParamParseFailure AnnounceQuery
+parseAnnounceQuery :: SimpleQuery -> ParseResult AnnounceQuery
 parseAnnounceQuery params = AnnounceQuery
   <$> reqParam ParamInfoHash params
   <*> reqParam ParamPeerId   params
@@ -331,25 +337,51 @@ parseAnnounceQuery params = AnnounceQuery
   <*> optParam ParamNumWant  params
   <*> optParam ParamEvent    params
 
+-- | Extensions for HTTP tracker protocol.
 data AnnounceQueryExt = AnnounceQueryExt
-  { extCompact  :: Maybe Bool -- | "compact" param
-  , extNoPeerId :: Maybe Bool -- | "no_peer_id" param
+  { -- | If specified, "compact" parameter is used to advise the
+    --   tracker to send peer id list as:
+    --
+    --   * bencoded list                 (extCompact = Just False);
+    --   * or more compact binary string (extCompact = Just True).
+    --
+    --   The later is prefered since compact peer list will reduce the
+    --   size of tracker responses. Hovewer, if tracker do not support
+    --   this extension then it can return peer list in either form.
+    --
+    --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
+    --
+    extCompact  :: !(Maybe Bool)
+
+    -- | If specified, "no_peer_id" parameter is used advise tracker
+    --   to either send or not to send peer id in tracker response.
+    --   Tracker may not support this extension as well.
+    --
+    --   For more info see:
+    --  <http://permalink.gmane.org/gmane.network.bit-torrent.general/4030>
+    --
+  , extNoPeerId :: !(Maybe Bool)
   } deriving (Show, Eq, Typeable)
 
+-- | Parse announce query extended part from query string.
 parseAnnounceQueryExt :: SimpleQuery -> AnnounceQueryExt
 parseAnnounceQueryExt = undefined
 
+-- | Render announce query extended part to query string.
 renderAnnounceQueryExt :: AnnounceQueryExt -> SimpleQuery
 renderAnnounceQueryExt = undefined
 
+-- | HTTP tracker request with extensions.
 data AnnounceRequest = AnnounceRequest
-  { announceQuery   :: AnnounceQuery
-  , announceAdvises :: AnnounceQueryExt
+  { announceQuery   :: AnnounceQuery    -- ^ Request query params.
+  , announceAdvises :: AnnounceQueryExt -- ^ Optional advises to the tracker.
   } deriving (Show, Eq, Typeable)
 
-parseAnnounceRequest :: SimpleQuery -> Either ParamParseFailure AnnounceRequest
+-- | Parse announce request from query string.
+parseAnnounceRequest :: SimpleQuery -> ParseResult AnnounceRequest
 parseAnnounceRequest = undefined
 
+-- | Render announce request to query string.
 renderAnnounceRequest :: AnnounceRequest -> SimpleQuery
 renderAnnounceRequest = undefined
 
@@ -479,12 +511,14 @@ instance Serialize AnnounceInfo where
 defaultNumWant :: Int
 defaultNumWant = 50
 
+-- | Reasonable upper bound of numwant parameter.
 defaultMaxNumWant :: Int
 defaultMaxNumWant = 200
 
+-- | Widely used reannounce interval. Note: tracker clients should not
+-- use this value!
 defaultReannounceInterval :: Int
 defaultReannounceInterval = 30 * 60
-
 
 missingOffset :: Int
 missingOffset = 101
@@ -492,22 +526,20 @@ missingOffset = 101
 invalidOffset :: Int
 invalidOffset = 150
 
--- | Get HTTP response error code from a announce params parse
--- failure.
---
---   For more info see:
---   <https://wiki.theory.org/BitTorrent_Tracker_Protocol#Response_Codes>
---
 parseFailureCode :: ParamParseFailure -> Int
 parseFailureCode (Missing param  ) = missingOffset + fromEnum param
 parseFailureCode (Invalid param _) = invalidOffset + fromEnum param
 
--- | Human readable message
 parseFailureMessage :: ParamParseFailure -> BS.ByteString
 parseFailureMessage e = BS.concat $ case e of
   Missing p   -> ["Missing parameter: ", paramName p]
   Invalid p v -> ["Invalid parameter: ", paramName p, " = ", v]
 
+-- | Get HTTP response status from a announce params parse failure.
+--
+--   For more info see:
+--   <https://wiki.theory.org/BitTorrent_Tracker_Protocol#Response_Codes>
+--
 parseFailureStatus :: ParamParseFailure -> Status
 parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
 
@@ -515,6 +547,9 @@ parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
   Scrape message
 -----------------------------------------------------------------------}
 
+-- | Scrape query used to specify a set of torrent to scrape.
+-- If list is empty then tracker should return scrape info about each
+-- torrent.
 type ScrapeQuery = [InfoHash]
 
 -- TODO
@@ -536,14 +571,16 @@ scrapeParam = "info_hash"
 isScrapeParam :: BS.ByteString -> Bool
 isScrapeParam = (==) scrapeParam
 
+-- | Parse scrape query to query string.
+parseScrapeQuery :: SimpleQuery -> ScrapeQuery
+parseScrapeQuery
+  = catMaybes . L.map (fromParam . snd) . L.filter (isScrapeParam . fst)
+
+-- | Render scrape query to query string.
 renderScrapeQuery :: ScrapeQuery -> SimpleQuery
 renderScrapeQuery = queryToSimpleQuery . L.map mkPair
   where
     mkPair ih = (scrapeParam, toQueryValue ih)
-
-parseScrapeQuery :: SimpleQuery -> ScrapeQuery
-parseScrapeQuery
-  = catMaybes . L.map (fromParam . snd) . L.filter (isScrapeParam . fst)
 
 -- | Overall information about particular torrent.
 data ScrapeEntry = ScrapeEntry {
