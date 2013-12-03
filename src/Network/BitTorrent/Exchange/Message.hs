@@ -25,8 +25,9 @@
 --   For more infomation see:
 --   <https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29>
 --
-{-# LANGUAGE TemplateHaskell   #-}
-{-# OPTIONS  -fno-warn-orphans #-}
+{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# OPTIONS  -fno-warn-orphans  #-}
 module Network.BitTorrent.Exchange.Message
        ( -- * Extensions
          Extension (..)
@@ -51,24 +52,37 @@ module Network.BitTorrent.Exchange.Message
        , Message        (..)
        , StatusUpdate   (..)
        , RegularMessage (..)
+
+         -- * Fast extension
        , FastMessage    (..)
+
+         -- * Extension protocol
+       , ExtendedExtension
+       , ExtendedCaps      (..)
+       , ExtendedHandshake (..)
+       , ExtendedMessage   (..)
        ) where
 
 import Control.Applicative
 import Control.Exception
 import Control.Monad
+import Data.BEncode as BE
 import Data.Bits
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy  as BL
 import Data.Default
+import Data.IntMap as IM
 import Data.List as L
 import Data.Monoid
 import Data.Serialize as S
+import Data.Text as T
+import Data.Typeable
 import Data.Word
 import Network
-import Network.Socket.ByteString
-import Text.PrettyPrint
+import Network.Socket hiding (KeepAlive)
+import Network.Socket.ByteString as BS
+import Text.PrettyPrint as PP
 import Text.PrettyPrint.Class
 
 import Data.Torrent.Bitfield
@@ -85,17 +99,20 @@ import Network.BitTorrent.Core.PeerAddr ()
 --  information.
 --
 data Extension
-  = ExtDHT  -- ^ BEP 5
-  | ExtFast -- ^ BEP 6
+  = ExtDHT      -- ^ BEP 5
+  | ExtFast     -- ^ BEP 6
+  | ExtExtended -- ^ BEP 10
     deriving (Show, Eq, Ord, Enum, Bounded)
 
 instance Pretty Extension where
-  pretty ExtDHT  = "DHT"
-  pretty ExtFast = "Fast Extension"
+  pretty ExtDHT      = "DHT"
+  pretty ExtFast     = "Fast Extension"
+  pretty ExtExtended = "Extension Protocol"
 
 capMask :: Extension -> Caps
-capMask ExtDHT  = Caps 0x01
-capMask ExtFast = Caps 0x04
+capMask ExtDHT      = Caps 0x01
+capMask ExtFast     = Caps 0x04
+capMask ExtExtended = Caps 0x100000
 
 {-----------------------------------------------------------------------
 --  Capabilities
@@ -208,14 +225,14 @@ sendHandshake sock hs = sendAll sock (S.encode hs)
 
 recvHandshake :: Socket -> IO Handshake
 recvHandshake sock = do
-    header <- recv sock 1
+    header <- BS.recv sock 1
     unless (BS.length header == 1) $
       throw $ userError "Unable to receive handshake header."
 
     let protocolLen = BS.head header
     let restLen     = handshakeSize protocolLen - 1
 
-    body <- recv sock restLen
+    body <- BS.recv sock restLen
     let resp = BS.cons protocolLen body
     either (throwIO . userError) return $ S.decode resp
 
@@ -312,6 +329,101 @@ instance Pretty FastMessage where
   pretty (RejectRequest bix) = "Reject"       <+> pretty bix
   pretty (AllowedFast   pix) = "Allowed fast" <+> int    pix
 
+{-----------------------------------------------------------------------
+--  Extended messages
+-----------------------------------------------------------------------}
+
+type ExtendedExtension = ()
+
+type ExtendedMessageId = Word8
+
+type ExtendedIdMap     = IntMap
+
+-- | The extension IDs must be stored for every peer, becuase every
+-- peer may have different IDs for the same extension.
+--
+newtype ExtendedCaps = ExtendedCaps
+  { extendedCaps :: ExtendedIdMap ExtendedExtension
+  } deriving (Show, Eq)
+
+instance BEncode ExtendedCaps where
+  fromBEncode = undefined
+  toBEncode   = undefined
+
+-- | This message should be sent immediately after the standard
+-- bittorrent handshake to any peer that supports this extension
+-- protocol. Extended handshakes can be sent more than once, however
+-- an implementation may choose to ignore subsequent handshake
+-- messages.
+--
+data ExtendedHandshake = ExtendedHandshake
+  { -- | If this peer has an IPv4 interface, this is the compact
+    -- representation of that address.
+    ehsIPv4        :: Maybe HostAddress
+
+    -- | If this peer has an IPv6 interface, this is the compact
+    -- representation of that address.
+  , ehsIPv6        :: Maybe HostAddress6
+
+    -- | Dictionary of supported extension messages which maps names
+    -- of extensions to an extended message ID for each extension
+    -- message.
+  , ehsCaps        :: ExtendedCaps
+
+    -- | Local TCP /listen/ port. Allows each side to learn about the
+    -- TCP port number of the other side.
+  , ehsPort        :: Maybe PortNumber
+
+    -- | Request queue the number of outstanding 'Request' messages
+    -- this client supports without dropping any.
+  , ehsQueueLength :: Maybe Int
+
+    -- | Client name and version.
+  , ehsVersion     :: Maybe Text
+
+--    -- |
+--  , yourip  :: Maybe (Either HostAddress HostAddress6)
+  } deriving (Show, Eq, Typeable)
+
+instance BEncode ExtendedHandshake where
+  toBEncode ExtendedHandshake {..} = toDict $
+       "ipv4"   .=? ehsIPv4
+    .: "ipv6"   .=? ehsIPv6
+    .: "m"      .=! ehsCaps
+    .: "p"      .=? ehsPort
+    .: "reqq"   .=? ehsQueueLength
+    .: "v"      .=? ehsVersion
+--    .: "yourip" .=? yourip
+    .: endDict
+
+  fromBEncode = fromDict $ ExtendedHandshake
+    <$>? "ipv4"
+    <*>? "ipv6"
+    <*>! "m"
+    <*>? "p"
+    <*>? "reqq"
+    <*>? "v"
+--    <*>? "yourip"
+
+instance Pretty ExtendedHandshake where
+  pretty = PP.text . show
+
+-- | For more info see <http://www.bittorrent.org/beps/bep_0010.html>
+data ExtendedMessage
+  = EHandshake ExtendedHandshake
+  | EUnknown   ExtendedMessageId BS.ByteString
+    deriving (Show, Eq)
+
+instance Pretty ExtendedMessage where
+  pretty (EHandshake ehs) = pretty ehs
+  pretty (EUnknown mid _) = "Unknown" <+> PP.text (show mid)
+
+{-----------------------------------------------------------------------
+-- The message datatype
+-----------------------------------------------------------------------}
+
+type MessageId = Word8
+
 -- | Messages used in communication between peers.
 --
 --   Note: If some extensions are disabled (not present in extension
@@ -327,6 +439,7 @@ data Message
     -- extensions
   | Port     !PortNumber
   | Fast     !FastMessage
+  | Extended !ExtendedMessage
     deriving (Show, Eq)
 
 instance Default Message where
@@ -340,6 +453,17 @@ instance Pretty Message where
   pretty (Regular   m) = pretty m
   pretty (Port      p) = "Port" <+> int (fromEnum p)
   pretty (Fast      m) = pretty m
+  pretty (Extended  m) = pretty m
+
+-- | Can be used to check if this message is allowed to send\/recv in
+--  current session.
+requires :: Message -> Maybe Extension
+requires  KeepAlive   = Nothing
+requires (Status   _) = Nothing
+requires (Regular  _) = Nothing
+requires (Port     _) = Just ExtDHT
+requires (Fast     _) = Just ExtFast
+requires (Extended _) = Just ExtExtended
 
 getInt :: S.Get Int
 getInt = fromIntegral <$> S.getWord32be
@@ -372,6 +496,7 @@ instance Serialize Message where
           0x0F -> return $ Fast HaveNone
           0x10 -> (Fast . RejectRequest) <$> S.get
           0x11 -> (Fast . AllowedFast)   <$> getInt
+          0x14 -> Extended <$> getExtendedMessage (pred len)
           _    -> do
             rm <- S.remaining >>= S.getBytes
             fail $ "unknown message ID: " ++ show mid ++ "\n"
@@ -388,6 +513,7 @@ instance Serialize Message where
   put (Regular msg) = putRegular msg
   put (Port    p  ) = putPort    p
   put (Fast    msg) = putFast    msg
+  put (Extended m ) = putExtendedMessage m
 
 putStatus :: Putter StatusUpdate
 putStatus su = putInt 1  >> S.putWord8 (fromIntegral (fromEnum su))
@@ -418,10 +544,30 @@ putFast (SuggestPiece pix) = putInt 5  >> S.putWord8 0x0D >> putInt pix
 putFast (RejectRequest i ) = putInt 13 >> S.putWord8 0x10 >> S.put i
 putFast (AllowedFast   i ) = putInt 5  >> S.putWord8 0x11 >> putInt i
 
+getExtendedHandshake :: Int -> S.Get ExtendedHandshake
+getExtendedHandshake messageSize = do
+  bs <- getByteString messageSize
+  either fail pure $ BE.decode bs
 
-requires :: Message -> Maybe Extension
-requires  KeepAlive  = Nothing
-requires (Status  _) = Nothing
-requires (Regular _) = Nothing
-requires (Port    _) = Just ExtDHT
-requires (Fast    _) = Just ExtFast
+getExtendedMessage :: Int -> S.Get ExtendedMessage
+getExtendedMessage messageSize = do
+  msgId   <- getWord8
+  let msgBodySize = messageSize - 1
+  case msgId of
+    0 -> EHandshake     <$> getExtendedHandshake msgBodySize
+    _ -> EUnknown msgId <$> getByteString        msgBodySize
+
+extendedMessageId :: MessageId
+extendedMessageId = 20
+
+-- NOTE: in contrast to getExtendedMessage this function put length
+-- and message id too!
+putExtendedMessage :: ExtendedMessage -> S.Put
+putExtendedMessage (EHandshake hs) = do
+  putExtendedMessage $ EUnknown 0 $ BL.toStrict $ BE.encode hs
+
+putExtendedMessage (EUnknown mid  bs) = do
+  putWord32be $ fromIntegral (4 + 1 + BS.length bs)
+  putWord8 extendedMessageId
+  putWord8 mid
+  putByteString bs
