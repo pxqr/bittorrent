@@ -56,7 +56,7 @@ module Network.BitTorrent.Tracker.RPC.Message
        , ScrapeEntry (..)
        , ScrapeInfo
 
-         -- ** Extra
+         -- * Extra
        , queryToSimpleQuery
        )
        where
@@ -71,6 +71,7 @@ import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.Char as Char
 import Data.Convertible
+import Data.Default
 import Data.List as L
 import Data.Maybe
 import Data.Serialize as S hiding (Result)
@@ -246,6 +247,7 @@ renderAnnounceQuery :: AnnounceQuery -> SimpleQuery
 renderAnnounceQuery = queryToSimpleQuery . toQuery
 
 data QueryParam
+    -- announce query
   = ParamInfoHash
   | ParamPeerId
   | ParamPort
@@ -255,6 +257,9 @@ data QueryParam
   | ParamIP
   | ParamNumWant
   | ParamEvent
+    -- announce query ext
+  | ParamCompact
+  | ParamNoPeerId
     deriving (Show, Eq, Ord, Enum)
 
 paramName :: QueryParam -> BS.ByteString
@@ -267,6 +272,9 @@ paramName ParamDownloaded = "downloaded"
 paramName ParamIP         = "ip"
 paramName ParamNumWant    = "numwant"
 paramName ParamEvent      = "event"
+paramName ParamCompact    = "compact"
+paramName ParamNoPeerId   = "no_peer_id"
+{-# INLINE paramName #-}
 
 class FromParam a where
   fromParam :: BS.ByteString -> Maybe a
@@ -363,13 +371,33 @@ data AnnounceQueryExt = AnnounceQueryExt
   , extNoPeerId :: !(Maybe Bool)
   } deriving (Show, Eq, Typeable)
 
+instance Default AnnounceQueryExt where
+  def = AnnounceQueryExt Nothing Nothing
+
+instance QueryLike AnnounceQueryExt where
+  toQuery AnnounceQueryExt {..} =
+      [ ("compact",    toQueryFlag <$> extCompact)
+      , ("no_peer_id", toQueryFlag <$> extNoPeerId)
+      ]
+    where
+      toQueryFlag False = "0"
+      toQueryFlag True  = "1"
+
+instance FromParam Bool where
+  fromParam "0" = Just False
+  fromParam "1" = Just True
+  fromParam _   = Nothing
+
 -- | Parse announce query extended part from query string.
 parseAnnounceQueryExt :: SimpleQuery -> AnnounceQueryExt
-parseAnnounceQueryExt = undefined
+parseAnnounceQueryExt params = either (const def) id $
+  AnnounceQueryExt
+    <$> optParam ParamCompact  params
+    <*> optParam ParamNoPeerId params
 
 -- | Render announce query extended part to query string.
 renderAnnounceQueryExt :: AnnounceQueryExt -> SimpleQuery
-renderAnnounceQueryExt = undefined
+renderAnnounceQueryExt = queryToSimpleQuery . toQuery
 
 -- | HTTP tracker request with extensions.
 data AnnounceRequest = AnnounceRequest
@@ -377,13 +405,18 @@ data AnnounceRequest = AnnounceRequest
   , announceAdvises :: AnnounceQueryExt -- ^ Optional advises to the tracker.
   } deriving (Show, Eq, Typeable)
 
+instance QueryLike AnnounceRequest where
+  toQuery AnnounceRequest{..} = toQuery announceAdvises ++ toQuery announceQuery
+
 -- | Parse announce request from query string.
 parseAnnounceRequest :: SimpleQuery -> ParseResult AnnounceRequest
-parseAnnounceRequest = undefined
+parseAnnounceRequest params = AnnounceRequest
+  <$> parseAnnounceQuery params
+  <*> pure (parseAnnounceQueryExt params)
 
 -- | Render announce request to query string.
 renderAnnounceRequest :: AnnounceRequest -> SimpleQuery
-renderAnnounceRequest = undefined
+renderAnnounceRequest = queryToSimpleQuery . toQuery
 
 {-----------------------------------------------------------------------
 --  Announce response
