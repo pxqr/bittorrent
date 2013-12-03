@@ -52,7 +52,7 @@ module Data.Torrent.Layout
          -- * Flat file layout
        , FileLayout
        , flatLayout
-       , accumOffsets
+       , accumPositions
        , fileOffset
 
          -- * Internal
@@ -303,11 +303,11 @@ flatLayout prefixPath MultiFile  {..}     = L.map mkPath liFiles
            </> joinPath (L.map BC.unpack fiName)
 
 -- | Calculate offset of each file based on its length, incrementally.
-accumOffsets :: FileLayout FileSize -> FileLayout FileOffset
-accumOffsets = go 0
+accumPositions :: FileLayout FileSize -> FileLayout (FileOffset, FileSize)
+accumPositions = go 0
   where
     go !_ [] = []
-    go !offset ((n, s) : xs) = (n, offset) : go (offset + s) xs
+    go !offset ((n, s) : xs) = (n, (offset, s)) : go (offset + s) xs
 
 -- | Gives global offset of a content file for a given full path.
 fileOffset :: FilePath -> FileLayout FileOffset -> Maybe FileOffset

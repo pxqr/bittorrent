@@ -16,7 +16,7 @@ import Test.QuickCheck.Instances ()
 import Data.Torrent.Piece
 import Data.Torrent.Layout
 import Data.Torrent
-
+import Data.Torrent.LayoutSpec ()
 
 {-----------------------------------------------------------------------
 --  Common
@@ -37,18 +37,6 @@ instance Arbitrary URI where
 {-----------------------------------------------------------------------
 --  Instances
 -----------------------------------------------------------------------}
-
-instance Arbitrary FileSize where
-  arbitrary = fromIntegral <$> (arbitrary :: Gen Int)
-
-instance Arbitrary a => Arbitrary (FileInfo a) where
-  arbitrary = FileInfo <$> arbitrary <*> arbitrary <*> arbitrary
-
-instance Arbitrary LayoutInfo where
-  arbitrary = oneof
-    [ SingleFile <$> arbitrary
-    , MultiFile  <$> arbitrary <*> arbitrary
-    ]
 
 instance Arbitrary HashArray where
   arbitrary = HashArray <$> arbitrary
