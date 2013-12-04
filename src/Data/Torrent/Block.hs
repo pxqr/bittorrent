@@ -13,12 +13,8 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Torrent.Block
-       ( -- * Piece attributes
-         PieceIx
-       , PieceSize
-
-         -- * Block attributes
-       , BlockOffset
+       ( -- * Block attributes
+         BlockOffset
        , BlockCount
        , BlockSize
        , defaultTransferSize
@@ -32,6 +28,7 @@ module Data.Torrent.Block
        , blockIx
        , blockSize
        , blockRange
+       , isPiece
        ) where
 
 import Control.Applicative
@@ -44,20 +41,7 @@ import Data.Typeable
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
 
-{-----------------------------------------------------------------------
---  Piece attributes
------------------------------------------------------------------------}
-
--- | Zero-based index of piece in torrent content.
-type PieceIx   = Int
-
--- | Size of piece in bytes. Should be a power of 2.
---
---   NOTE: Have max and min size constrained to wide used
---   semi-standard values. This bounds should be used to make decision
---   about piece size for new torrents.
---
-type PieceSize = Int
+import Data.Torrent.Piece
 
 {-----------------------------------------------------------------------
 --  Block attributes
@@ -171,3 +155,9 @@ blockIx = BlockIx <$> blkPiece <*> blkOffset <*> blockSize
 blockRange :: (Num a, Integral a) => PieceSize -> Block Lazy.ByteString -> (a, a)
 blockRange pieceSize = blockIxRange pieceSize . blockIx
 {-# INLINE blockRange #-}
+
+-- | Test if a block can be safely turned into a piece.
+isPiece :: PieceSize -> Block Lazy.ByteString -> Bool
+isPiece pieceLen blk @ (Block i offset _) =
+     offset == 0 && blockSize blk == pieceLen && i >= 0
+{-# INLINE isPiece #-}

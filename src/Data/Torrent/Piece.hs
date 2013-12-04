@@ -23,7 +23,6 @@ module Data.Torrent.Piece
          -- * Piece data
        , Piece (..)
        , pieceSize
-       , isPiece
 
          -- * Piece control
        , HashArray (..)
@@ -63,11 +62,9 @@ import Data.Typeable
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
 
-import Data.Torrent.Block
-
-
+-- TODO add torrent file validation
 class Lint a where
-  lint :: a -> Either String a
+   lint :: a -> Either String a
 
 --class Validation a where
 --  validate :: PieceInfo -> Piece a -> Bool
@@ -76,8 +73,22 @@ class Lint a where
 -- Piece attributes
 -----------------------------------------------------------------------}
 
+-- | Zero-based index of piece in torrent content.
+type PieceIx   = Int
+
+-- | Size of piece in bytes. Should be a power of 2.
+--
+--   NOTE: Have max and min size constrained to wide used
+--   semi-standard values. This bounds should be used to make decision
+--   about piece size for new torrents.
+--
+type PieceSize = Int
+
 -- | Number of pieces in torrent or a part of torrent.
 type PieceCount = Int
+
+defaultBlockSize :: Int
+defaultBlockSize = 16 * 1024
 
 -- | Optimal number of pieces in torrent.
 optimalPieceCount :: PieceCount
@@ -86,7 +97,7 @@ optimalPieceCount = 1000
 
 -- | Piece size should not be less than this value.
 minPieceSize :: Int
-minPieceSize = defaultTransferSize * 4
+minPieceSize = defaultBlockSize * 4
 {-# INLINE minPieceSize #-}
 
 -- | To prevent transfer degradation piece size should not exceed this
@@ -129,12 +140,6 @@ instance Pretty (Piece a) where
 -- | Get size of piece in bytes.
 pieceSize :: Piece BL.ByteString -> PieceSize
 pieceSize Piece {..} = fromIntegral (BL.length pieceData)
-
--- | Test if a block can be safely turned into a piece.
-isPiece :: PieceSize -> Block BL.ByteString -> Bool
-isPiece pieceLen blk @ (Block i offset _) =
-     offset == 0 && blockSize blk == pieceLen && i >= 0
-{-# INLINE isPiece #-}
 
 {-----------------------------------------------------------------------
 -- Piece control
