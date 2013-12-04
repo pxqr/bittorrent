@@ -39,7 +39,7 @@ import Network.HTTP.Conduit.Internal
 import Network.HTTP.Types.URI
 
 import Data.Torrent.InfoHash
-import Network.BitTorrent.Tracker.RPC.Message
+import Network.BitTorrent.Tracker.Message
 
 
 data Connection = Connection

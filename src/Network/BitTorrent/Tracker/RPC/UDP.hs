@@ -45,7 +45,7 @@ import System.Entropy
 import System.Timeout
 import Numeric
 
-import Network.BitTorrent.Tracker.RPC.Message
+import Network.BitTorrent.Tracker.Message
 
 {-----------------------------------------------------------------------
   Tokens

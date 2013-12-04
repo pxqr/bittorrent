@@ -23,7 +23,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# OPTIONS -fno-warn-orphans           #-}
-module Network.BitTorrent.Tracker.RPC.Message
+module Network.BitTorrent.Tracker.Message
        ( -- * Announce
          -- ** Query
          Event(..)

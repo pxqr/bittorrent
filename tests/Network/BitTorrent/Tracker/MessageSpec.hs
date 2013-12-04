@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards  #-}
 {-# OPTIONS -fno-warn-orphans #-}
-module Network.BitTorrent.Tracker.RPC.MessageSpec
+module Network.BitTorrent.Tracker.MessageSpec
        ( spec
        , validateInfo
        , arbitrarySample
@@ -18,7 +18,7 @@ import Data.Torrent.InfoHashSpec ()
 import Data.Torrent.ProgressSpec ()
 import Network.BitTorrent.Core.PeerIdSpec ()
 
-import Network.BitTorrent.Tracker.RPC.Message as Message
+import Network.BitTorrent.Tracker.Message as Message
 import Network.BitTorrent.Core.PeerAddr
 
 

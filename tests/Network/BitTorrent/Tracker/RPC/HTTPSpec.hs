@@ -9,7 +9,7 @@ import Data.Maybe
 import Network.URI
 import Test.Hspec
 
-import Network.BitTorrent.Tracker.RPC.MessageSpec hiding (spec)
+import Network.BitTorrent.Tracker.MessageSpec hiding (spec)
 import Network.BitTorrent.Tracker.RPC.HTTP
 
 
