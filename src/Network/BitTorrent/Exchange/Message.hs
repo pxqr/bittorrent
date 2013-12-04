@@ -25,48 +25,50 @@
 --   For more infomation see:
 --   <https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29>
 --
-{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TemplateHaskell    #-}
 {-# OPTIONS  -fno-warn-orphans  #-}
 module Network.BitTorrent.Exchange.Message
-       ( -- * Extensions
+       ( -- * Capabilities
          Extension (..)
        , Caps
-       , requires
-       , allowed
        , toCaps
        , fromCaps
+       , allowed
 
          -- * Handshake
        , Handshake(..)
        , defaultHandshake
        , defaultBTProtocol
+       , handshakeSize
        , handshakeMaxSize
-
-         -- * TODO remove this section from this module
-       , handshake
-       , recvHandshake
-       , sendHandshake
 
          -- * Messages
        , Message        (..)
+       , PeerMessage    (..)
+       , requires
+
+         -- ** Core messages
        , StatusUpdate   (..)
        , RegularMessage (..)
 
-         -- * Fast extension
+         -- ** Fast extension
        , FastMessage    (..)
 
-         -- * Extension protocol
+         -- ** Extension protocol
+       , ExtendedMessage   (..)
        , ExtendedExtension
        , ExtendedCaps      (..)
        , ExtendedHandshake (..)
-       , ExtendedMessage   (..)
+       , ExtendedMetadata  (..)
        ) where
 
 import Control.Applicative
-import Control.Exception
-import Control.Monad
 import Data.BEncode as BE
+import Data.BEncode.BDict as BE
+import Data.BEncode.Internal (ppBEncode)
 import Data.Bits
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
@@ -75,9 +77,11 @@ import Data.Default
 import Data.IntMap as IM
 import Data.List as L
 import Data.Monoid
+import Data.Ord
 import Data.Serialize as S
 import Data.Text as T
 import Data.Typeable
+import Data.Tuple
 import Data.Word
 import Network
 import Network.Socket hiding (KeepAlive)
@@ -219,35 +223,12 @@ defaultBTProtocol = "BitTorrent protocol"
 defaultHandshake :: InfoHash -> PeerId -> Handshake
 defaultHandshake = Handshake defaultBTProtocol def
 
--- | TODO remove socket stuff to corresponding module
-sendHandshake :: Socket -> Handshake -> IO ()
-sendHandshake sock hs = sendAll sock (S.encode hs)
-
-recvHandshake :: Socket -> IO Handshake
-recvHandshake sock = do
-    header <- BS.recv sock 1
-    unless (BS.length header == 1) $
-      throw $ userError "Unable to receive handshake header."
-
-    let protocolLen = BS.head header
-    let restLen     = handshakeSize protocolLen - 1
-
-    body <- BS.recv sock restLen
-    let resp = BS.cons protocolLen body
-    either (throwIO . userError) return $ S.decode resp
-
--- | Handshaking with a peer specified by the second argument.
-handshake :: Socket -> Handshake -> IO Handshake
-handshake sock hs = do
-    sendHandshake sock hs
-    hs' <- recvHandshake sock
-    when (hsInfoHash hs /= hsInfoHash hs') $ do
-      throwIO $ userError  "Handshake info hash do not match."
-    return hs'
-
 {-----------------------------------------------------------------------
     Regular messages
 -----------------------------------------------------------------------}
+
+class PeerMessage a where
+  envelop :: ExtendedCaps -> a -> Message
 
 data StatusUpdate
   = Choke
@@ -258,6 +239,9 @@ data StatusUpdate
 
 instance Pretty StatusUpdate where
   pretty = text . show
+
+instance PeerMessage StatusUpdate where
+  envelop _ = Status
 
 data RegularMessage =
     -- | Zero-based index of a piece that has just been successfully
@@ -298,6 +282,18 @@ instance Pretty RegularMessage where
   pretty (Piece    blk) = "Piece"    <+> pretty blk
   pretty (Cancel   i  ) = "Cancel"   <+> pretty i
 
+instance PeerMessage RegularMessage where
+  envelop _ = Regular
+
+instance PeerMessage Bitfield where
+  envelop c = envelop c . Bitfield
+
+instance PeerMessage BlockIx where
+  envelop c = envelop c . Request
+
+instance PeerMessage (Block BL.ByteString) where
+  envelop c = envelop c . Piece
+
 -- | BEP6 messages.
 data FastMessage =
     -- | If a peer have all pieces it might send the 'HaveAll' message
@@ -329,26 +325,58 @@ instance Pretty FastMessage where
   pretty (RejectRequest bix) = "Reject"       <+> pretty bix
   pretty (AllowedFast   pix) = "Allowed fast" <+> int    pix
 
+instance PeerMessage FastMessage where
+  envelop _ = Fast
+
 {-----------------------------------------------------------------------
 --  Extended messages
 -----------------------------------------------------------------------}
 
-type ExtendedExtension = ()
-
 type ExtendedMessageId = Word8
-
 type ExtendedIdMap     = IntMap
 
--- | The extension IDs must be stored for every peer, becuase every
+data ExtendedExtension
+  = ExtMetadata -- ^ BEP 9
+    deriving (Show, Eq, Typeable)
+
+instance Pretty ExtendedExtension where
+  pretty ExtMetadata = "Extension for Peers to Send Metadata Files"
+
+extId :: ExtendedExtension -> ExtendedMessageId
+extId ExtMetadata = 1
+{-# INLINE extId #-}
+
+extString :: ExtendedExtension -> BS.ByteString
+extString ExtMetadata = "ut_metadata"
+{-# INLINE extString #-}
+
+fromS :: BS.ByteString -> ExtendedExtension
+fromS "ut_metadata" = ExtMetadata
+
+-- | The extension IDs must be stored for every peer, because every
 -- peer may have different IDs for the same extension.
 --
 newtype ExtendedCaps = ExtendedCaps
   { extendedCaps :: ExtendedIdMap ExtendedExtension
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Monoid)
+
+-- | Empty set.
+instance Default ExtendedCaps where
+  def = ExtendedCaps IM.empty
+
+instance Pretty ExtendedCaps where
+  pretty = ppBEncode . toBEncode
 
 instance BEncode ExtendedCaps where
-  fromBEncode = undefined
-  toBEncode   = undefined
+  toBEncode = BDict . BE.fromAscList . L.sortBy (comparing fst)
+            . L.map mkPair . IM.toList . extendedCaps
+    where
+      mkPair (eid, ex) = (extString ex, toBEncode eid)
+
+  fromBEncode (BDict bd) = ExtendedCaps <$> undefined
+
+  fromBEncode _          = decodingError "ExtendedCaps"
+
 
 -- | This message should be sent immediately after the standard
 -- bittorrent handshake to any peer that supports this extension
@@ -385,10 +413,13 @@ data ExtendedHandshake = ExtendedHandshake
 --  , yourip  :: Maybe (Either HostAddress HostAddress6)
   } deriving (Show, Eq, Typeable)
 
+instance Default ExtendedHandshake where
+  def = ExtendedHandshake Nothing Nothing def Nothing Nothing Nothing
+
 instance BEncode ExtendedHandshake where
   toBEncode ExtendedHandshake {..} = toDict $
-       "ipv4"   .=? ehsIPv4
-    .: "ipv6"   .=? ehsIPv6
+       "ipv4"   .=? ehsIPv4 -- FIXME invalid encoding
+    .: "ipv6"   .=? ehsIPv6 -- FIXME invalid encoding
     .: "m"      .=! ehsCaps
     .: "p"      .=? ehsPort
     .: "reqq"   .=? ehsQueueLength
@@ -408,15 +439,66 @@ instance BEncode ExtendedHandshake where
 instance Pretty ExtendedHandshake where
   pretty = PP.text . show
 
+instance PeerMessage ExtendedHandshake where
+  envelop c = envelop c . EHandshake
+
+{-----------------------------------------------------------------------
+-- Metadata exchange
+-----------------------------------------------------------------------}
+
+type MetadataId = Int
+
+pieceSize :: Int
+pieceSize = 16 * 1024
+
+data ExtendedMetadata
+  = MetadataRequest PieceIx
+  | MetadataData    PieceIx Int
+  | MetadataReject  PieceIx
+  | MetadataUnknown BValue
+    deriving (Show, Eq, Typeable)
+
+instance BEncode ExtendedMetadata where
+  toBEncode (MetadataRequest pix) = toDict $
+       "msg_type"   .=! (0 :: MetadataId)
+    .: "piece"      .=! pix
+    .: endDict
+  toBEncode (MetadataData    pix totalSize) = toDict $
+       "msg_type"   .=! (1 :: MetadataId)
+    .: "piece"      .=! pix
+    .: "total_size" .=! totalSize
+    .: endDict
+  toBEncode (MetadataReject  pix)  = toDict $
+       "msg_type"   .=! (2 :: MetadataId)
+    .: "piece"      .=! pix
+    .: endDict
+  toBEncode (MetadataUnknown bval) = bval
+
+  fromBEncode = undefined
+
+instance Pretty ExtendedMetadata where
+  pretty (MetadataRequest pix  ) = "Request" <+> PP.int pix
+  pretty (MetadataData    pix s) = "Data"    <+> PP.int pix <+> PP.int s
+  pretty (MetadataReject  pix  ) = "Reject"  <+> PP.int pix
+  pretty (MetadataUnknown bval ) = ppBEncode bval
+
+instance PeerMessage ExtendedMetadata where
+  envelop c = envelop c . EMetadata
+
 -- | For more info see <http://www.bittorrent.org/beps/bep_0010.html>
 data ExtendedMessage
   = EHandshake ExtendedHandshake
+  | EMetadata  ExtendedMetadata
   | EUnknown   ExtendedMessageId BS.ByteString
-    deriving (Show, Eq)
+    deriving (Show, Eq, Typeable)
 
 instance Pretty ExtendedMessage where
   pretty (EHandshake ehs) = pretty ehs
+  pretty (EMetadata  msg) = pretty msg
   pretty (EUnknown mid _) = "Unknown" <+> PP.text (show mid)
+
+instance PeerMessage ExtendedMessage where
+  envelop _ = Extended
 
 {-----------------------------------------------------------------------
 -- The message datatype
@@ -454,6 +536,12 @@ instance Pretty Message where
   pretty (Port      p) = "Port" <+> int (fromEnum p)
   pretty (Fast      m) = pretty m
   pretty (Extended  m) = pretty m
+
+instance PeerMessage Message where
+  envelop _ = id
+
+instance PeerMessage PortNumber where
+  envelop _ = Port
 
 -- | Can be used to check if this message is allowed to send\/recv in
 --  current session.
@@ -555,6 +643,7 @@ getExtendedMessage messageSize = do
   let msgBodySize = messageSize - 1
   case msgId of
     0 -> EHandshake     <$> getExtendedHandshake msgBodySize
+    1 -> EMetadata      <$> undefined
     _ -> EUnknown msgId <$> getByteString        msgBodySize
 
 extendedMessageId :: MessageId
@@ -565,7 +654,9 @@ extendedMessageId = 20
 putExtendedMessage :: ExtendedMessage -> S.Put
 putExtendedMessage (EHandshake hs) = do
   putExtendedMessage $ EUnknown 0 $ BL.toStrict $ BE.encode hs
-
+putExtendedMessage (EMetadata msg)  = do
+  putExtendedMessage $ EUnknown (extId ExtMetadata)
+    $ BL.toStrict $ BE.encode msg
 putExtendedMessage (EUnknown mid  bs) = do
   putWord32be $ fromIntegral (4 + 1 + BS.length bs)
   putWord8 extendedMessageId
