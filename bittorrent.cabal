@@ -155,6 +155,7 @@ test-suite spec
                        Data.Torrent.MagnetSpec
                        Data.Torrent.MetainfoSpec
                        Data.Torrent.ProgressSpec
+                       Network.BitTorrent.CoreSpec
                        Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.Tracker.MessageSpec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
