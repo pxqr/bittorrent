@@ -53,6 +53,7 @@ library
                      , Data.Torrent.Tree
                      , Data.Torrent.URN
 --                   , Network.BitTorrent
+                     , Network.BitTorrent.Core
                      , Network.BitTorrent.Core.PeerId
                      , Network.BitTorrent.Core.PeerAddr
 --                   , Network.BitTorrent.DHT
@@ -64,7 +65,6 @@ library
 --                   , Network.BitTorrent.Exchange.Session
                      , Network.BitTorrent.Exchange.Status
 --                   , Network.BitTorrent.Exchange.Wire
---                   , Network.BitTorrent.Extension
 --                   , Network.BitTorrent.Tracker
 --                     , Network.BitTorrent.Tracker.RPC
                      , Network.BitTorrent.Tracker.Wai
@@ -88,7 +88,7 @@ library
                      , deepseq      >= 1.3
                      , lens         >= 3.0
                      , resourcet    >= 0.4
---                     , transformers
+                     , mtl
 
                        -- Concurrency
 --                     , SafeSemaphore
