@@ -18,7 +18,6 @@ module Network.BitTorrent.Core.PeerAddr
          PeerAddr(..)
        , defaultPorts
        , peerSockAddr
-       , connectToPeer
        ) where
 
 import Control.Applicative
@@ -116,10 +115,3 @@ peerSockAddr = SockAddrInet <$> (g . peerPort) <*> (htonl . peerIP)
 
     g :: PortNumber -> PortNumber
     g = id
-
--- | Tries to connect to peer using reasonable default parameters.
-connectToPeer :: PeerAddr -> IO Socket
-connectToPeer p = do
-  sock <- socket AF_INET Stream Network.Socket.defaultProtocol
-  connect sock (peerSockAddr p)
-  return sock

@@ -22,6 +22,11 @@ import Network.BitTorrent.Exchange.Status
 
 type Extension = ()
 
+data ExchangeError
+  = InvalidPieceIx PieceIx
+  | InvalidBlock   BlockIx
+  | CorruptedPiece PieceIx
+
 -- | Peer session contain all data necessary for peer to peer
 -- communication.
 data ExchangeSession = ExchangeSession
@@ -69,30 +74,6 @@ $(makeLenses ''SessionState)
 --getSessionState :: PeerSession -> IO SessionState
 --getSessionState PeerSession {..} = readIORef sessionState
 
-{-----------------------------------------------------------------------
---  Exceptions
------------------------------------------------------------------------}
-
--- | Exceptions used to interrupt the current P2P session. This
--- exceptions will NOT affect other P2P sessions, DHT, peer <->
--- tracker, or any other session.
---
-data ExchangeFailure
-  = PeerDisconnected
-  | ProtocolError  Doc
-  | UnknownTorrent InfoHash
-    deriving (Show, Typeable)
-
-instance Exception ExchangeFailure
-
--- | Do nothing with exception, used with 'handle' or 'try'.
-isSessionException :: Monad m => ExchangeFailure -> m ()
-isSessionException _ = return ()
-
--- | The same as 'isSessionException' but output to stdout the catched
--- exception, for debugging purposes only.
-putSessionException :: ExchangeFailure -> IO ()
-putSessionException = print
 {-
 {-----------------------------------------------------------------------
 --  Broadcasting: Have, Cancel, Bitfield, SuggestPiece

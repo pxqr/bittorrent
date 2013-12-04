@@ -84,7 +84,6 @@ import Control.Monad.Trans.Resource
 import Data.IORef
 import Data.Conduit as C
 import Data.Conduit.Cereal as S
---import Data.Conduit.Serialization.Binary as B
 import Data.Conduit.Network
 import Data.Serialize as S
 import Text.PrettyPrint as PP hiding (($$))
