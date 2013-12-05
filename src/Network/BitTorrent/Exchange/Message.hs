@@ -61,27 +61,40 @@ module Network.BitTorrent.Exchange.Message
 
          -- ** Extension protocol
        , ExtendedMessage   (..)
-       , ExtendedExtension
+
+         -- *** Capabilities
+       , ExtendedExtension (..)
        , ExtendedCaps      (..)
+       , toExtCaps
+       , fromExtCaps
+       , extendedAllowed
+
+         -- *** Handshake
        , ExtendedHandshake (..)
        , nullExtendedHandshake
+
+         -- *** Metadata
        , ExtendedMetadata  (..)
        ) where
 
 import Control.Applicative
+import Control.Arrow ((&&&), (***))
 import Data.BEncode as BE
 import Data.BEncode.BDict as BE
 import Data.BEncode.Internal (ppBEncode)
+import Data.BEncode.Types    (BDict)
 import Data.Bits
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy  as BL
 import Data.Default
-import Data.IntMap as IM
 import Data.List as L
+import Data.Map.Strict as M
+import Data.Maybe
 import Data.Monoid
 import Data.Ord
 import Data.Serialize as S
+import Data.String
 import Data.Text as T
 import Data.Typeable
 import Data.Word
@@ -106,7 +119,7 @@ import Network.BitTorrent.Exchange.Block
 data Extension
   = ExtDHT      -- ^ BEP 5:  allow to send PORT messages.
   | ExtFast     -- ^ BEP 6:  allow to send FAST messages.
-  | ExtExtended -- ^ BEP 10: allow to send extension protocol messages.
+  | ExtExtended -- ^ BEP 10: allow to send the extension protocol messages.
     deriving (Show, Eq, Ord, Enum, Bounded)
 
 -- | Full extension names, suitable for logging.
@@ -243,7 +256,9 @@ defaultHandshake = Handshake defaultBTProtocol def
 -- | Messages which can be sent after handshaking. Minimal complete
 -- definition: 'envelop'.
 class PeerMessage a where
-  -- | Construct a message to be /sent/.
+  -- | Construct a message to be /sent/. Note that if 'ExtendedCaps'
+  -- do not contain mapping for this message the default
+  -- 'ExtendedMessageId' is used.
   envelop :: ExtendedCaps -- ^ The /receiver/ extended capabilities;
           -> a            -- ^ An regular message;
           -> Message      -- ^ Enveloped message to sent.
@@ -391,54 +406,96 @@ instance PeerMessage FastMessage where
   {-# INLINE requires #-}
 
 {-----------------------------------------------------------------------
---  Extended messages
+--  Extension protocol
 -----------------------------------------------------------------------}
 
-type ExtendedMessageId = Word8
-type ExtendedIdMap     = IntMap
+{-----------------------------------------------------------------------
+--  Extended capabilities
+-----------------------------------------------------------------------}
 
 data ExtendedExtension
-  = ExtMetadata -- ^ BEP 9
-    deriving (Show, Eq, Typeable)
+  = ExtMetadata -- ^ BEP 9: Extension for Peers to Send Metadata Files
+    deriving (Show, Eq, Ord, Enum, Bounded, Typeable)
+
+instance IsString ExtendedExtension where
+  fromString = fromMaybe (error msg) . fromKey . fromString
+    where
+      msg = "fromString: could not parse ExtendedExtension"
 
 instance Pretty ExtendedExtension where
   pretty ExtMetadata = "Extension for Peers to Send Metadata Files"
+
+fromKey :: BKey -> Maybe ExtendedExtension
+fromKey "ut_metadata" = Just ExtMetadata
+fromKey _             = Nothing
+{-# INLINE fromKey #-}
+
+toKey :: ExtendedExtension -> BKey
+toKey ExtMetadata = "ut_metadata"
+{-# INLINE toKey #-}
+
+type ExtendedMessageId = Word8
 
 extId :: ExtendedExtension -> ExtendedMessageId
 extId ExtMetadata = 1
 {-# INLINE extId #-}
 
-extString :: ExtendedExtension -> BS.ByteString
-extString ExtMetadata = "ut_metadata"
-{-# INLINE extString #-}
-
-fromS :: BS.ByteString -> ExtendedExtension
-fromS "ut_metadata" = ExtMetadata
+type ExtendedMap = Map ExtendedExtension ExtendedMessageId
 
 -- | The extension IDs must be stored for every peer, because every
 -- peer may have different IDs for the same extension.
 --
-newtype ExtendedCaps = ExtendedCaps
-  { extendedCaps :: ExtendedIdMap ExtendedExtension
-  } deriving (Show, Eq, Monoid)
-
--- | Empty set.
-instance Default ExtendedCaps where
-  def = ExtendedCaps IM.empty
+newtype ExtendedCaps = ExtendedCaps { extendedCaps :: ExtendedMap }
+  deriving (Show, Eq)
 
 instance Pretty ExtendedCaps where
-  pretty = ppBEncode . toBEncode
+  pretty = hcat . punctuate ", " . L.map pretty . fromExtCaps
 
+-- | The empty set.
+instance Default ExtendedCaps where
+  def = ExtendedCaps M.empty
+
+-- | Monoid under intersection:
+--
+--     * The 'mempty' caps include all known extensions;
+--
+--     * the 'mappend' operation is NOT commutative: it return message
+-- id from the first caps for the extensions existing in both caps.
+--
+instance Monoid ExtendedCaps where
+  mempty  = toExtCaps [minBound..maxBound]
+  mappend (ExtendedCaps a) (ExtendedCaps b) =
+    ExtendedCaps (M.intersection a b)
+
+appendBDict ::  BDict -> ExtendedMap -> ExtendedMap
+appendBDict (Cons key val xs) caps
+  | Just  ext <- fromKey     key
+  , Right eid <- fromBEncode val   = M.insert ext eid (appendBDict xs caps)
+  |           otherwise            = caps
+appendBDict  Nil              caps = caps
+
+-- | Handshake compatible encoding.
 instance BEncode ExtendedCaps where
   toBEncode = BDict . BE.fromAscList . L.sortBy (comparing fst)
-            . L.map mkPair . IM.toList . extendedCaps
-    where
-      mkPair (eid, ex) = (extString ex, toBEncode eid)
+            . L.map (toKey *** toBEncode) . M.toList . extendedCaps
 
-  fromBEncode (BDict bd) = ExtendedCaps <$> undefined
-
+  fromBEncode (BDict bd) = pure $ ExtendedCaps $ appendBDict bd M.empty
   fromBEncode _          = decodingError "ExtendedCaps"
 
+toExtCaps :: [ExtendedExtension] -> ExtendedCaps
+toExtCaps = ExtendedCaps . M.fromList . L.map (id &&& extId)
+
+fromExtCaps :: ExtendedCaps -> [ExtendedExtension]
+fromExtCaps = M.keys . extendedCaps
+{-# INLINE fromExtCaps #-}
+
+extendedAllowed :: ExtendedExtension -> ExtendedCaps -> Bool
+extendedAllowed e (ExtendedCaps caps) = M.member e caps
+{-# INLINE extendedAllowed #-}
+
+{-----------------------------------------------------------------------
+--  Extended handshake
+-----------------------------------------------------------------------}
 
 -- | This message should be sent immediately after the standard
 -- bittorrent handshake to any peer that supports this extension
@@ -474,6 +531,9 @@ data ExtendedHandshake = ExtendedHandshake
 --    -- |
 --  , yourip  :: Maybe (Either HostAddress HostAddress6)
   } deriving (Show, Eq, Typeable)
+
+extendedHandshakeId :: ExtendedMessageId
+extendedHandshakeId = 0
 
 instance Default ExtendedHandshake where
   def = nullExtendedHandshake def
@@ -513,7 +573,7 @@ nullExtendedHandshake caps
   = ExtendedHandshake Nothing Nothing caps Nothing Nothing Nothing
 
 {-----------------------------------------------------------------------
--- Metadata exchange
+-- Metadata exchange extension
 -----------------------------------------------------------------------}
 
 type MetadataId = Int
@@ -552,8 +612,11 @@ instance Pretty ExtendedMetadata where
   pretty (MetadataReject  pix  ) = "Reject"  <+> PP.int pix
   pretty (MetadataUnknown bval ) = ppBEncode bval
 
+remoteMessageId :: ExtendedExtension -> ExtendedCaps -> ExtendedMessageId
+remoteMessageId ext = fromMaybe (extId ext) . M.lookup ext . extendedCaps
+
 instance PeerMessage ExtendedMetadata where
-  envelop  c = envelop c . EMetadata
+  envelop  c = envelop c . EMetadata (remoteMessageId ExtMetadata c)
   {-# INLINE envelop #-}
 
   requires _ = Just ExtExtended
@@ -562,14 +625,14 @@ instance PeerMessage ExtendedMetadata where
 -- | For more info see <http://www.bittorrent.org/beps/bep_0010.html>
 data ExtendedMessage
   = EHandshake ExtendedHandshake
-  | EMetadata  ExtendedMetadata
+  | EMetadata  ExtendedMessageId ExtendedMetadata
   | EUnknown   ExtendedMessageId BS.ByteString
     deriving (Show, Eq, Typeable)
 
 instance Pretty ExtendedMessage where
-  pretty (EHandshake ehs) = pretty ehs
-  pretty (EMetadata  msg) = pretty msg
-  pretty (EUnknown mid _) = "Unknown" <+> PP.text (show mid)
+  pretty (EHandshake     ehs) = pretty ehs
+  pretty (EMetadata  _   msg) = pretty msg
+  pretty (EUnknown   mid _  ) = "Unknown" <+> PP.text (show mid)
 
 instance PeerMessage ExtendedMessage where
   envelop  _ = Extended
@@ -755,23 +818,24 @@ getExtendedMessage messageSize = do
   msgId   <- getWord8
   let msgBodySize = messageSize - 1
   case msgId of
-    0 -> EHandshake     <$> getExtendedHandshake msgBodySize
-    1 -> EMetadata      <$> undefined
-    _ -> EUnknown msgId <$> getByteString        msgBodySize
+    0 -> EHandshake      <$> getExtendedHandshake msgBodySize
+    1 -> EMetadata msgId <$> undefined
+    _ -> EUnknown  msgId <$> getByteString        msgBodySize
 
 extendedMessageId :: MessageId
 extendedMessageId = 20
 
 -- NOTE: in contrast to getExtendedMessage this function put length
 -- and message id too!
-putExtendedMessage :: ExtendedMessage -> S.Put
+putExtendedMessage :: Putter ExtendedMessage
 putExtendedMessage (EHandshake hs) = do
-  putExtendedMessage $ EUnknown 0 $ BL.toStrict $ BE.encode hs
-putExtendedMessage (EMetadata msg)  = do
-  putExtendedMessage $ EUnknown (extId ExtMetadata)
+  putExtendedMessage $ EUnknown extendedHandshakeId
+    $ BL.toStrict $ BE.encode hs
+putExtendedMessage (EMetadata mid msg)  = do
+  putExtendedMessage $ EUnknown mid
     $ BL.toStrict $ BE.encode msg
 putExtendedMessage (EUnknown mid  bs) = do
-  putWord32be $ fromIntegral (4 + 1 + BS.length bs)
+  putWord32be $ fromIntegral (1 + 1 + BS.length bs)
   putWord8 extendedMessageId
   putWord8 mid
   putByteString bs
