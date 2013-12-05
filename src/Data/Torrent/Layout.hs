@@ -81,8 +81,6 @@ import Text.PrettyPrint.Class
 import System.FilePath
 import System.Posix.Types
 
-import Data.Torrent.Block
-
 
 {-----------------------------------------------------------------------
 --  File attribytes
@@ -274,7 +272,7 @@ fileCount MultiFile  {..} = L.length liFiles
 
 -- | Find number of blocks of the specified size. If torrent size is
 -- not a multiple of block size then the count is rounded up.
-blockCount :: BlockSize -> LayoutInfo -> Int
+blockCount :: Int -> LayoutInfo -> Int
 blockCount blkSize ci = contentLength ci `sizeInBase` blkSize
 
 {-----------------------------------------------------------------------

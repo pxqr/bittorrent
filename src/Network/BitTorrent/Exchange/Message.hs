@@ -90,10 +90,10 @@ import Text.PrettyPrint as PP
 import Text.PrettyPrint.Class
 
 import Data.Torrent.Bitfield
-import Data.Torrent.Block
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core.PeerId
 import Network.BitTorrent.Core.PeerAddr ()
+import Network.BitTorrent.Exchange.Block
 
 {-----------------------------------------------------------------------
 --  Extensions

@@ -43,7 +43,6 @@ library
   hs-source-dirs:      src
   exposed-modules:     Data.Torrent
 --                     Data.Torrent.Bitfield
-                       Data.Torrent.Block
                        Data.Torrent.Client
                        Data.Torrent.InfoHash
                        Data.Torrent.Layout
@@ -61,6 +60,7 @@ library
 --                     Network.BitTorrent.DHT.Session
 --                     Network.BitTorrent.Exchange
 --                     Network.BitTorrent.Exchange.Assembler
+                       Network.BitTorrent.Exchange.Block
                        Network.BitTorrent.Exchange.Message
 --                     Network.BitTorrent.Exchange.Session
                        Network.BitTorrent.Exchange.Status

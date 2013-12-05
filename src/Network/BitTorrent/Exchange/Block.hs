@@ -12,7 +12,7 @@
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Data.Torrent.Block
+module Network.BitTorrent.Exchange.Block
        ( -- * Block attributes
          BlockOffset
        , BlockCount
