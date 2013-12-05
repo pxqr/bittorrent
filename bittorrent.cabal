@@ -49,7 +49,6 @@ library
                        Data.Torrent.Piece
                        Data.Torrent.Progress
                        Data.Torrent.Tree
-                       Data.Torrent.URN
 --                     Network.BitTorrent
                        Network.BitTorrent.Core
                        Network.BitTorrent.Core.Fingerprint
