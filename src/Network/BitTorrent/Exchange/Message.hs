@@ -48,6 +48,7 @@ module Network.BitTorrent.Exchange.Message
          -- * Messages
        , Message        (..)
        , PeerMessage    (..)
+       , defaultKeepAliveInterval
 
          -- ** Core messages
        , StatusUpdate   (..)
@@ -581,9 +582,9 @@ type MessageId = Word8
 data Message
     -- | Peers may close the TCP connection if they have not received
     -- any messages for a given period of time, generally 2
-    -- minutes. Thus, the "keep-alive" message is sent tot keep the
+    -- minutes. Thus, the KeepAlive message is sent to keep the
     -- connection between two peers alive, if no /other/ message has
-    -- been sentin a given period of time.
+    -- been sent in a given period of time.
   = KeepAlive
   | Status   !StatusUpdate
   | Regular  !RegularMessage
@@ -622,6 +623,10 @@ instance PeerMessage PortNumber where
 
   requires _ = Just ExtDHT
   {-# INLINE requires #-}
+
+-- | In seconds.
+defaultKeepAliveInterval :: Int
+defaultKeepAliveInterval = 2 * 60
 
 getInt :: S.Get Int
 getInt = fromIntegral <$> S.getWord32be
