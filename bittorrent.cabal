@@ -132,7 +132,7 @@ library
 --                     , krpc        >= 0.4
                      , http-types   >= 0.8
                      , http-conduit >= 1.9
-                     , wai          >= 1.4
+                     , wai          >= 1.4 && < 2.0
 
                        -- System
                      , directory   >= 1.2
