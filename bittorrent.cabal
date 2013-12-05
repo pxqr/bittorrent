@@ -58,7 +58,7 @@ library
 --                     Network.BitTorrent.DHT.Protocol
 --                     Network.BitTorrent.DHT.Session
 --                     Network.BitTorrent.Exchange
---                     Network.BitTorrent.Exchange.Assembler
+                       Network.BitTorrent.Exchange.Assembler
                        Network.BitTorrent.Exchange.Block
                        Network.BitTorrent.Exchange.Message
                        Network.BitTorrent.Exchange.Selection
