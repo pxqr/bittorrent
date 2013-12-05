@@ -97,20 +97,23 @@ import Network.BitTorrent.Exchange.Block
 --  Extensions
 -----------------------------------------------------------------------}
 
---  | See <http://www.bittorrent.org/beps/bep_0004.html> for more
---  information.
+-- | Enumeration of message extension protocols.
+--
+--   For more info see: <http://www.bittorrent.org/beps/bep_0004.html>
 --
 data Extension
-  = ExtDHT      -- ^ BEP 5
-  | ExtFast     -- ^ BEP 6
-  | ExtExtended -- ^ BEP 10
+  = ExtDHT      -- ^ BEP 5:  allow to send PORT messages.
+  | ExtFast     -- ^ BEP 6:  allow to send FAST messages.
+  | ExtExtended -- ^ BEP 10: allow to send extension protocol messages.
     deriving (Show, Eq, Ord, Enum, Bounded)
 
+-- | Full extension names, suitable for logging.
 instance Pretty Extension where
-  pretty ExtDHT      = "DHT"
+  pretty ExtDHT      = "Distributed Hash Table Protocol"
   pretty ExtFast     = "Fast Extension"
   pretty ExtExtended = "Extension Protocol"
 
+-- | Extension bitmask as specified by BEP 4.
 capMask :: Extension -> Caps
 capMask ExtDHT      = Caps 0x01
 capMask ExtFast     = Caps 0x04
@@ -120,17 +123,21 @@ capMask ExtExtended = Caps 0x100000
 --  Capabilities
 -----------------------------------------------------------------------}
 
--- | A set of 'Extension's.
+-- | Capabilities is a set of 'Extension's usually sent in 'Handshake'
+-- messages.
 newtype Caps = Caps { unCaps :: Word64 }
   deriving (Show, Eq)
 
+-- | Render set of extensions as comma separated list.
 instance Pretty Caps where
   pretty = hcat . punctuate ", " . L.map pretty . fromCaps
 
+-- | The empty set.
 instance Default Caps where
   def = Caps 0
   {-# INLINE def #-}
 
+-- | Monoid under intersection.
 instance Monoid Caps where
   mempty  = Caps (-1)
   {-# INLINE mempty #-}
@@ -138,6 +145,7 @@ instance Monoid Caps where
   mappend (Caps a) (Caps b) = Caps (a .&. b)
   {-# INLINE mappend #-}
 
+-- | 'Handshake' compatible encoding.
 instance Serialize Caps where
   put (Caps caps) = S.putWord64be caps
   {-# INLINE put #-}
@@ -145,14 +153,17 @@ instance Serialize Caps where
   get = Caps <$> S.getWord64be
   {-# INLINE get #-}
 
+-- | Check if an extension is a member of the specified set.
 allowed :: Caps -> Extension -> Bool
 allowed (Caps caps) = testMask . capMask
   where
     testMask (Caps bits) = (bits .&. caps) == bits
 
+-- | Pack extensions to caps.
 toCaps :: [Extension] -> Caps
 toCaps = Caps . L.foldr (.|.) 0 . L.map (unCaps . capMask)
 
+-- | Unpack extensions from caps.
 fromCaps :: Caps -> [Extension]
 fromCaps caps = L.filter (allowed caps) [minBound..maxBound]
 
