@@ -144,7 +144,7 @@ instance Pretty (Block BL.ByteString) where
 
 -- | Get size of block /payload/ in bytes.
 blockSize :: Block BL.ByteString -> BlockSize
-blockSize blk = fromIntegral (BL.length (blkData blk))
+blockSize = fromIntegral . BL.length . blkData
 {-# INLINE blockSize #-}
 
 -- | Get block index of a block.

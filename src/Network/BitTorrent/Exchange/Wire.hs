@@ -51,7 +51,9 @@ import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Message
 
-
+-- TODO handle port message?
+-- TODO handle limits?
+-- TODO filter not requested PIECE messages
 {-----------------------------------------------------------------------
 --  Exceptions
 -----------------------------------------------------------------------}

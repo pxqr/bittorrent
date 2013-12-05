@@ -25,11 +25,12 @@
 --   For more infomation see:
 --   <https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29>
 --
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE TemplateHaskell    #-}
-{-# OPTIONS  -fno-warn-orphans  #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# OPTIONS  -fno-warn-orphans          #-}
 module Network.BitTorrent.Exchange.Message
        ( -- * Capabilities
          Extension (..)
@@ -52,7 +53,8 @@ module Network.BitTorrent.Exchange.Message
 
          -- ** Core messages
        , StatusUpdate   (..)
-       , RegularMessage (..)
+       , Available      (..)
+       , Transfer       (..)
 
          -- ** Fast extension
        , FastMessage    (..)
@@ -279,10 +281,12 @@ instance PeerMessage StatusUpdate where
   {-# INLINE envelop #-}
 
 {-----------------------------------------------------------------------
---  Available and transfer messages
+--  Available messages
 -----------------------------------------------------------------------}
 
-data RegularMessage =
+-- | Messages used to inform receiver which pieces of the torrent
+-- sender have.
+data Available =
     -- | Zero-based index of a piece that has just been successfully
     -- downloaded and verified via the hash.
     Have    ! PieceIx
@@ -292,11 +296,30 @@ data RegularMessage =
     -- are sent. If client have no pieces then bitfield need not to be
     -- sent.
   | Bitfield !Bitfield
+    deriving (Show, Eq)
 
+instance Pretty Available where
+  pretty (Have     ix ) = "Have"     <+> int ix
+  pretty (Bitfield _  ) = "Bitfield"
+
+instance PeerMessage Available where
+  envelop _ = Available
+
+-- | BITFIELD message.
+instance PeerMessage Bitfield where
+  envelop c = envelop c . Bitfield
+  {-# INLINE envelop #-}
+
+{-----------------------------------------------------------------------
+--  Transfer messages
+-----------------------------------------------------------------------}
+
+-- | Messages used to transfer 'Block's.
+data Transfer
     -- | Request for a particular block. If a client is requested a
     -- block that another peer do not have the peer might not answer
     -- at all.
-  | Request ! BlockIx
+  = Request ! BlockIx
 
     -- | Response to a request for a block.
   | Piece   !(Block BL.ByteString)
@@ -306,33 +329,21 @@ data RegularMessage =
   | Cancel  !BlockIx
     deriving (Show, Eq)
 
--- TODO
--- data Availability = Have | Bitfield
--- data Transfer
---   = Request !BlockIx
---   | Piece   !(Block BL.ByteString)
---   | Cancel  !BlockIx
-
-
-instance Pretty RegularMessage where
-  pretty (Have     ix ) = "Have"     <+> int ix
-  pretty (Bitfield _  ) = "Bitfield"
+instance Pretty Transfer where
   pretty (Request  ix ) = "Request"  <+> pretty ix
   pretty (Piece    blk) = "Piece"    <+> pretty blk
   pretty (Cancel   i  ) = "Cancel"   <+> pretty i
 
-instance PeerMessage RegularMessage where
-  envelop _ = Regular
+instance PeerMessage Transfer where
+  envelop _ = Transfer
   {-# INLINE envelop #-}
 
-instance PeerMessage Bitfield where
-  envelop c = envelop c . Bitfield
-  {-# INLINE envelop #-}
-
+-- | REQUEST message.
 instance PeerMessage BlockIx where
   envelop c = envelop c . Request
   {-# INLINE envelop #-}
 
+-- | PIECE message.
 instance PeerMessage (Block BL.ByteString) where
   envelop c = envelop c . Piece
   {-# INLINE envelop #-}
@@ -507,8 +518,8 @@ nullExtendedHandshake caps
 
 type MetadataId = Int
 
-pieceSize :: Int
-pieceSize = 16 * 1024
+metadataPieceSize :: Int
+metadataPieceSize = 16 * 1024
 
 data ExtendedMetadata
   = MetadataRequest PieceIx
@@ -586,11 +597,17 @@ data Message
     -- connection between two peers alive, if no /other/ message has
     -- been sent in a given period of time.
   = KeepAlive
-  | Status   !StatusUpdate
-  | Regular  !RegularMessage
-  | Port     !PortNumber
-  | Fast     !FastMessage
-  | Extended !ExtendedMessage
+  | Status    !StatusUpdate -- ^ Messages used to update peer status.
+  | Available !Available    -- ^ Messages used to inform availability.
+  | Transfer  !Transfer     -- ^ Messages used to transfer 'Block's.
+
+    -- | Peer receiving a handshake indicating the remote peer
+    -- supports the 'ExtDHT' should send a 'Port' message. Peers that
+    -- receive this message should attempt to ping the node on the
+    -- received port and IP address of the remote peer.
+  | Port      !PortNumber
+  | Fast      !FastMessage
+  | Extended  !ExtendedMessage
     deriving (Show, Eq)
 
 instance Default Message where
@@ -601,7 +618,8 @@ instance Default Message where
 instance Pretty Message where
   pretty (KeepAlive  ) = "Keep alive"
   pretty (Status    m) = pretty m
-  pretty (Regular   m) = pretty m
+  pretty (Available m) = pretty m
+  pretty (Transfer  m) = pretty m
   pretty (Port      p) = "Port" <+> int (fromEnum p)
   pretty (Fast      m) = pretty m
   pretty (Extended  m) = pretty m
@@ -610,13 +628,15 @@ instance PeerMessage Message where
   envelop _ = id
   {-# INLINE envelop #-}
 
-  requires  KeepAlive   = Nothing
-  requires (Status   _) = Nothing
-  requires (Regular  _) = Nothing
-  requires (Port     _) = Just ExtDHT
-  requires (Fast     _) = Just ExtFast
-  requires (Extended _) = Just ExtExtended
+  requires  KeepAlive    = Nothing
+  requires (Status    _) = Nothing
+  requires (Available _) = Nothing
+  requires (Transfer  _) = Nothing
+  requires (Port      _) = Just ExtDHT
+  requires (Fast      _) = Just ExtFast
+  requires (Extended  _) = Just ExtExtended
 
+-- | PORT message.
 instance PeerMessage PortNumber where
   envelop  _ = Port
   {-# INLINE envelop #-}
@@ -647,12 +667,12 @@ instance Serialize Message where
           0x01 -> return $ Status (Choking False)
           0x02 -> return $ Status (Interested True)
           0x03 -> return $ Status (Interested False)
-          0x04 -> (Regular . Have)    <$> getInt
-          0x05 -> (Regular . Bitfield . fromBitmap)
+          0x04 -> (Available . Have)    <$> getInt
+          0x05 -> (Available . Bitfield . fromBitmap)
                                       <$> S.getByteString (pred len)
-          0x06 -> (Regular . Request) <$> S.get
-          0x07 -> (Regular . Piece)   <$> getBlock (len - 9)
-          0x08 -> (Regular . Cancel)  <$> S.get
+          0x06 -> (Transfer . Request) <$> S.get
+          0x07 -> (Transfer . Piece)   <$> getBlock (len - 9)
+          0x08 -> (Transfer . Cancel)  <$> S.get
           0x09 -> Port <$> S.get
           0x0D -> (Fast . SuggestPiece) <$> getInt
           0x0E -> return $ Fast HaveAll
@@ -671,45 +691,59 @@ instance Serialize Message where
                            <*> S.getLazyByteString (fromIntegral len)
       {-# INLINE getBlock #-}
 
-  put  KeepAlive    = putInt 0
-  put (Status  msg) = putStatus  msg
-  put (Regular msg) = putRegular msg
-  put (Port    p  ) = putPort    p
-  put (Fast    msg) = putFast    msg
-  put (Extended m ) = putExtendedMessage m
+  put  KeepAlive      = putInt 0
+  put (Status    msg) = putStatus    msg
+  put (Available msg) = putAvailable msg
+  put (Transfer  msg) = putTransfer  msg
+  put (Port      p  ) = putPort      p
+  put (Fast      msg) = putFast      msg
+  put (Extended  m )  = putExtendedMessage m
 
 statusUpdateId :: StatusUpdate -> MessageId
 statusUpdateId (Choking    choking) = fromIntegral (0 + fromEnum choking)
 statusUpdateId (Interested choking) = fromIntegral (2 + fromEnum choking)
 
 putStatus :: Putter StatusUpdate
-putStatus su = putInt 1  >> S.putWord8 (statusUpdateId su)
+putStatus su = do
+  putInt 1
+  putWord8 (statusUpdateId su)
 
-putRegular :: Putter RegularMessage
-putRegular (Have i)      = putInt 5  >> S.putWord8 0x04 >> putInt i
-putRegular (Bitfield bf) = putInt l  >> S.putWord8 0x05 >> S.putLazyByteString b
-  where b = toBitmap bf
-        l = succ (fromIntegral (BL.length b))
-        {-# INLINE l #-}
-putRegular (Request blk) = putInt 13 >> S.putWord8 0x06 >> S.put blk
-putRegular (Piece   blk) = putInt l  >> S.putWord8 0x07 >> putBlock
-  where l = 9 + fromIntegral (BL.length (blkData blk))
-        {-# INLINE l #-}
-        putBlock = do putInt (blkPiece blk)
-                      putInt (blkOffset  blk)
-                      S.putLazyByteString (blkData blk)
-        {-# INLINE putBlock #-}
-putRegular (Cancel  blk)      = putInt 13 >> S.putWord8 0x08 >> S.put blk
+putAvailable :: Putter Available
+putAvailable (Have i)      = do
+  putInt 5
+  putWord8 0x04
+  putInt i
+putAvailable (Bitfield (toBitmap -> bs)) = do
+  putInt $ 1 + fromIntegral (BL.length bs)
+  putWord8 0x05
+  putLazyByteString bs
+
+putBlock :: Putter (Block BL.ByteString)
+putBlock Block {..} = do
+  putInt blkPiece
+  putInt blkOffset
+  putLazyByteString blkData
+
+putTransfer :: Putter Transfer
+putTransfer (Request blk) = putInt 13 >> S.putWord8 0x06 >> S.put blk
+putTransfer (Piece   blk) = do
+  putInt (9 + blockSize blk)
+  putWord8 0x07
+  putBlock blk
+putTransfer (Cancel  blk)  = putInt 13 >> S.putWord8 0x08 >> S.put blk
 
 putPort :: Putter PortNumber
-putPort p = putInt 3  >> S.putWord8 0x09 >> S.put p
+putPort p = do
+  putInt 3
+  putWord8 0x09
+  put p
 
 putFast :: Putter FastMessage
-putFast  HaveAll           = putInt 1  >> S.putWord8 0x0E
-putFast  HaveNone          = putInt 1  >> S.putWord8 0x0F
-putFast (SuggestPiece pix) = putInt 5  >> S.putWord8 0x0D >> putInt pix
-putFast (RejectRequest i ) = putInt 13 >> S.putWord8 0x10 >> S.put i
-putFast (AllowedFast   i ) = putInt 5  >> S.putWord8 0x11 >> putInt i
+putFast  HaveAll           = putInt 1  >> putWord8 0x0E
+putFast  HaveNone          = putInt 1  >> putWord8 0x0F
+putFast (SuggestPiece pix) = putInt 5  >> putWord8 0x0D >> putInt pix
+putFast (RejectRequest i ) = putInt 13 >> putWord8 0x10 >> put i
+putFast (AllowedFast   i ) = putInt 5  >> putWord8 0x11 >> putInt i
 
 getExtendedHandshake :: Int -> S.Get ExtendedHandshake
 getExtendedHandshake messageSize = do
