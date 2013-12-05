@@ -62,6 +62,7 @@ module Network.BitTorrent.Exchange.Message
        , ExtendedExtension
        , ExtendedCaps      (..)
        , ExtendedHandshake (..)
+       , nullExtendedHandshake
        , ExtendedMetadata  (..)
        ) where
 
@@ -411,7 +412,7 @@ data ExtendedHandshake = ExtendedHandshake
   } deriving (Show, Eq, Typeable)
 
 instance Default ExtendedHandshake where
-  def = ExtendedHandshake Nothing Nothing def Nothing Nothing Nothing
+  def = nullExtendedHandshake def
 
 instance BEncode ExtendedHandshake where
   toBEncode ExtendedHandshake {..} = toDict $
@@ -438,6 +439,10 @@ instance Pretty ExtendedHandshake where
 
 instance PeerMessage ExtendedHandshake where
   envelop c = envelop c . EHandshake
+
+nullExtendedHandshake :: ExtendedCaps -> ExtendedHandshake
+nullExtendedHandshake caps
+  = ExtendedHandshake Nothing Nothing caps Nothing Nothing Nothing
 
 {-----------------------------------------------------------------------
 -- Metadata exchange
