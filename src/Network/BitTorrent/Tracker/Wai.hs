@@ -1,6 +1,19 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   Tracker WAI application.
+--
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.Tracker.Wai
-       ( tracker
+       ( -- * Configuration
+         TrackerSettings (..)
+
+         -- * Application
+       , tracker
        ) where
 
 import Control.Monad.Trans.Resource
@@ -15,12 +28,13 @@ import Data.Torrent.Progress
 import Network.BitTorrent.Tracker.Message
 
 
+-- | Various configuration settings used to generate tracker response.
 data TrackerSettings = TrackerSettings
   { -- | If peer did not specified the "numwant" then this value is
     -- used.
     defNumWant            :: {-# UNPACK #-} !Int
 
-    -- | If peer specified to big numwant value.
+    -- | If peer specified too big numwant value.
   , maxNumWant            :: {-# UNPACK #-} !Int
 
     -- | Recommended time interval to wait between regular announce
@@ -44,8 +58,9 @@ data TrackerSettings = TrackerSettings
     -- | Whether to send compact peer list. Peer can override this
     -- value by setting "compact" to 0 or 1.
   , compactPeerList       :: !Bool
-  }
+  } deriving (Show, Read, Eq)
 
+-- | Conservative tracker settings compatible with any client.
 instance Default TrackerSettings where
   def = TrackerSettings
     { defNumWant            = defaultNumWant
@@ -58,15 +73,15 @@ instance Default TrackerSettings where
     , noPeerId              = False
     }
 
-getAnnounceR :: AnnounceRequest -> ResourceT IO AnnounceInfo
+getAnnounceR :: TrackerSettings -> AnnounceRequest -> ResourceT IO AnnounceInfo
 getAnnounceR = undefined
 
-getScrapeR :: ScrapeQuery -> ResourceT IO ScrapeInfo
+getScrapeR :: TrackerSettings -> ScrapeQuery -> ResourceT IO ScrapeInfo
 getScrapeR = undefined
 
 -- content-type: "text/plain" ?
-tracker :: Application
-tracker Request {..}
+tracker :: TrackerSettings -> Application
+tracker settings Request {..}
   | requestMethod /= methodGet
   = return $ responseLBS methodNotAllowed405 [] ""
 
@@ -75,7 +90,7 @@ tracker Request {..}
       ["announce"] ->
         case parseAnnounceRequest $ queryToSimpleQuery queryString of
           Right query -> do
-            info <- getAnnounceR query
+            info <- getAnnounceR settings query
             return $ responseLBS ok200 [] $ BE.encode info
           Left msg ->
             return $ responseLBS (parseFailureStatus msg) [] ""
@@ -83,7 +98,7 @@ tracker Request {..}
       ["scrape"]   ->
         case Right $ parseScrapeQuery $ queryToSimpleQuery queryString of -- TODO
           Right query -> do
-            info <- getScrapeR query
+            info <- getScrapeR settings query
             return $ responseLBS ok200 [] $ BE.encode info
           Left _ ->
             return $ responseLBS badRequest400 [] ""
