@@ -43,7 +43,6 @@ library
   hs-source-dirs:      src
   exposed-modules:     Data.Torrent
                        Data.Torrent.Bitfield
-                       Data.Torrent.Client
                        Data.Torrent.InfoHash
                        Data.Torrent.Layout
                        Data.Torrent.Magnet
@@ -53,6 +52,7 @@ library
                        Data.Torrent.URN
 --                     Network.BitTorrent
                        Network.BitTorrent.Core
+                       Network.BitTorrent.Core.Fingerprint
                        Network.BitTorrent.Core.PeerId
                        Network.BitTorrent.Core.PeerAddr
 --                     Network.BitTorrent.DHT
@@ -105,6 +105,7 @@ library
                      , bytestring   >= 0.10
                      , containers   >= 0.5
                      , data-default >= 0.4
+--                     , data-dword
                      , intset       >= 0.1
                      , split        >= 0.2
                      , text         >= 0.11.0

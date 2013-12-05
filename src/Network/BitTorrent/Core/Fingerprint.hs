@@ -21,7 +21,7 @@
 --   done using 'Network.BitTorrent.Extension'!
 --
 {-# OPTIONS -fno-warn-orphans #-}
-module Data.Torrent.Client
+module Network.BitTorrent.Core.Fingerprint
        ( ClientImpl (..)
        , ClientInfo (..)
        , libClientInfo
