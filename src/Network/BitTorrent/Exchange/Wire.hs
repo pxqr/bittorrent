@@ -38,8 +38,7 @@ import Text.PrettyPrint as PP hiding (($$), (<>))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.InfoHash
-import Network.BitTorrent.Core.PeerId
-import Network.BitTorrent.Core.PeerAddr
+import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Message
 
 
@@ -147,15 +146,21 @@ connectToPeer p = do
 
 type Wire = ConduitM Message Message (ReaderT Connection IO)
 
-validate :: Wire ()
-validate = do
-  mmsg <- await
-  case mmsg of
-    Nothing  -> return ()
-    Just msg -> do
-      valid <- lift $ asks (`isAllowed` msg)
-      if valid then yield msg else error "TODO"
+validate :: ChannelSide -> Wire ()
+validate side = await >>= maybe (return ()) yieldCheck
+  where
+    yieldCheck msg = do
+      caps <- lift $ asks connCaps
+      case requires msg of
+        Nothing  -> return ()
+        Just ext
+          | allowed caps ext -> yield msg
+          |     otherwise    -> monadThrow $ ProtocolError $ InvalidMessage side ext
 
+validate' action = do
+  validate RemotePeer
+  action
+  validate ThisPeer
 
 runWire :: Wire () -> Socket -> Connection -> IO ()
 runWire action sock = runReaderT $
@@ -172,8 +177,6 @@ sendMessage msg = do
 
 recvMessage :: Wire Message
 recvMessage = undefined
-
-
 
 extendedHandshake :: Wire ()
 extendedHandshake = undefined

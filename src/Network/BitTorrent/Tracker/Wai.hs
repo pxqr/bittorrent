@@ -12,8 +12,6 @@ import Network.HTTP.Types
 import Network.Wai
 
 import Data.Torrent.Progress
-import Network.BitTorrent.Core.PeerId
-import Network.BitTorrent.Core.PeerAddr
 import Network.BitTorrent.Tracker.Message
 
 

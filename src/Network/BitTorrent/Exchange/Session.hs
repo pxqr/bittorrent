@@ -15,7 +15,7 @@ import Text.PrettyPrint
 
 import Data.Torrent.Bitfield
 import Data.Torrent.InfoHash
-import Network.BitTorrent.Core.PeerAddr
+import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Message
 import Network.BitTorrent.Exchange.Status
 

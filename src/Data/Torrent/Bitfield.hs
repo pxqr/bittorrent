@@ -55,10 +55,8 @@ module Data.Torrent.Bitfield
        , fromBitmap, toBitmap
        , toList
 
-#if  defined (TESTING)
          -- * Debug
        , mkBitfield
-#endif
        ) where
 
 import Control.Monad

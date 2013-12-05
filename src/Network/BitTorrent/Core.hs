@@ -8,5 +8,6 @@
 --   Re-export every @Network.BitTorrent.Core.*@ module.
 --
 module Network.BitTorrent.Core (module Core) where
-import Network.BitTorrent.Core.PeerId   as Core
-import Network.BitTorrent.Core.PeerAddr as Core
+import Network.BitTorrent.Core.Fingerprint as Core
+import Network.BitTorrent.Core.PeerId      as Core
+import Network.BitTorrent.Core.PeerAddr    as Core

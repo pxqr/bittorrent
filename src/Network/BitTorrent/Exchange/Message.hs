@@ -81,18 +81,15 @@ import Data.Ord
 import Data.Serialize as S
 import Data.Text as T
 import Data.Typeable
-import Data.Tuple
 import Data.Word
 import Network
 import Network.Socket hiding (KeepAlive)
-import Network.Socket.ByteString as BS
 import Text.PrettyPrint as PP
 import Text.PrettyPrint.Class
 
 import Data.Torrent.Bitfield
 import Data.Torrent.InfoHash
-import Network.BitTorrent.Core.PeerId
-import Network.BitTorrent.Core.PeerAddr ()
+import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block
 
 {-----------------------------------------------------------------------

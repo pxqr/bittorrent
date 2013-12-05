@@ -88,8 +88,7 @@ import Text.Read (readMaybe)
 
 import Data.Torrent.InfoHash
 import Data.Torrent.Progress
-import Network.BitTorrent.Core.PeerId
-import Network.BitTorrent.Core.PeerAddr
+import Network.BitTorrent.Core
 
 
 {-----------------------------------------------------------------------
