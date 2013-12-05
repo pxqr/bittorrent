@@ -33,7 +33,7 @@ module Network.BitTorrent.Exchange.Block
 
 import Control.Applicative
 import Data.Aeson.TH
-import qualified Data.ByteString.Lazy as Lazy
+import Data.ByteString.Lazy as BL
 import Data.Char
 import Data.List as L
 import Data.Serialize as S
@@ -138,26 +138,26 @@ data Block payload = Block {
   } deriving (Show, Eq, Functor, Typeable)
 
 -- | Payload is ommitted.
-instance Pretty (Block Lazy.ByteString) where
+instance Pretty (Block BL.ByteString) where
   pretty = pretty . blockIx
   {-# INLINE pretty #-}
 
 -- | Get size of block /payload/ in bytes.
-blockSize :: Block Lazy.ByteString -> BlockSize
-blockSize blk = fromIntegral (Lazy.length (blkData blk))
+blockSize :: Block BL.ByteString -> BlockSize
+blockSize blk = fromIntegral (BL.length (blkData blk))
 {-# INLINE blockSize #-}
 
 -- | Get block index of a block.
-blockIx :: Block Lazy.ByteString -> BlockIx
+blockIx :: Block BL.ByteString -> BlockIx
 blockIx = BlockIx <$> blkPiece <*> blkOffset <*> blockSize
 
 -- | Get location of payload bytes in the torrent content.
-blockRange :: (Num a, Integral a) => PieceSize -> Block Lazy.ByteString -> (a, a)
+blockRange :: (Num a, Integral a) => PieceSize -> Block BL.ByteString -> (a, a)
 blockRange pieceSize = blockIxRange pieceSize . blockIx
 {-# INLINE blockRange #-}
 
 -- | Test if a block can be safely turned into a piece.
-isPiece :: PieceSize -> Block Lazy.ByteString -> Bool
+isPiece :: PieceSize -> Block BL.ByteString -> Bool
 isPiece pieceLen blk @ (Block i offset _) =
      offset == 0 && blockSize blk == pieceLen && i >= 0
 {-# INLINE isPiece #-}
