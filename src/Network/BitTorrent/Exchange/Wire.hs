@@ -61,13 +61,16 @@ data ChannelSide
   | RemotePeer
     deriving (Show, Eq, Enum)
 
+-- TODO pretty instance
+
 -- | Errors occur when a remote peer violates protocol specification.
 data ProtocolError
   = UnexpectedTopic   InfoHash -- ^ peer replied with unexpected infohash.
   | UnexpectedPeerId  PeerId   -- ^ peer replied with unexpected peer id.
   | UnknownTopic      InfoHash -- ^ peer requested unknown torrent.
   | HandshakeRefused           -- ^ peer do not send an extended handshake back.
-  | InvalidMessage
+  | BitfieldAlreadSend ChannelSide
+  | InvalidMessage -- TODO caps violation
     { violentSender     :: ChannelSide -- ^ endpoint sent invalid message
     , extensionRequired :: Extension   -- ^
     }

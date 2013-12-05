@@ -210,9 +210,12 @@ instance Serialize Handshake where
               <*> S.get
               <*> S.get
 
+-- | Show handshake protocol string, caps and fingerprint.
 instance Pretty Handshake where
   pretty Handshake {..}
-    = text (BC.unpack hsProtocol) <+> pretty (fingerprint hsPeerId)
+    = text (BC.unpack hsProtocol) $$
+      pretty hsReserved           $$
+      pretty (fingerprint hsPeerId)
 
 -- | Get handshake message size in bytes from the length of protocol
 -- string.
@@ -227,30 +230,48 @@ handshakeMaxSize = handshakeSize maxBound
 defaultBTProtocol :: BS.ByteString
 defaultBTProtocol = "BitTorrent protocol"
 
--- | Length of info hash and peer id is unchecked, so it /should/ be
--- equal 20.
+-- | Handshake with default protocol string and reserved bitmask.
 defaultHandshake :: InfoHash -> PeerId -> Handshake
 defaultHandshake = Handshake defaultBTProtocol def
 
 {-----------------------------------------------------------------------
-    Regular messages
+--  Regular messages
 -----------------------------------------------------------------------}
 
 class PeerMessage a where
-  envelop :: ExtendedCaps -> a -> Message
+  -- | Construct a message to be /sent/.
+  envelop :: ExtendedCaps -- ^ The /receiver/ extended capabilities;
+          -> a            -- ^ An regular message;
+          -> Message      -- ^ Enveloped message to sent.
 
+{-----------------------------------------------------------------------
+--  Status messages
+-----------------------------------------------------------------------}
+
+-- | Notification that the sender have updated its
+-- 'Network.BitTorrent.Exchange.Status.PeerStatus'.
 data StatusUpdate
-  = Choke
-  | Unchoke
-  | Interested
-  | NotInterested
-    deriving (Show, Eq, Ord, Enum, Bounded)
+    -- | Notification that the sender will not upload data to the
+    -- receiver until unchoking happen.
+  = Choking    !Bool
+
+    -- | Notification that the sender is interested (or not interested)
+    -- in any of the receiver's data pieces.
+  | Interested !Bool
+    deriving (Show, Eq, Ord, Typeable)
 
 instance Pretty StatusUpdate where
-  pretty = text . show
+  pretty (Choking    False) = "not choking"
+  pretty (Choking    True ) = "choking"
+  pretty (Interested False) = "not interested"
+  pretty (Interested True ) = "interested"
 
 instance PeerMessage StatusUpdate where
   envelop _ = Status
+
+{-----------------------------------------------------------------------
+--  Available and transfer messages
+-----------------------------------------------------------------------}
 
 data RegularMessage =
     -- | Zero-based index of a piece that has just been successfully
@@ -302,6 +323,10 @@ instance PeerMessage BlockIx where
 
 instance PeerMessage (Block BL.ByteString) where
   envelop c = envelop c . Piece
+
+{-----------------------------------------------------------------------
+--  Fast messages
+-----------------------------------------------------------------------}
 
 -- | BEP6 messages.
 data FastMessage =
@@ -526,12 +551,14 @@ type MessageId = Word8
 --   extension then the client MUST close the connection.
 --
 data Message
-    -- core
+    -- | Peers may close the TCP connection if they have not received
+    -- any messages for a given period of time, generally 2
+    -- minutes. Thus, the "keep-alive" message is sent tot keep the
+    -- connection between two peers alive, if no /other/ message has
+    -- been sentin a given period of time.
   = KeepAlive
   | Status   !StatusUpdate
   | Regular  !RegularMessage
-
-    -- extensions
   | Port     !PortNumber
   | Fast     !FastMessage
   | Extended !ExtendedMessage
@@ -581,10 +608,10 @@ instance Serialize Message where
       else do
         mid <- S.getWord8
         case mid of
-          0x00 -> return $ Status Choke
-          0x01 -> return $ Status Unchoke
-          0x02 -> return $ Status Interested
-          0x03 -> return $ Status NotInterested
+          0x00 -> return $ Status (Choking True)
+          0x01 -> return $ Status (Choking False)
+          0x02 -> return $ Status (Interested True)
+          0x03 -> return $ Status (Interested False)
           0x04 -> (Regular . Have)    <$> getInt
           0x05 -> (Regular . Bitfield . fromBitmap)
                                       <$> S.getByteString (pred len)
@@ -616,8 +643,12 @@ instance Serialize Message where
   put (Fast    msg) = putFast    msg
   put (Extended m ) = putExtendedMessage m
 
+statusUpdateId :: StatusUpdate -> MessageId
+statusUpdateId (Choking    choking) = fromIntegral (0 + fromEnum choking)
+statusUpdateId (Interested choking) = fromIntegral (2 + fromEnum choking)
+
 putStatus :: Putter StatusUpdate
-putStatus su = putInt 1  >> S.putWord8 (fromIntegral (fromEnum su))
+putStatus su = putInt 1  >> S.putWord8 (statusUpdateId su)
 
 putRegular :: Putter RegularMessage
 putRegular (Have i)      = putInt 5  >> S.putWord8 0x04 >> putInt i
