@@ -203,7 +203,7 @@ instance Serialize Handshake where
 
 instance Pretty Handshake where
   pretty Handshake {..}
-    = text (BC.unpack hsProtocol) <+> pretty (clientInfo hsPeerId)
+    = text (BC.unpack hsProtocol) <+> pretty (fingerprint hsPeerId)
 
 -- | Get handshake message size in bytes from the length of protocol
 -- string.

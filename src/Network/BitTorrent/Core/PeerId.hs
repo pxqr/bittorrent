@@ -30,7 +30,7 @@ module Network.BitTorrent.Core.PeerId
        , defaultVersionNumber
 
          -- * Decoding
-       , clientInfo
+       , fingerprint
        ) where
 
 import Control.Applicative
@@ -175,7 +175,7 @@ defaultClientId = "HS"
 -- package.  Version is taken from .cabal file.
 defaultVersionNumber :: ByteString
 defaultVersionNumber = BS.take 4 $ BC.pack $ foldMap show $
-                         versionBranch $ ciVersion libClientInfo
+                         versionBranch $ ciVersion libFingerprint
 
 {-----------------------------------------------------------------------
 --  Generation
@@ -294,23 +294,23 @@ parseImpl = f . BC.unpack
 -- peer id uses unknown coding style then client info returned is
 -- 'def'.
 --
-clientInfo :: PeerId -> ClientInfo
-clientInfo pid = either (const def) id $ runGet getCI (getPeerId pid)
+fingerprint :: PeerId -> Fingerprint
+fingerprint pid = either (const def) id $ runGet getCI (getPeerId pid)
   where
     getCI    = do
       leading <- BS.w2c <$> getWord8
       case leading of
-        '-' -> ClientInfo <$> getAzureusImpl <*> getAzureusVersion
-        'M' -> ClientInfo <$> pure IMainline <*> getMainlineVersion
-        'e' -> ClientInfo <$> getBitCometImpl <*> getBitCometVersion
-        'F' -> ClientInfo <$> getBitCometImpl <*> getBitCometVersion
+        '-' -> Fingerprint <$> getAzureusImpl <*> getAzureusVersion
+        'M' -> Fingerprint <$> pure IMainline <*> getMainlineVersion
+        'e' -> Fingerprint <$> getBitCometImpl <*> getBitCometVersion
+        'F' -> Fingerprint <$> getBitCometImpl <*> getBitCometVersion
         c   -> do
           c1 <- w2c <$> lookAhead getWord8
           if c1 == 'P'
             then do
                  _ <- getWord8
-                 ClientInfo <$> pure IOpera            <*> getOperaVersion
-            else ClientInfo <$> pure (getShadowImpl c) <*> getShadowVersion
+                 Fingerprint <$> pure IOpera            <*> getOperaVersion
+            else Fingerprint <$> pure (getShadowImpl c) <*> getShadowVersion
 
     getMainlineVersion = do
       str <- BC.unpack <$> getByteString 7

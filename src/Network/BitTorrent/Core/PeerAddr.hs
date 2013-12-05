@@ -89,7 +89,7 @@ instance Serialize PeerAddr where
 
 instance Pretty PeerAddr where
   pretty p @ PeerAddr {..}
-    | Just pid <- peerID = pretty (clientInfo pid) <+> "at" <+> paddr
+    | Just pid <- peerID = pretty (fingerprint pid) <+> "at" <+> paddr
     |     otherwise      = paddr
     where
       paddr = text (show (peerSockAddr p))

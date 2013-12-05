@@ -5,7 +5,7 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   'ClientInfo' is used to identify the client implementation and
+--   'Fingerprint' is used to identify the client implementation and
 --   version which also contained in 'Peer'. For exsample first 6
 --   bytes of peer id of this this library are @-HS0100-@ while for
 --   mainline we have @M4-3-6--@.  We could extract this info and
@@ -23,8 +23,8 @@
 {-# OPTIONS -fno-warn-orphans #-}
 module Network.BitTorrent.Core.Fingerprint
        ( ClientImpl (..)
-       , ClientInfo (..)
-       , libClientInfo
+       , Fingerprint (..)
+       , libFingerprint
        ) where
 
 import Data.Default
@@ -162,33 +162,33 @@ instance Pretty Version where
 
 -- | The all sensible infomation that can be obtained from a peer
 -- identifier or torrent /createdBy/ field.
-data ClientInfo = ClientInfo {
-    ciImpl    :: ClientImpl
+data Fingerprint = Fingerprint
+  { ciImpl    :: ClientImpl
   , ciVersion :: Version
   } deriving (Show, Eq, Ord)
 
 -- | Unrecognized client implementation.
-instance Default ClientInfo where
-  def = ClientInfo def def
+instance Default Fingerprint where
+  def = Fingerprint def def
   {-# INLINE def #-}
 
 -- | Example: @\"BitComet-1.2\" == ClientInfo IBitComet (Version [1, 2] [])@
-instance IsString ClientInfo where
+instance IsString Fingerprint where
   fromString str
-    | _ : ver <- _ver = ClientInfo (fromString impl) (fromString ver)
+    | _ : ver <- _ver = Fingerprint (fromString impl) (fromString ver)
     | otherwise = error $ "fromString: invalid client info string" ++ str
     where
       (impl, _ver) = L.span ((/=) '-') str
 
-instance Pretty ClientInfo where
-  pretty ClientInfo {..} = pretty ciImpl <+> "version" <+> pretty ciVersion
+instance Pretty Fingerprint where
+  pretty Fingerprint {..} = pretty ciImpl <+> "version" <+> pretty ciVersion
 
--- | Client info of this (the bittorrent library) package. Normally,
--- applications should introduce its own idenitifiers, otherwise they
--- can use 'libClientInfo' value.
+-- | Fingerprint of this (the bittorrent library) package. Normally,
+-- applications should introduce its own fingerprints, otherwise they
+-- can use 'libFingerprint' value.
 --
-libClientInfo :: ClientInfo
-libClientInfo = ClientInfo IlibHSbittorrent version
+libFingerprint :: Fingerprint
+libFingerprint =  Fingerprint IlibHSbittorrent version
 
 {-----------------------------------------------------------------------
 --  For torrent file

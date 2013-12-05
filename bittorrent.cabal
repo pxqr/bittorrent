@@ -151,14 +151,14 @@ test-suite spec
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   main-is:             Spec.hs
-  other-modules:       Data.Torrent.ClientSpec
-                       Data.Torrent.InfoHashSpec
+  other-modules:       Data.Torrent.InfoHashSpec
                        Data.Torrent.LayoutSpec
                        Data.Torrent.MagnetSpec
                        Data.Torrent.MetainfoSpec
                        Data.Torrent.ProgressSpec
                        Network.BitTorrent.CoreSpec
                        Network.BitTorrent.Core.PeerIdSpec
+                       Network.BitTorrent.Core.FingerprintSpec
                        Network.BitTorrent.Tracker.MessageSpec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
                        Network.BitTorrent.Tracker.RPC.UDPSpec
