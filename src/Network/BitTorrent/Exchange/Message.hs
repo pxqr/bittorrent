@@ -48,7 +48,6 @@ module Network.BitTorrent.Exchange.Message
          -- * Messages
        , Message        (..)
        , PeerMessage    (..)
-       , requires
 
          -- ** Core messages
        , StatusUpdate   (..)
@@ -238,11 +237,19 @@ defaultHandshake = Handshake defaultBTProtocol def
 --  Regular messages
 -----------------------------------------------------------------------}
 
+-- | Messages which can be sent after handshaking. Minimal complete
+-- definition: 'envelop'.
 class PeerMessage a where
   -- | Construct a message to be /sent/.
   envelop :: ExtendedCaps -- ^ The /receiver/ extended capabilities;
           -> a            -- ^ An regular message;
           -> Message      -- ^ Enveloped message to sent.
+
+  -- | Find out the extension this message belong to. Can be used to
+  -- check if this message is allowed to send\/recv in current
+  -- session.
+  requires :: a -> Maybe Extension
+  requires _ = Nothing
 
 {-----------------------------------------------------------------------
 --  Status messages
@@ -268,6 +275,7 @@ instance Pretty StatusUpdate where
 
 instance PeerMessage StatusUpdate where
   envelop _ = Status
+  {-# INLINE envelop #-}
 
 {-----------------------------------------------------------------------
 --  Available and transfer messages
@@ -314,15 +322,19 @@ instance Pretty RegularMessage where
 
 instance PeerMessage RegularMessage where
   envelop _ = Regular
+  {-# INLINE envelop #-}
 
 instance PeerMessage Bitfield where
   envelop c = envelop c . Bitfield
+  {-# INLINE envelop #-}
 
 instance PeerMessage BlockIx where
   envelop c = envelop c . Request
+  {-# INLINE envelop #-}
 
 instance PeerMessage (Block BL.ByteString) where
   envelop c = envelop c . Piece
+  {-# INLINE envelop #-}
 
 {-----------------------------------------------------------------------
 --  Fast messages
@@ -360,7 +372,11 @@ instance Pretty FastMessage where
   pretty (AllowedFast   pix) = "Allowed fast" <+> int    pix
 
 instance PeerMessage FastMessage where
-  envelop _ = Fast
+  envelop  _ = Fast
+  {-# INLINE envelop #-}
+
+  requires _ = Just ExtFast
+  {-# INLINE requires #-}
 
 {-----------------------------------------------------------------------
 --  Extended messages
@@ -474,7 +490,11 @@ instance Pretty ExtendedHandshake where
   pretty = PP.text . show
 
 instance PeerMessage ExtendedHandshake where
-  envelop c = envelop c . EHandshake
+  envelop  c = envelop c . EHandshake
+  {-# INLINE envelop #-}
+
+  requires _ = Just ExtExtended
+  {-# INLINE requires #-}
 
 nullExtendedHandshake :: ExtendedCaps -> ExtendedHandshake
 nullExtendedHandshake caps
@@ -521,7 +541,11 @@ instance Pretty ExtendedMetadata where
   pretty (MetadataUnknown bval ) = ppBEncode bval
 
 instance PeerMessage ExtendedMetadata where
-  envelop c = envelop c . EMetadata
+  envelop  c = envelop c . EMetadata
+  {-# INLINE envelop #-}
+
+  requires _ = Just ExtExtended
+  {-# INLINE requires #-}
 
 -- | For more info see <http://www.bittorrent.org/beps/bep_0010.html>
 data ExtendedMessage
@@ -536,7 +560,11 @@ instance Pretty ExtendedMessage where
   pretty (EUnknown mid _) = "Unknown" <+> PP.text (show mid)
 
 instance PeerMessage ExtendedMessage where
-  envelop _ = Extended
+  envelop  _ = Extended
+  {-# INLINE envelop #-}
+
+  requires _ = Just ExtExtended
+  {-# INLINE requires #-}
 
 {-----------------------------------------------------------------------
 -- The message datatype
@@ -579,19 +607,21 @@ instance Pretty Message where
 
 instance PeerMessage Message where
   envelop _ = id
+  {-# INLINE envelop #-}
+
+  requires  KeepAlive   = Nothing
+  requires (Status   _) = Nothing
+  requires (Regular  _) = Nothing
+  requires (Port     _) = Just ExtDHT
+  requires (Fast     _) = Just ExtFast
+  requires (Extended _) = Just ExtExtended
 
 instance PeerMessage PortNumber where
-  envelop _ = Port
+  envelop  _ = Port
+  {-# INLINE envelop #-}
 
--- | Can be used to check if this message is allowed to send\/recv in
---  current session.
-requires :: Message -> Maybe Extension
-requires  KeepAlive   = Nothing
-requires (Status   _) = Nothing
-requires (Regular  _) = Nothing
-requires (Port     _) = Just ExtDHT
-requires (Fast     _) = Just ExtFast
-requires (Extended _) = Just ExtExtended
+  requires _ = Just ExtDHT
+  {-# INLINE requires #-}
 
 getInt :: S.Get Int
 getInt = fromIntegral <$> S.getWord32be
