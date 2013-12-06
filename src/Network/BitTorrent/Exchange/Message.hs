@@ -27,17 +27,17 @@
 --
 {-# LANGUAGE ViewPatterns               #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# OPTIONS  -fno-warn-orphans          #-}
 module Network.BitTorrent.Exchange.Message
        ( -- * Capabilities
-         Extension (..)
+         Capabilities (..)
+       , Extension (..)
        , Caps
-       , toCaps
-       , fromCaps
-       , allowed
 
          -- * Handshake
        , Handshake(..)
@@ -65,9 +65,6 @@ module Network.BitTorrent.Exchange.Message
          -- *** Capabilities
        , ExtendedExtension (..)
        , ExtendedCaps      (..)
-       , toExtCaps
-       , fromExtCaps
-       , extendedAllowed
 
          -- *** Handshake
        , ExtendedHandshake (..)
@@ -109,6 +106,26 @@ import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block
 
 {-----------------------------------------------------------------------
+--  Capabilities
+-----------------------------------------------------------------------}
+
+-- |
+class Capabilities caps where
+  type Ext caps :: *
+
+  -- | Pack extensions to caps.
+  toCaps   :: [Ext caps] -> caps
+
+  -- | Unpack extensions from caps.
+  fromCaps :: caps -> [Ext caps]
+
+  -- | Check if an extension is a member of the specified set.
+  allowed  :: Ext caps -> caps -> Bool
+
+ppCaps :: Capabilities caps => Pretty (Ext caps) => caps -> Doc
+ppCaps = hcat . punctuate ", " . L.map pretty . fromCaps
+
+{-----------------------------------------------------------------------
 --  Extensions
 -----------------------------------------------------------------------}
 
@@ -129,10 +146,10 @@ instance Pretty Extension where
   pretty ExtExtended = "Extension Protocol"
 
 -- | Extension bitmask as specified by BEP 4.
-capMask :: Extension -> Caps
-capMask ExtDHT      = Caps 0x01
-capMask ExtFast     = Caps 0x04
-capMask ExtExtended = Caps 0x100000
+extMask :: Extension -> Word64
+extMask ExtDHT      = 0x01
+extMask ExtFast     = 0x04
+extMask ExtExtended = 0x100000
 
 {-----------------------------------------------------------------------
 --  Capabilities
@@ -140,12 +157,13 @@ capMask ExtExtended = Caps 0x100000
 
 -- | Capabilities is a set of 'Extension's usually sent in 'Handshake'
 -- messages.
-newtype Caps = Caps { unCaps :: Word64 }
+newtype Caps = Caps Word64
   deriving (Show, Eq)
 
 -- | Render set of extensions as comma separated list.
 instance Pretty Caps where
-  pretty = hcat . punctuate ", " . L.map pretty . fromCaps
+  pretty = ppCaps
+  {-# INLINE pretty #-}
 
 -- | The empty set.
 instance Default Caps where
@@ -168,19 +186,14 @@ instance Serialize Caps where
   get = Caps <$> S.getWord64be
   {-# INLINE get #-}
 
--- | Check if an extension is a member of the specified set.
-allowed :: Caps -> Extension -> Bool
-allowed (Caps caps) = testMask . capMask
-  where
-    testMask (Caps bits) = (bits .&. caps) == bits
+instance Capabilities Caps where
+  type Ext Caps = Extension
 
--- | Pack extensions to caps.
-toCaps :: [Extension] -> Caps
-toCaps = Caps . L.foldr (.|.) 0 . L.map (unCaps . capMask)
+  allowed e (Caps caps) = (extMask e .&. caps) /= 0
+  {-# INLINE allowed #-}
 
--- | Unpack extensions from caps.
-fromCaps :: Caps -> [Extension]
-fromCaps caps = L.filter (allowed caps) [minBound..maxBound]
+  toCaps        = Caps . L.foldr (.|.) 0 . L.map extMask
+  fromCaps caps = L.filter (`allowed` caps) [minBound..maxBound]
 
 {-----------------------------------------------------------------------
     Handshake
@@ -449,7 +462,8 @@ newtype ExtendedCaps = ExtendedCaps { extendedCaps :: ExtendedMap }
   deriving (Show, Eq)
 
 instance Pretty ExtendedCaps where
-  pretty = hcat . punctuate ", " . L.map pretty . fromExtCaps
+  pretty = ppCaps
+  {-# INLINE pretty #-}
 
 -- | The empty set.
 instance Default ExtendedCaps where
@@ -463,7 +477,7 @@ instance Default ExtendedCaps where
 -- id from the first caps for the extensions existing in both caps.
 --
 instance Monoid ExtendedCaps where
-  mempty  = toExtCaps [minBound..maxBound]
+  mempty  = toCaps [minBound..maxBound]
   mappend (ExtendedCaps a) (ExtendedCaps b) =
     ExtendedCaps (M.intersection a b)
 
@@ -482,16 +496,16 @@ instance BEncode ExtendedCaps where
   fromBEncode (BDict bd) = pure $ ExtendedCaps $ appendBDict bd M.empty
   fromBEncode _          = decodingError "ExtendedCaps"
 
-toExtCaps :: [ExtendedExtension] -> ExtendedCaps
-toExtCaps = ExtendedCaps . M.fromList . L.map (id &&& extId)
+instance Capabilities ExtendedCaps where
+  type Ext ExtendedCaps = ExtendedExtension
 
-fromExtCaps :: ExtendedCaps -> [ExtendedExtension]
-fromExtCaps = M.keys . extendedCaps
-{-# INLINE fromExtCaps #-}
+  toCaps = ExtendedCaps . M.fromList . L.map (id &&& extId)
 
-extendedAllowed :: ExtendedExtension -> ExtendedCaps -> Bool
-extendedAllowed e (ExtendedCaps caps) = M.member e caps
-{-# INLINE extendedAllowed #-}
+  fromCaps = M.keys . extendedCaps
+  {-# INLINE fromCaps #-}
+
+  allowed e (ExtendedCaps caps) = M.member e caps
+  {-# INLINE allowed #-}
 
 {-----------------------------------------------------------------------
 --  Extended handshake

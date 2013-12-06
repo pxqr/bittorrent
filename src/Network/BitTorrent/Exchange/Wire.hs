@@ -114,7 +114,7 @@ instance Pretty Connection where
 
 isAllowed :: Connection -> Message -> Bool
 isAllowed Connection {..} msg
-  | Just ext <- requires msg = allowed connCaps ext
+  | Just ext <- requires msg = ext `allowed` connCaps
   |          otherwise       = True
 
 {-----------------------------------------------------------------------
@@ -189,8 +189,8 @@ validate side = await >>= maybe (return ()) yieldCheck
       case requires msg of
         Nothing  -> return ()
         Just ext
-          | allowed caps ext -> yield msg
-          |     otherwise    -> protocolError $ InvalidMessage side ext
+          | ext `allowed` caps -> yield msg
+          |     otherwise      -> protocolError $ InvalidMessage side ext
 
 validateBoth :: Wire () -> Wire ()
 validateBoth action = do
@@ -235,7 +235,7 @@ connectWire hs addr extCaps wire =
       throwIO $ ProtocolError $ UnexpectedPeerId (hsPeerId hs')
 
     let caps = hsReserved hs <> hsReserved hs'
-    let wire' = if allowed caps ExtExtended
+    let wire' = if ExtExtended `allowed` caps
                 then extendedHandshake extCaps >> wire
                 else wire
 
