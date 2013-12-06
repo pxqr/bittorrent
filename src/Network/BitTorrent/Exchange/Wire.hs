@@ -54,6 +54,8 @@ import Network.BitTorrent.Exchange.Message
 -- TODO handle port message?
 -- TODO handle limits?
 -- TODO filter not requested PIECE messages
+-- TODO metadata piece request flood protection
+-- TODO piece request flood protection
 {-----------------------------------------------------------------------
 --  Exceptions
 -----------------------------------------------------------------------}

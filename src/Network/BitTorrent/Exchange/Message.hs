@@ -73,6 +73,7 @@ module Network.BitTorrent.Exchange.Message
 
          -- *** Metadata
        , ExtendedMetadata  (..)
+       , metadataPieceSize
        ) where
 
 import Control.Applicative
@@ -508,6 +509,9 @@ instance Capabilities ExtendedCaps where
   allowed e (ExtendedCaps caps) = M.member e caps
   {-# INLINE allowed #-}
 
+remoteMessageId :: ExtendedExtension -> ExtendedCaps -> ExtendedMessageId
+remoteMessageId ext = fromMaybe (extId ext) . M.lookup ext . extendedCaps
+
 {-----------------------------------------------------------------------
 --  Extended handshake
 -----------------------------------------------------------------------}
@@ -531,6 +535,11 @@ data ExtendedHandshake = ExtendedHandshake
     -- of extensions to an extended message ID for each extension
     -- message.
   , ehsCaps        :: ExtendedCaps
+
+    -- | Size of 'Data.Torrent.InfoDict' in bytes. This field should
+    -- be added if ExtMetadata is enabled in current session /and/
+    -- peer have the torrent file.
+  , ehsMetadataSize :: Maybe Int
 
     -- | Local TCP /listen/ port. Allows each side to learn about the
     -- TCP port number of the other side.
@@ -556,13 +565,14 @@ defaultQueueLength = 0
 
 -- | All fields are empty.
 instance Default ExtendedHandshake where
-  def = ExtendedHandshake def def def def def def
+  def = ExtendedHandshake def def def def def def def
 
 instance BEncode ExtendedHandshake where
   toBEncode ExtendedHandshake {..} = toDict $
        "ipv4"   .=? ehsIPv4 -- FIXME invalid encoding
     .: "ipv6"   .=? ehsIPv6 -- FIXME invalid encoding
     .: "m"      .=! ehsCaps
+    .: "metadata_size" .=? ehsMetadataSize
     .: "p"      .=? ehsPort
     .: "reqq"   .=? ehsQueueLength
     .: "v"      .=? ehsVersion
@@ -573,6 +583,7 @@ instance BEncode ExtendedHandshake where
     <$>? "ipv4"
     <*>? "ipv6"
     <*>! "m"
+    <*>? "metadata_size"
     <*>? "p"
     <*>? "reqq"
     <*>? "v"
@@ -591,56 +602,92 @@ instance PeerMessage ExtendedHandshake where
 -- | Set default values and the specified 'ExtendedCaps'.
 nullExtendedHandshake :: ExtendedCaps -> ExtendedHandshake
 nullExtendedHandshake caps = ExtendedHandshake
-    { ehsIPv4        = Nothing
-    , ehsIPv6        = Nothing
-    , ehsCaps        = caps
-    , ehsPort        = Nothing
-    , ehsQueueLength = Just defaultQueueLength
-    , ehsVersion     = Just $ T.pack $ render $ pretty libFingerprint
+    { ehsIPv4         = Nothing
+    , ehsIPv6         = Nothing
+    , ehsCaps         = caps
+    , ehsMetadataSize = Nothing
+    , ehsPort         = Nothing
+    , ehsQueueLength  = Just defaultQueueLength
+    , ehsVersion      = Just $ T.pack $ render $ pretty libFingerprint
     }
 
 {-----------------------------------------------------------------------
 -- Metadata exchange extension
 -----------------------------------------------------------------------}
 
-type MetadataId = Int
-
-metadataPieceSize :: Int
-metadataPieceSize = 16 * 1024
-
+-- | A peer MUST verify that any piece it sends passes the info-hash
+-- verification. i.e. until the peer has the entire metadata, it
+-- cannot run SHA-1 to verify that it yields the same hash as the
+-- info-hash.
+--
 data ExtendedMetadata
+    -- | This message requests the a specified metadata piece. The
+    -- response to this message, from a peer supporting the extension,
+    -- is either a 'MetadataReject' or a 'MetadataData' message.
   = MetadataRequest PieceIx
-  | MetadataData    PieceIx Int
+
+  | MetadataData
+    { -- | FIXME add piece data
+      piece     :: PieceIx
+
+      -- | This key has the same semantics as the 'ehsMetadataSize' in
+      -- the 'ExtendedHandshake' — it is size of the torrent info
+      -- dict.
+    , totalSize :: Int
+    }
+
+    -- | Peers that do not have the entire metadata MUST respond with
+    -- a reject message to any metadata request.
+    --
+    --   Clients MAY implement flood protection by rejecting request
+    --   messages after a certain number of them have been
+    --   served. Typically the number of pieces of metadata times a
+    --   factor.
   | MetadataReject  PieceIx
+
+    -- | Reserved.
   | MetadataUnknown BValue
     deriving (Show, Eq, Typeable)
 
+-- | Extended metadata message id used in 'msg_type_key'.
+type MetadataId = Int
+
+msg_type_key, piece_key, total_size_key :: BKey
+msg_type_key   = "msg_type"
+piece_key      = "piece"
+total_size_key = "total_size"
+
+-- | BEP9 compatible encoding.
 instance BEncode ExtendedMetadata where
   toBEncode (MetadataRequest pix) = toDict $
-       "msg_type"   .=! (0 :: MetadataId)
-    .: "piece"      .=! pix
+       msg_type_key   .=! (0 :: MetadataId)
+    .: piece_key      .=! pix
     .: endDict
   toBEncode (MetadataData    pix totalSize) = toDict $
-       "msg_type"   .=! (1 :: MetadataId)
-    .: "piece"      .=! pix
-    .: "total_size" .=! totalSize
+       msg_type_key   .=! (1 :: MetadataId)
+    .: piece_key      .=! pix
+    .: total_size_key .=! totalSize
     .: endDict
   toBEncode (MetadataReject  pix)  = toDict $
-       "msg_type"   .=! (2 :: MetadataId)
-    .: "piece"      .=! pix
+       msg_type_key   .=! (2 :: MetadataId)
+    .: piece_key      .=! pix
     .: endDict
   toBEncode (MetadataUnknown bval) = bval
 
-  fromBEncode = undefined
+  fromBEncode bval = (`fromDict` bval) $ do
+    mid <- field $ req msg_type_key
+    case mid :: MetadataId of
+      0 -> MetadataRequest <$>! piece_key
+      1 -> MetadataData    <$>! piece_key <*>! total_size_key
+      2 -> MetadataReject  <$>! piece_key
+      _ -> pure (MetadataUnknown bval)
 
+-- | Piece data bytes are omitted.
 instance Pretty ExtendedMetadata where
   pretty (MetadataRequest pix  ) = "Request" <+> PP.int pix
   pretty (MetadataData    pix s) = "Data"    <+> PP.int pix <+> PP.int s
   pretty (MetadataReject  pix  ) = "Reject"  <+> PP.int pix
-  pretty (MetadataUnknown bval ) = ppBEncode bval
-
-remoteMessageId :: ExtendedExtension -> ExtendedCaps -> ExtendedMessageId
-remoteMessageId ext = fromMaybe (extId ext) . M.lookup ext . extendedCaps
+  pretty (MetadataUnknown bval ) = "Unknown" <+> ppBEncode bval
 
 instance PeerMessage ExtendedMetadata where
   envelop  c = envelop c . EMetadata (remoteMessageId ExtMetadata c)
@@ -648,6 +695,9 @@ instance PeerMessage ExtendedMetadata where
 
   requires _ = Just ExtExtended
   {-# INLINE requires #-}
+
+metadataPieceSize :: Int
+metadataPieceSize = 16 * 1024
 
 {-----------------------------------------------------------------------
 --  Extension protocol messages
