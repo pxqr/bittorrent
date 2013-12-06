@@ -712,8 +712,8 @@ data ExtendedMessage
 
 instance Pretty ExtendedMessage where
   pretty (EHandshake     ehs) = pretty ehs
-  pretty (EMetadata  _   msg) = pretty msg
-  pretty (EUnknown   mid _  ) = "Unknown" <+> PP.text (show mid)
+  pretty (EMetadata  _   msg) = "Metadata" <+> pretty msg
+  pretty (EUnknown   mid _  ) = "Unknown"  <+> PP.text (show mid)
 
 instance PeerMessage ExtendedMessage where
   envelop  _ = Extended
@@ -761,7 +761,7 @@ instance Default Message where
 -- | Payload bytes are omitted.
 instance Pretty Message where
   pretty (KeepAlive  ) = "Keep alive"
-  pretty (Status    m) = pretty m
+  pretty (Status    m) = "Status" <+> pretty m
   pretty (Available m) = pretty m
   pretty (Transfer  m) = pretty m
   pretty (Port      p) = "Port" <+> int (fromEnum p)
