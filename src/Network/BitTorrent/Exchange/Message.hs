@@ -68,6 +68,7 @@ module Network.BitTorrent.Exchange.Message
 
          -- *** Handshake
        , ExtendedHandshake (..)
+       , defaultQueueLength
        , nullExtendedHandshake
 
          -- *** Metadata
@@ -549,8 +550,13 @@ data ExtendedHandshake = ExtendedHandshake
 extendedHandshakeId :: ExtendedMessageId
 extendedHandshakeId = 0
 
+-- | Default 'Request' queue size.
+defaultQueueLength :: Int
+defaultQueueLength = 0
+
+-- | All fields are empty.
 instance Default ExtendedHandshake where
-  def = nullExtendedHandshake def
+  def = ExtendedHandshake def def def def def def
 
 instance BEncode ExtendedHandshake where
   toBEncode ExtendedHandshake {..} = toDict $
@@ -582,9 +588,16 @@ instance PeerMessage ExtendedHandshake where
   requires _ = Just ExtExtended
   {-# INLINE requires #-}
 
+-- | Set default values and the specified 'ExtendedCaps'.
 nullExtendedHandshake :: ExtendedCaps -> ExtendedHandshake
-nullExtendedHandshake caps
-  = ExtendedHandshake Nothing Nothing caps Nothing Nothing Nothing
+nullExtendedHandshake caps = ExtendedHandshake
+    { ehsIPv4        = Nothing
+    , ehsIPv6        = Nothing
+    , ehsCaps        = caps
+    , ehsPort        = Nothing
+    , ehsQueueLength = Just defaultQueueLength
+    , ehsVersion     = Just $ T.pack $ render $ pretty libFingerprint
+    }
 
 {-----------------------------------------------------------------------
 -- Metadata exchange extension
@@ -635,6 +648,10 @@ instance PeerMessage ExtendedMetadata where
 
   requires _ = Just ExtExtended
   {-# INLINE requires #-}
+
+{-----------------------------------------------------------------------
+--  Extension protocol messages
+-----------------------------------------------------------------------}
 
 -- | For more info see <http://www.bittorrent.org/beps/bep_0010.html>
 data ExtendedMessage
