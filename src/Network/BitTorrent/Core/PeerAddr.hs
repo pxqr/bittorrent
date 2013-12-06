@@ -56,7 +56,7 @@ instance Serialize PortNumber where
 -- | Peer address info normally extracted from peer list or peer
 -- compact list encoding.
 data PeerAddr = PeerAddr {
-      peerID   :: !(Maybe PeerId)
+      peerId   :: !(Maybe PeerId)
     , peerIP   :: {-# UNPACK #-} !HostAddress
     , peerPort :: {-# UNPACK #-} !PortNumber
     } deriving (Show, Eq, Ord, Typeable)
@@ -82,14 +82,14 @@ instance BEncode PeerAddr where
 --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
 --
 instance Serialize PeerAddr where
-  put PeerAddr {..} = put peerID >> put peerPort
+  put PeerAddr {..} = put peerId >> put peerPort
   {-# INLINE put #-}
   get = PeerAddr Nothing <$> get <*> get
   {-# INLINE get #-}
 
 instance Pretty PeerAddr where
   pretty p @ PeerAddr {..}
-    | Just pid <- peerID = pretty (fingerprint pid) <+> "at" <+> paddr
+    | Just pid <- peerId = pretty (fingerprint pid) <+> "at" <+> paddr
     |     otherwise      = paddr
     where
       paddr = text (show (peerSockAddr p))

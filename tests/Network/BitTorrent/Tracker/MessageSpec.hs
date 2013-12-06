@@ -46,7 +46,7 @@ validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
     respIncomplete  `shouldSatisfy` isJust
     respMinInterval `shouldSatisfy` isNothing
     respWarning     `shouldSatisfy` isNothing
-    peerList `shouldSatisfy` L.all (isNothing . peerID)
+    peerList `shouldSatisfy` L.all (isNothing . peerId)
     fromJust respComplete + fromJust respIncomplete `shouldBe` L.length peerList
   where
     peerList = getPeerList respPeers

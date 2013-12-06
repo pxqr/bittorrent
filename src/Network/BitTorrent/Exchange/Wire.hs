@@ -233,7 +233,7 @@ connectWire hs addr extCaps wire =
     unless (hsInfoHash hs == hsInfoHash hs') $ do
       throwIO $ ProtocolError $ UnexpectedTopic (hsInfoHash hs')
 
-    unless (hsPeerId hs' == fromMaybe (hsPeerId hs') (peerID addr)) $ do
+    unless (hsPeerId hs' == fromMaybe (hsPeerId hs') (peerId addr)) $ do
       throwIO $ ProtocolError $ UnexpectedPeerId (hsPeerId hs')
 
     let caps = hsReserved hs <> hsReserved hs'
