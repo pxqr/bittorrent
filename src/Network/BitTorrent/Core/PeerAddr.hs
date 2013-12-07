@@ -21,19 +21,25 @@ module Network.BitTorrent.Core.PeerAddr
        ) where
 
 import Control.Applicative
+import Control.Exception
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Aeson.TH
 import Data.BEncode   as BS
 import Data.BEncode.BDict (BKey)
 import Data.Bits
 import Data.Char
+import Data.Default
 import Data.List      as L
+import Data.List.Split
 import Data.Serialize as S
+import Data.String
 import Data.Typeable
 import Data.Word
 import Network.Socket
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
+import Text.Read (readMaybe)
+import System.IO.Unsafe
 
 import Network.BitTorrent.Core.PeerId
 
@@ -70,7 +76,7 @@ peer_ip_key   = "ip"
 peer_port_key = "port"
 
 -- FIXME do we need to byteswap peerIP in bencode instance?
--- | The tracker announce response compatible encoding.
+-- | The tracker's 'announce response' compatible encoding.
 instance BEncode PeerAddr where
   toBEncode PeerAddr {..} = toDict $
        peer_id_key   .=? peerId
@@ -83,17 +89,42 @@ instance BEncode PeerAddr where
              <*>! peer_ip_key
              <*>! peer_port_key
 
--- | The tracker "compact peer list" compatible encoding. The
+-- | The tracker's 'compact peer list' compatible encoding. The
 -- 'peerId' is always 'Nothing'.
 --
 --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
 --
 instance Serialize PeerAddr where
-  put PeerAddr {..} = putWord32host peerId >> putWord peerPort
+  put PeerAddr {..} = putWord32host peerIP >> put peerPort
   {-# INLINE put #-}
   get = PeerAddr Nothing <$> getWord32host <*> get
   {-# INLINE get #-}
 
+-- | @127.0.0.1:6881@
+instance Default PeerAddr where
+  def = "127.0.0.1:6881"
+
+-- inet_addr is pure; so it is safe to throw IO
+unsafeCatchIO :: IO a -> Maybe a
+unsafeCatchIO m = unsafePerformIO $
+    catch (m >>= evaluate >>= return . Just) handler
+  where
+    handler :: IOError -> IO (Maybe a)
+    handler _ = pure Nothing
+
+-- | Example:
+--
+--   @peerPort \"127.0.0.1:6881\" == 6881@
+--
+instance IsString PeerAddr where
+  fromString str
+    | [hostAddrStr, portStr] <- splitWhen (== ':') str
+    , Just hostAddr <- unsafeCatchIO $ inet_addr hostAddrStr
+    , Just portNum  <- toEnum <$> readMaybe portStr
+                = PeerAddr Nothing hostAddr portNum
+    | otherwise = error $ "fromString: unable to parse PeerAddr: " ++ str
+
+-- | fingerprint + "at" + dotted.host.inet.addr:port
 instance Pretty PeerAddr where
   pretty p @ PeerAddr {..}
     | Just pid <- peerId = pretty (fingerprint pid) <+> "at" <+> paddr
