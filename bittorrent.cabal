@@ -77,6 +77,7 @@ library
                        System.Torrent.FileMap
                        System.Torrent.Storage
   other-modules:       Paths_bittorrent
+                       Data.Torrent.JSON
 
   build-depends:       base       == 4.*
                      , bits-extras  >= 0.1.2

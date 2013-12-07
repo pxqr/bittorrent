@@ -36,13 +36,14 @@ module Network.BitTorrent.Exchange.Status
 import Control.Lens
 import Data.Aeson.TH
 import Data.Default
-import Data.List as L
 import Data.Maybe
 import Data.Monoid
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
+import Data.Torrent.JSON
 import Network.BitTorrent.Exchange.Message
+
 
 {-----------------------------------------------------------------------
 --  Peer status
@@ -60,7 +61,7 @@ data PeerStatus = PeerStatus
   } deriving (Show, Eq, Ord)
 
 $(makeLenses ''PeerStatus)
-$(deriveJSON defaultOptions { fieldLabelModifier = L.tail } ''PeerStatus)
+$(deriveJSON omitLensPrefix ''PeerStatus)
 
 instance Pretty PeerStatus where
   pretty PeerStatus {..} =
@@ -103,7 +104,7 @@ data SessionStatus = SessionStatus
   } deriving (Show, Eq)
 
 $(makeLenses ''SessionStatus)
-$(deriveJSON defaultOptions { fieldLabelModifier = L.tail } ''SessionStatus)
+$(deriveJSON omitRecordPrefix ''SessionStatus)
 
 instance Pretty SessionStatus where
   pretty SessionStatus {..} =

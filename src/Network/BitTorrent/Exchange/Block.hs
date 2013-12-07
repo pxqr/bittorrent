@@ -41,6 +41,7 @@ import Data.Typeable
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
 
+import Data.Torrent.JSON
 import Data.Torrent.Piece
 
 {-----------------------------------------------------------------------
@@ -84,7 +85,7 @@ data BlockIx = BlockIx {
   , ixLength :: {-# UNPACK #-} !BlockSize
   } deriving (Show, Eq, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier = (L.map toLower . L.dropWhile isLower) } ''BlockIx)
+$(deriveJSON omitRecordPrefix ''BlockIx)
 
 getInt :: S.Get Int
 getInt = fromIntegral <$> S.getWord32be

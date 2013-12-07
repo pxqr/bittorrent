@@ -34,6 +34,9 @@ module Network.BitTorrent.Tracker.Message
 
          -- ** Request
        , AnnounceQueryExt (..)
+       , renderAnnounceQueryExt
+       , parseAnnounceQueryExt
+
        , AnnounceRequest  (..)
        , parseAnnounceRequest
        , renderAnnounceRequest
@@ -87,6 +90,7 @@ import Network.Socket
 import Text.Read (readMaybe)
 
 import Data.Torrent.InfoHash
+import Data.Torrent.JSON
 import Data.Torrent.Progress
 import Network.BitTorrent.Core
 
@@ -104,7 +108,7 @@ data Event = Started
              -- ^ To be sent when the peer completes a download.
              deriving (Show, Read, Eq, Ord, Enum, Bounded, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''Event)
+$(deriveJSON omitRecordPrefix ''Event)
 
 -- | HTTP tracker protocol compatible encoding.
 instance QueryValueLike Event where
@@ -174,7 +178,7 @@ data AnnounceQuery = AnnounceQuery
    , reqEvent      :: Maybe Event
    } deriving (Show, Eq, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''AnnounceQuery)
+$(deriveJSON omitRecordPrefix ''AnnounceQuery)
 
 -- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceQuery where
@@ -480,7 +484,7 @@ data AnnounceInfo =
      , respWarning     :: !(Maybe Text)
      } deriving (Show, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''AnnounceInfo)
+$(deriveJSON omitRecordPrefix ''AnnounceInfo)
 
 -- | HTTP tracker protocol compatible encoding.
 instance BEncode AnnounceInfo where
@@ -630,7 +634,7 @@ data ScrapeEntry = ScrapeEntry {
   , siName       :: !(Maybe Text)
   } deriving (Show, Eq, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''ScrapeEntry)
+$(deriveJSON omitRecordPrefix ''ScrapeEntry)
 
 -- | HTTP tracker protocol compatible encoding.
 instance BEncode ScrapeEntry where

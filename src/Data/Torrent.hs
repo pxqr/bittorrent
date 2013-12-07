@@ -92,6 +92,7 @@ import Text.PrettyPrint.Class
 import System.FilePath
 
 import Data.Torrent.InfoHash as IH
+import Data.Torrent.JSON
 import Data.Torrent.Layout
 import Data.Torrent.Piece
 
@@ -123,7 +124,7 @@ data InfoDict = InfoDict
     --   BEP 27: <http://www.bittorrent.org/beps/bep_0027.html>
   } deriving (Show, Read, Eq, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map Char.toLower . L.dropWhile isLower) } ''InfoDict)
+$(deriveJSON omitRecordPrefix ''InfoDict)
 
 makeLensesFor
   [ ("idInfoHash"  , "infohash"  )
@@ -239,7 +240,7 @@ instance ToJSON NominalDiffTime where
 instance FromJSON NominalDiffTime where
   parseJSON v = utcTimeToPOSIXSeconds <$> parseJSON v
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map Char.toLower . L.dropWhile isLower) } ''Torrent)
+$(deriveJSON omitRecordPrefix ''Torrent)
 
 makeLensesFor
   [ ("tAnnounce"    , "announce"    )

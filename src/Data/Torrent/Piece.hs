@@ -54,13 +54,14 @@ import Data.Bits.Extras
 import           Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Base64 as Base64
-import Data.Char
 import Data.Int
-import Data.List as L
 import Data.Text.Encoding as T
 import Data.Typeable
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
+
+import Data.Torrent.JSON
+
 
 -- TODO add torrent file validation
 class Lint a where
@@ -129,7 +130,7 @@ data Piece a = Piece
   , pieceData  :: !a
   } deriving (Show, Read, Eq, Functor, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''Piece)
+$(deriveJSON omitRecordPrefix ''Piece)
 
 instance NFData (Piece a)
 
@@ -166,7 +167,7 @@ data PieceInfo = PieceInfo
     -- ^ Concatenation of all 20-byte SHA1 hash values.
   } deriving (Show, Read, Eq, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map toLower . L.dropWhile isLower) } ''PieceInfo)
+$(deriveJSON omitRecordPrefix ''PieceInfo)
 
 -- | Number of bytes in each piece.
 makeLensesFor [("piPieceLength", "pieceLength")] ''PieceInfo

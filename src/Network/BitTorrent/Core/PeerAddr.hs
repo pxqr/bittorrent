@@ -41,6 +41,7 @@ import Text.PrettyPrint.Class
 import Text.Read (readMaybe)
 import System.IO.Unsafe
 
+import Data.Torrent.JSON
 import Network.BitTorrent.Core.PeerId
 
 
@@ -68,7 +69,7 @@ data PeerAddr = PeerAddr
   , peerPort :: {-# UNPACK #-} !PortNumber
   } deriving (Show, Eq, Ord, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier = (L.map toLower . L.dropWhile isLower) } ''PeerAddr)
+$(deriveJSON omitRecordPrefix ''PeerAddr)
 
 peer_id_key, peer_ip_key, peer_port_key :: BKey
 peer_id_key   = "peer id"

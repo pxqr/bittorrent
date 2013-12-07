@@ -49,6 +49,8 @@ import Network.HTTP.Types.QueryLike
 import Text.PrettyPrint as PP
 import Text.PrettyPrint.Class
 
+import Data.Torrent.JSON
+
 
 -- | Progress data is considered as dynamic within one client
 -- session. This data also should be shared across client application
@@ -62,7 +64,7 @@ data Progress = Progress
   } deriving (Show, Read, Eq)
 
 $(makeLenses ''Progress)
-$(deriveJSON defaultOptions { fieldLabelModifier = L.tail } ''Progress)
+$(deriveJSON omitLensPrefix ''Progress)
 
 -- | UDP tracker compatible encoding.
 instance Serialize Progress where

@@ -70,7 +70,6 @@ import Data.BEncode.Types
 import Data.ByteString as BS
 import Data.ByteString.Base16 as Base16
 import Data.ByteString.Char8 as BC
-import Data.Char as Char
 import Data.Foldable as F
 import Data.List as L
 import Data.Text as T
@@ -81,6 +80,7 @@ import Text.PrettyPrint.Class
 import System.FilePath
 import System.Posix.Types
 
+import Data.Torrent.JSON
 
 {-----------------------------------------------------------------------
 --  File attribytes
@@ -123,7 +123,7 @@ data FileInfo a = FileInfo {
                , Functor, Foldable
                )
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map Char.toLower . L.dropWhile isLower) } ''FileInfo)
+$(deriveJSON omitRecordPrefix ''FileInfo)
 
 makeLensesFor
   [ ("fiLength", "fileLength")
@@ -208,7 +208,7 @@ data LayoutInfo
     , liDirName  :: !ByteString
     } deriving (Show, Read, Eq, Typeable)
 
-$(deriveJSON defaultOptions { fieldLabelModifier =  (L.map Char.toLower . L.dropWhile isLower) } ''LayoutInfo)
+$(deriveJSON omitRecordPrefix ''LayoutInfo)
 
 makeLensesFor
   [ ("liFile"   , "singleFile" )
