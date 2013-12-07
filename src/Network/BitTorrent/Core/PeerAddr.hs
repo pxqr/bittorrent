@@ -24,6 +24,7 @@ import Control.Applicative
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Aeson.TH
 import Data.BEncode   as BS
+import Data.BEncode.BDict (BKey)
 import Data.Bits
 import Data.Char
 import Data.List      as L
@@ -55,26 +56,32 @@ instance Serialize PortNumber where
 
 -- | Peer address info normally extracted from peer list or peer
 -- compact list encoding.
-data PeerAddr = PeerAddr {
-      peerId   :: !(Maybe PeerId)
-    , peerIP   :: {-# UNPACK #-} !HostAddress
-    , peerPort :: {-# UNPACK #-} !PortNumber
-    } deriving (Show, Eq, Ord, Typeable)
+data PeerAddr = PeerAddr
+  { peerId   :: !(Maybe PeerId)
+  , peerIP   :: {-# UNPACK #-} !HostAddress
+  , peerPort :: {-# UNPACK #-} !PortNumber
+  } deriving (Show, Eq, Ord, Typeable)
 
 $(deriveJSON defaultOptions { fieldLabelModifier = (L.map toLower . L.dropWhile isLower) } ''PeerAddr)
 
--- | The tracker "announce query" compatible encoding.
+peer_id_key, peer_ip_key, peer_port_key :: BKey
+peer_id_key   = "peer id"
+peer_ip_key   = "ip"
+peer_port_key = "port"
+
+-- FIXME do we need to byteswap peerIP in bencode instance?
+-- | The tracker announce response compatible encoding.
 instance BEncode PeerAddr where
-  toBEncode (PeerAddr pid pip pport) = toDict $
-       "peer id" .=? pid
-    .: "ip"      .=! pip
-    .: "port"    .=! pport
+  toBEncode PeerAddr {..} = toDict $
+       peer_id_key   .=? peerId
+    .: peer_ip_key   .=! peerIP
+    .: peer_port_key .=! peerPort
     .: endDict
 
   fromBEncode = fromDict $ do
-    PeerAddr <$>? "peer id"
-             <*>! "ip"
-             <*>! "port"
+    PeerAddr <$>? peer_id_key
+             <*>! peer_ip_key
+             <*>! peer_port_key
 
 -- | The tracker "compact peer list" compatible encoding. The
 -- 'peerId' is always 'Nothing'.
@@ -82,9 +89,9 @@ instance BEncode PeerAddr where
 --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
 --
 instance Serialize PeerAddr where
-  put PeerAddr {..} = put peerId >> put peerPort
+  put PeerAddr {..} = putWord32host peerId >> putWord peerPort
   {-# INLINE put #-}
-  get = PeerAddr Nothing <$> get <*> get
+  get = PeerAddr Nothing <$> getWord32host <*> get
   {-# INLINE get #-}
 
 instance Pretty PeerAddr where
@@ -98,20 +105,8 @@ instance Pretty PeerAddr where
 defaultPorts :: [PortNumber]
 defaultPorts =  [6881..6889]
 
--- TODO make platform independent, clarify htonl
-
 -- | Convert peer info from tracker response to socket address.  Used
 --   for establish connection between peers.
 --
 peerSockAddr :: PeerAddr -> SockAddr
-peerSockAddr = SockAddrInet <$> (g . peerPort) <*> (htonl . peerIP)
-  where
-    htonl :: Word32 -> Word32
-    htonl d =
-       ((d .&. 0xff) `shiftL` 24) .|.
-       (((d `shiftR` 8 ) .&. 0xff) `shiftL` 16) .|.
-       (((d `shiftR` 16) .&. 0xff) `shiftL` 8)  .|.
-       ((d `shiftR` 24) .&. 0xff)
-
-    g :: PortNumber -> PortNumber
-    g = id
+peerSockAddr = SockAddrInet <$> peerPort <*> peerIP
