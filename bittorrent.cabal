@@ -163,6 +163,7 @@ test-suite spec
                        Network.BitTorrent.Tracker.MessageSpec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
                        Network.BitTorrent.Tracker.RPC.UDPSpec
+                       Network.BitTorrent.Exchange.MessageSpec
                        System.Torrent.FileMapSpec
   build-depends:       base == 4.*
                      , bytestring
@@ -172,6 +173,7 @@ test-suite spec
                      , convertible
                      , data-default
                      , monad-loops
+                     , containers
 
                      , aeson
                      , cereal
