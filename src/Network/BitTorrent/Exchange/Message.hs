@@ -243,7 +243,7 @@ instance Serialize ProtocolString where
 -- to establish connection between peers.
 --
 data Handshake = Handshake {
-    -- | Identifier of the protocol. This is usually equal to defaultProtocol
+    -- | Identifier of the protocol. This is usually equal to 'def'.
     hsProtocol    :: ProtocolString
 
     -- | Reserved bytes used to specify supported BEP's.
