@@ -1,10 +1,12 @@
 module Network.BitTorrent.Exchange.MessageSpec (spec) where
 import Control.Applicative
+import Control.Exception
 import Data.ByteString as BS
 import Data.Default
 import Data.List as L
 import Data.Set as S
 import Data.Serialize as S
+import Data.String
 import Test.Hspec
 import Test.QuickCheck
 
@@ -18,6 +20,9 @@ instance Arbitrary Extension where
 
 instance Arbitrary Caps where
   arbitrary = toCaps <$> arbitrary
+
+instance Arbitrary ProtocolString where
+  arbitrary = fromString <$> (arbitrary `suchThat` ((200 <) . L.length))
 
 instance Arbitrary Handshake where
   arbitrary = Handshake <$> arbitrary <*> arbitrary
@@ -33,11 +38,13 @@ spec = do
       S.fromList (fromCaps (toCaps (S.toList extSet) :: Caps))
         `shouldBe` extSet
 
+  describe "ProtocolString" $ do
+    it "fail to construct invalid string" $ do
+      let str = L.replicate 500 'x'
+      evaluate (fromString str :: ProtocolString)
+        `shouldThrow`
+        errorCall ("fromString: ProtocolString too long: " ++ str)
+
   describe "Handshake" $ do
     it "properly serialized" $ property $ \ hs ->
       S.decode (S.encode hs ) `shouldBe` Right (hs :: Handshake)
-
-    it "fail if protocol string is too long" $ do
-      pid <- genPeerId
-      let hs = (defaultHandshake def pid) {hsProtocol = BS.replicate 256 0}
-      S.decode (S.encode hs) `shouldBe` Right hs

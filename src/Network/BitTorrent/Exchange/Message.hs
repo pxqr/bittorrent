@@ -40,9 +40,9 @@ module Network.BitTorrent.Exchange.Message
        , Caps
 
          -- * Handshake
+       , ProtocolString
        , Handshake(..)
        , defaultHandshake
-       , defaultBTProtocol
        , handshakeSize
        , handshakeMaxSize
 
@@ -203,12 +203,48 @@ instance Capabilities Caps where
     Handshake
 -----------------------------------------------------------------------}
 
+maxProtocolStringSize :: Word8
+maxProtocolStringSize = maxBound
+
+-- | The protocol name is used to identify to the local peer which
+-- version of BTP the remote peer uses.
+newtype ProtocolString = ProtocolString BS.ByteString
+  deriving (Eq, Ord, Typeable)
+
+-- | In BTP/1.0 the name is 'BitTorrent protocol'. If this string is
+-- different from the local peers own protocol name, then the
+-- connection is to be dropped.
+instance Default ProtocolString where
+  def = ProtocolString "BitTorrent protocol"
+
+instance Show ProtocolString where
+  show (ProtocolString bs) = show bs
+
+instance Pretty ProtocolString where
+  pretty (ProtocolString bs) = PP.text $ BC.unpack bs
+
+instance IsString ProtocolString where
+  fromString str
+    | L.length str <= fromIntegral maxProtocolStringSize
+    = ProtocolString (fromString str)
+    | otherwise = error $ "fromString: ProtocolString too long: " ++ str
+
+instance Serialize ProtocolString where
+  put (ProtocolString bs) = do
+    putWord8 $ fromIntegral $ BS.length bs
+    putByteString bs
+
+  get = do
+    len  <- getWord8
+    bs   <- getByteString $ fromIntegral len
+    return (ProtocolString bs)
+
 -- | Handshake message is used to exchange all information necessary
 -- to establish connection between peers.
 --
 data Handshake = Handshake {
     -- | Identifier of the protocol. This is usually equal to defaultProtocol
-    hsProtocol    :: BS.ByteString
+    hsProtocol    :: ProtocolString
 
     -- | Reserved bytes used to specify supported BEP's.
   , hsReserved    :: Caps
@@ -229,23 +265,16 @@ data Handshake = Handshake {
 
 instance Serialize Handshake where
   put Handshake {..} = do
-    S.putWord8 (fromIntegral (BS.length hsProtocol))
-    S.putByteString hsProtocol
-    S.put hsReserved
-    S.put hsInfoHash
-    S.put hsPeerId
-
-  get = do
-    len  <- S.getWord8
-    Handshake <$> S.getBytes (fromIntegral len)
-              <*> S.get
-              <*> S.get
-              <*> S.get
+    put hsProtocol
+    put hsReserved
+    put hsInfoHash
+    put hsPeerId
+  get = Handshake <$> get <*> get <*> get <*> get
 
 -- | Show handshake protocol string, caps and fingerprint.
 instance Pretty Handshake where
   pretty Handshake {..}
-    = text (BC.unpack hsProtocol) $$
+    = pretty hsProtocol           $$
       pretty hsReserved           $$
       pretty (fingerprint hsPeerId)
 
@@ -256,15 +285,11 @@ handshakeSize n = 1 + fromIntegral n + 8 + 20 + 20
 
 -- | Maximum size of handshake message in bytes.
 handshakeMaxSize :: Int
-handshakeMaxSize = handshakeSize maxBound
-
--- | Default protocol string "BitTorrent protocol" as is.
-defaultBTProtocol :: BS.ByteString
-defaultBTProtocol = "BitTorrent protocol"
+handshakeMaxSize = handshakeSize maxProtocolStringSize
 
 -- | Handshake with default protocol string and reserved bitmask.
 defaultHandshake :: InfoHash -> PeerId -> Handshake
-defaultHandshake = Handshake defaultBTProtocol def
+defaultHandshake = Handshake def def
 
 {-----------------------------------------------------------------------
 --  Regular messages
