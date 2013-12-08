@@ -73,11 +73,15 @@ data ChannelSide
   | RemotePeer
     deriving (Show, Eq, Enum)
 
--- TODO pretty instance
+instance Pretty ChannelSide where
+  pretty = PP.text . show
 
 -- | Errors occur when a remote peer violates protocol specification.
 data ProtocolError
-  = UnexpectedTopic   InfoHash -- ^ peer replied with unexpected infohash.
+    -- | Protocol string should be 'BitTorrent Protocol' but remote
+    -- peer send a different string.
+  = InvalidProtocol   ProtocolString
+  | UnexpectedTopic   InfoHash -- ^ peer replied with unexpected infohash.
   | UnexpectedPeerId  PeerId   -- ^ peer replied with unexpected peer id.
   | UnknownTopic      InfoHash -- ^ peer requested unknown torrent.
   | HandshakeRefused           -- ^ peer do not send an extended handshake back.
@@ -269,6 +273,9 @@ connectWire :: Handshake -> PeerAddr -> ExtendedCaps -> Wire () -> IO ()
 connectWire hs addr extCaps wire =
   bracket (connectToPeer addr) close $ \ sock -> do
     hs' <- initiateHandshake sock hs
+
+    unless (def           == hsProtocol hs') $ do
+      throwIO $ ProtocolError $ InvalidProtocol (hsProtocol hs')
 
     unless (hsInfoHash hs == hsInfoHash hs') $ do
       throwIO $ ProtocolError $ UnexpectedTopic (hsInfoHash hs')
