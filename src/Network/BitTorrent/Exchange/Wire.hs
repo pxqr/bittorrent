@@ -11,13 +11,18 @@ module Network.BitTorrent.Exchange.Wire
          Wire
 
          -- ** Exceptions
+       , ChannelSide
        , ProtocolError (..)
        , WireFailure   (..)
        , isWireFailure
        , disconnectPeer
 
          -- ** Connection
-       , Connection    (..)
+       , Connection
+           ( connCaps, connTopic
+           , connRemotePeerId, connThisPeerId
+           )
+       , getConnection
 
          -- ** Setup
        , runWire
@@ -25,8 +30,11 @@ module Network.BitTorrent.Exchange.Wire
        , acceptWire
 
          -- ** Query
-       , getConnection
        , getExtCaps
+
+         -- ** Stats
+       , ConnectionStats (..)
+       , getStats
        ) where
 
 import Control.Exception
@@ -100,6 +108,38 @@ isWireFailure :: Monad m => WireFailure -> m ()
 isWireFailure _ = return ()
 
 {-----------------------------------------------------------------------
+--  Stats
+-----------------------------------------------------------------------}
+
+data MessageStats = MessageStats
+  { overhead :: {-# UNPACK #-} !Int
+  , payload  :: {-# UNPACK #-} !Int
+  } deriving Show
+
+messageSize :: MessageStats -> Int
+messageSize = undefined
+
+data ConnectionStats = ConnectionStats
+  { a :: !MessageStats
+  , b :: !MessageStats
+  }
+
+sentBytes :: ConnectionStats -> Int
+sentBytes = undefined
+
+recvBytes :: ConnectionStats -> Int
+recvBytes = undefined
+
+wastedBytes :: ConnectionStats -> Int
+wastedBytes = undefined
+
+payloadBytes :: ConnectionStats -> Int
+payloadBytes = undefined
+
+getStats :: Wire ConnectionStats
+getStats = undefined
+
+{-----------------------------------------------------------------------
 --  Connection
 -----------------------------------------------------------------------}
 
@@ -123,10 +163,10 @@ isAllowed Connection {..} msg
 --  Hanshaking
 -----------------------------------------------------------------------}
 
--- | TODO remove socket stuff to corresponding module
 sendHandshake :: Socket -> Handshake -> IO ()
 sendHandshake sock hs = sendAll sock (S.encode hs)
 
+-- TODO drop connection if protocol string do not match
 recvHandshake :: Socket -> IO Handshake
 recvHandshake sock = do
     header <- BS.recv sock 1
