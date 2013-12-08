@@ -78,9 +78,10 @@ module Network.BitTorrent.Exchange.Message
 
 import Control.Applicative
 import Control.Arrow ((&&&), (***))
+import Data.Attoparsec.ByteString.Char8 as BS
 import Data.BEncode as BE
 import Data.BEncode.BDict as BE
-import Data.BEncode.Internal (ppBEncode)
+import Data.BEncode.Internal as BE (ppBEncode, parser)
 import Data.BEncode.Types    (BDict)
 import Data.Bits
 import Data.ByteString as BS
@@ -99,11 +100,12 @@ import Data.Typeable
 import Data.Word
 import Network
 import Network.Socket hiding (KeepAlive)
-import Text.PrettyPrint as PP
+import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.Bitfield
 import Data.Torrent.InfoHash
+import qualified Data.Torrent.Piece as Data
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block
 
@@ -556,8 +558,8 @@ data ExtendedHandshake = ExtendedHandshake
 --  , yourip  :: Maybe (Either HostAddress HostAddress6)
   } deriving (Show, Eq, Typeable)
 
-extendedHandshakeId :: ExtendedMessageId
-extendedHandshakeId = 0
+extHandshakeId :: ExtendedMessageId
+extHandshakeId = 0
 
 -- | Default 'Request' queue size.
 defaultQueueLength :: Int
@@ -626,9 +628,12 @@ data ExtendedMetadata
     -- is either a 'MetadataReject' or a 'MetadataData' message.
   = MetadataRequest PieceIx
 
+    -- | If sender requested a valid 'PieceIx' and receiver have the
+    -- corresponding piece then receiver should respond with this
+    -- message.
   | MetadataData
-    { -- | FIXME add piece data
-      piece     :: PieceIx
+    { -- | A piece of 'Data.Torrent.InfoDict'.
+      piece     :: Data.Piece BS.ByteString
 
       -- | This key has the same semantics as the 'ehsMetadataSize' in
       -- the 'ExtendedHandshake' — it is size of the torrent info
@@ -663,7 +668,7 @@ instance BEncode ExtendedMetadata where
        msg_type_key   .=! (0 :: MetadataId)
     .: piece_key      .=! pix
     .: endDict
-  toBEncode (MetadataData    pix totalSize) = toDict $
+  toBEncode (MetadataData (Data.Piece pix _) totalSize) = toDict $
        msg_type_key   .=! (1 :: MetadataId)
     .: piece_key      .=! pix
     .: total_size_key .=! totalSize
@@ -678,15 +683,17 @@ instance BEncode ExtendedMetadata where
     mid <- field $ req msg_type_key
     case mid :: MetadataId of
       0 -> MetadataRequest <$>! piece_key
-      1 -> MetadataData    <$>! piece_key <*>! total_size_key
+      1 -> metadataData    <$>! piece_key <*>! total_size_key
       2 -> MetadataReject  <$>! piece_key
       _ -> pure (MetadataUnknown bval)
+   where
+     metadataData pix s = MetadataData (Data.Piece pix BS.empty) s
 
 -- | Piece data bytes are omitted.
 instance Pretty ExtendedMetadata where
-  pretty (MetadataRequest pix  ) = "Request" <+> PP.int pix
-  pretty (MetadataData    pix s) = "Data"    <+> PP.int pix <+> PP.int s
-  pretty (MetadataReject  pix  ) = "Reject"  <+> PP.int pix
+  pretty (MetadataRequest pix  ) = "Request" <+> PP.int    pix
+  pretty (MetadataData    pi  t) = "Data"    <+>    pretty pi  <+> PP.int t
+  pretty (MetadataReject  pix  ) = "Reject"  <+> PP.int    pix
   pretty (MetadataUnknown bval ) = "Unknown" <+> ppBEncode bval
 
 instance PeerMessage ExtendedMetadata where
@@ -698,6 +705,43 @@ instance PeerMessage ExtendedMetadata where
 
 metadataPieceSize :: Int
 metadataPieceSize = 16 * 1024
+
+-- TODO we can check if the piece payload bytestring have appropriate
+-- length; otherwise serialization MUST fail.
+isLastMetadata :: ExtendedMetadata -> Bool
+isLastMetadata = undefined -- FIXME
+
+checkPiece :: ExtendedMetadata -> Bool
+checkPiece = undefined -- FIXME
+
+setMetadataPayload :: BS.ByteString -> ExtendedMetadata -> ExtendedMetadata
+setMetadataPayload bs (MetadataData (Data.Piece pix _) t) =
+  MetadataData (Data.Piece pix bs) t
+setMetadataPayload _   msg               = msg
+
+getMetadataPayload :: ExtendedMetadata -> Maybe BS.ByteString
+getMetadataPayload (MetadataData (Data.Piece _ bs) _) = Just bs
+getMetadataPayload _                                  = Nothing
+
+-- to make MetadataData constructor fields a little bit prettier we
+-- cheat here: first we read empty 'pieceData' from bdict, but then we
+-- fill that field with the actual piece data — trailing bytes of
+-- the message
+getMetadata :: Int -> S.Get ExtendedMetadata
+getMetadata len = do
+  bs <- getByteString len
+  case BS.parse BE.parser bs of
+    BS.Fail _ _ _ -> fail "unable to parse metadata bdict: possible corrupted"
+    BS.Partial c  -> fail "unable to parse metadata bdict: not enough bytes"
+    BS.Done piece bvalueBS -> do
+      let msg = "metadata dictionary is invalid"
+      metadata <- either (fail msg) pure $ fromBEncode bvalueBS
+      pure $ setMetadataPayload piece metadata
+
+putMetadata :: ExtendedMetadata -> BL.ByteString
+putMetadata msg
+  | Just bs <- getMetadataPayload msg = BE.encode msg <> BL.fromStrict bs
+  |              otherwise            = BE.encode msg
 
 {-----------------------------------------------------------------------
 --  Extension protocol messages
@@ -900,23 +944,22 @@ getExtendedMessage messageSize = do
   let msgBodySize = messageSize - 1
   case msgId of
     0 -> EHandshake      <$> getExtendedHandshake msgBodySize
-    1 -> EMetadata msgId <$> undefined
+    1 -> EMetadata msgId <$> getMetadata          msgBodySize
     _ -> EUnknown  msgId <$> getByteString        msgBodySize
 
 extendedMessageId :: MessageId
 extendedMessageId = 20
 
+putExt :: ExtendedMessageId -> BL.ByteString -> Put
+putExt mid lbs = do
+  putWord32be $ fromIntegral (1 + 1 + BL.length lbs)
+  putWord8 extendedMessageId
+  putWord8 mid
+  putLazyByteString lbs
+
 -- NOTE: in contrast to getExtendedMessage this function put length
 -- and message id too!
 putExtendedMessage :: Putter ExtendedMessage
-putExtendedMessage (EHandshake hs) = do
-  putExtendedMessage $ EUnknown extendedHandshakeId
-    $ BL.toStrict $ BE.encode hs
-putExtendedMessage (EMetadata mid msg)  = do
-  putExtendedMessage $ EUnknown mid
-    $ BL.toStrict $ BE.encode msg
-putExtendedMessage (EUnknown mid  bs) = do
-  putWord32be $ fromIntegral (1 + 1 + BS.length bs)
-  putWord8 extendedMessageId
-  putWord8 mid
-  putByteString bs
+putExtendedMessage (EHandshake hs)     = putExt extHandshakeId (BE.encode hs)
+putExtendedMessage (EMetadata mid msg) = putExt mid (BE.encode msg)
+putExtendedMessage (EUnknown  mid  bs) = putExt mid (BL.fromStrict bs)
