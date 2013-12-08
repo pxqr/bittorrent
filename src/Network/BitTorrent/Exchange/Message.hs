@@ -514,7 +514,7 @@ appendBDict ::  BDict -> ExtendedMap -> ExtendedMap
 appendBDict (Cons key val xs) caps
   | Just  ext <- fromKey     key
   , Right eid <- fromBEncode val   = M.insert ext eid (appendBDict xs caps)
-  |           otherwise            = caps
+  |           otherwise            = appendBDict xs caps
 appendBDict  Nil              caps = caps
 
 -- | Handshake compatible encoding.
