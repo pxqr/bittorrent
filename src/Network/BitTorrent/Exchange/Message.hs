@@ -40,7 +40,7 @@ module Network.BitTorrent.Exchange.Message
        , Caps
 
          -- * Handshake
-       , ProtocolString
+       , ProtocolName
        , Handshake(..)
        , defaultHandshake
        , handshakeSize
@@ -208,48 +208,48 @@ instance Capabilities Caps where
     Handshake
 -----------------------------------------------------------------------}
 
-maxProtocolStringSize :: Word8
-maxProtocolStringSize = maxBound
+maxProtocolNameSize :: Word8
+maxProtocolNameSize = maxBound
 
 -- | The protocol name is used to identify to the local peer which
 -- version of BTP the remote peer uses.
-newtype ProtocolString = ProtocolString BS.ByteString
+newtype ProtocolName = ProtocolName BS.ByteString
   deriving (Eq, Ord, Typeable)
 
 -- | In BTP/1.0 the name is 'BitTorrent protocol'. If this string is
 -- different from the local peers own protocol name, then the
 -- connection is to be dropped.
-instance Default ProtocolString where
-  def = ProtocolString "BitTorrent protocol"
+instance Default ProtocolName where
+  def = ProtocolName "BitTorrent protocol"
 
-instance Show ProtocolString where
-  show (ProtocolString bs) = show bs
+instance Show ProtocolName where
+  show (ProtocolName bs) = show bs
 
-instance Pretty ProtocolString where
-  pretty (ProtocolString bs) = PP.text $ BC.unpack bs
+instance Pretty ProtocolName where
+  pretty (ProtocolName bs) = PP.text $ BC.unpack bs
 
-instance IsString ProtocolString where
+instance IsString ProtocolName where
   fromString str
-    | L.length str <= fromIntegral maxProtocolStringSize
-    = ProtocolString (fromString str)
-    | otherwise = error $ "fromString: ProtocolString too long: " ++ str
+    | L.length str <= fromIntegral maxProtocolNameSize
+    = ProtocolName (fromString str)
+    | otherwise = error $ "fromString: ProtocolName too long: " ++ str
 
-instance Serialize ProtocolString where
-  put (ProtocolString bs) = do
+instance Serialize ProtocolName where
+  put (ProtocolName bs) = do
     putWord8 $ fromIntegral $ BS.length bs
     putByteString bs
 
   get = do
     len  <- getWord8
     bs   <- getByteString $ fromIntegral len
-    return (ProtocolString bs)
+    return (ProtocolName bs)
 
 -- | Handshake message is used to exchange all information necessary
 -- to establish connection between peers.
 --
 data Handshake = Handshake {
     -- | Identifier of the protocol. This is usually equal to 'def'.
-    hsProtocol    :: ProtocolString
+    hsProtocol    :: ProtocolName
 
     -- | Reserved bytes used to specify supported BEP's.
   , hsReserved    :: Caps
@@ -290,7 +290,7 @@ handshakeSize n = 1 + fromIntegral n + 8 + 20 + 20
 
 -- | Maximum size of handshake message in bytes.
 handshakeMaxSize :: Int
-handshakeMaxSize = handshakeSize maxProtocolStringSize
+handshakeMaxSize = handshakeSize maxProtocolNameSize
 
 -- | Handshake with default protocol string and reserved bitmask.
 defaultHandshake :: InfoHash -> PeerId -> Handshake

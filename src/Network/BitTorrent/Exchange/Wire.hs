@@ -102,7 +102,7 @@ instance Pretty ChannelSide where
 data ProtocolError
     -- | Protocol string should be 'BitTorrent Protocol' but remote
     -- peer send a different string.
-  = InvalidProtocol   ProtocolString
+  = InvalidProtocol   ProtocolName
   | UnexpectedTopic   InfoHash -- ^ peer replied with unexpected infohash.
   | UnexpectedPeerId  PeerId   -- ^ peer replied with unexpected peer id.
   | UnknownTopic      InfoHash -- ^ peer requested unknown torrent.

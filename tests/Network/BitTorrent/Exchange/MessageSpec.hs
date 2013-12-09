@@ -2,8 +2,6 @@ module Network.BitTorrent.Exchange.MessageSpec (spec) where
 import Control.Applicative
 import Control.Exception
 import Data.ByteString as BS
-import Data.ByteString.Lazy as BL
-import Data.Default
 import Data.List as L
 import Data.Set as S
 import Data.Serialize as S
@@ -14,7 +12,7 @@ import Test.QuickCheck
 import Data.Torrent.BitfieldSpec ()
 import Data.Torrent.InfoHashSpec ()
 import Network.BitTorrent.CoreSpec ()
-import Network.BitTorrent.Core
+import Network.BitTorrent.Core ()
 import Network.BitTorrent.Exchange.BlockSpec ()
 import Network.BitTorrent.Exchange.Message
 
@@ -24,7 +22,7 @@ instance Arbitrary Extension where
 instance Arbitrary Caps where
   arbitrary = toCaps <$> arbitrary
 
-instance Arbitrary ProtocolString where
+instance Arbitrary ProtocolName where
   arbitrary = fromString <$> (arbitrary `suchThat` ((200 <) . L.length))
 
 instance Arbitrary Handshake where
@@ -85,12 +83,12 @@ spec = do
       byteLength (stats msg) `shouldBe`
         fromIntegral (BS.length (S.encode (msg :: Message)))
 
-  describe "ProtocolString" $ do
+  describe "ProtocolName" $ do
     it "fail to construct invalid string" $ do
       let str = L.replicate 500 'x'
-      evaluate (fromString str :: ProtocolString)
+      evaluate (fromString str :: ProtocolName)
         `shouldThrow`
-        errorCall ("fromString: ProtocolString too long: " ++ str)
+        errorCall ("fromString: ProtocolName too long: " ++ str)
 
   describe "Handshake" $ do
     it "properly serialized" $ property $ \ hs ->
