@@ -23,6 +23,10 @@ module System.Torrent.Storage
        , open
        , close
 
+         -- * Query
+       , genPieceInfo
+       , getBitfield
+
          -- * Modification
        , writePiece
        , readPiece
@@ -32,6 +36,7 @@ module System.Torrent.Storage
 import Control.Applicative
 import Data.ByteString.Lazy as BL
 
+import Data.Torrent.Bitfield
 import Data.Torrent.Layout
 import Data.Torrent.Piece
 import System.Torrent.FileMap
@@ -65,3 +70,11 @@ unsafeReadPiece pix Storage {..} = return $ Piece pix lbs
   where
     lbs = unsafeReadBytes (fromIntegral (pix * pieceLen))
                           (fromIntegral pieceLen) fileMap
+
+-- | TODO examples of use
+genPieceInfo :: Storage -> IO PieceInfo
+genPieceInfo = undefined
+
+-- | TODO examples of use
+getBitfield :: Storage -> PieceInfo -> IO Bitfield
+getBitfield = undefined
