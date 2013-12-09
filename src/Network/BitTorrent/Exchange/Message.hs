@@ -46,10 +46,15 @@ module Network.BitTorrent.Exchange.Message
        , handshakeSize
        , handshakeMaxSize
 
+         -- * Stats
+       , ByteCount
+       , ByteStats   (..)
+       , byteLength
+
          -- * Messages
        , Message        (..)
-       , PeerMessage    (..)
        , defaultKeepAliveInterval
+       , PeerMessage    (..)
 
          -- ** Core messages
        , StatusUpdate   (..)
@@ -292,6 +297,47 @@ defaultHandshake :: InfoHash -> PeerId -> Handshake
 defaultHandshake = Handshake def def
 
 {-----------------------------------------------------------------------
+--  Stats
+-----------------------------------------------------------------------}
+
+-- | Number of bytes.
+type ByteCount = Int
+
+-- | Summary of encoded message byte layout can be used to collect
+-- stats about message flow in both directions. This data can be
+-- retrieved using 'stats' function.
+data ByteStats = ByteStats
+  { -- | Number of bytes used to help encode 'control' and 'payload'
+    -- bytes: message size, message ID's, etc
+    overhead :: {-# UNPACK #-} !ByteCount
+
+    -- | Number of bytes used to exchange peers state\/options: piece
+    -- and block indexes, infohash, port numbers, peer ID\/IP, etc.
+  , control  :: {-# UNPACK #-} !ByteCount
+
+    -- | Number of payload bytes: torrent data blocks and infodict
+    -- metadata.
+  , payload  :: {-# UNPACK #-} !ByteCount
+  } deriving Show
+
+-- | Empty byte sequences.
+instance Default ByteStats where
+  def = ByteStats 0 0 0
+
+-- | Monoid under addition.
+instance Monoid ByteStats where
+  mempty      = def
+  mappend a b = ByteStats
+    { overhead = overhead a + overhead b
+    , control  = control  a + control  b
+    , payload  = payload  a + payload  b
+    }
+
+-- | Sum of the all byte sequences.
+byteLength :: ByteStats -> Int
+byteLength ByteStats {..} = overhead + control + payload
+
+{-----------------------------------------------------------------------
 --  Regular messages
 -----------------------------------------------------------------------}
 
@@ -310,6 +356,17 @@ class PeerMessage a where
   -- session.
   requires :: a -> Maybe Extension
   requires _ = Nothing
+
+  -- | Get sizes of overhead\/control\/payload byte sequences of
+  -- binary message representation without encoding message to binary
+  -- bytestring.
+  --
+  --   This function should obey one law:
+  --
+  --     * 'byteLength' ('stats' msg) == 'BL.length' ('encode' msg)
+  --
+  stats :: a -> ByteStats
+  stats _ = ByteStats 4 0 0
 
 {-----------------------------------------------------------------------
 --  Status messages
@@ -337,6 +394,9 @@ instance PeerMessage StatusUpdate where
   envelop _ = Status
   {-# INLINE envelop #-}
 
+  stats _ = ByteStats 4 1 0
+  {-# INLINE stats #-}
+
 {-----------------------------------------------------------------------
 --  Available messages
 -----------------------------------------------------------------------}
@@ -361,11 +421,13 @@ instance Pretty Available where
 
 instance PeerMessage Available where
   envelop _ = Available
-
--- | BITFIELD message.
-instance PeerMessage Bitfield where
-  envelop c = envelop c . Bitfield
   {-# INLINE envelop #-}
+
+  stats (Have      _) = ByteStats (4 + 1) 4 0
+  stats (Bitfield bf) = ByteStats (4 + 1) (q + trailing)  0
+    where
+      trailing = if r == 0 then 0 else 1
+      (q, r) = quotRem (totalCount bf) 8
 
 {-----------------------------------------------------------------------
 --  Transfer messages
@@ -395,15 +457,9 @@ instance PeerMessage Transfer where
   envelop _ = Transfer
   {-# INLINE envelop #-}
 
--- | REQUEST message.
-instance PeerMessage BlockIx where
-  envelop c = envelop c . Request
-  {-# INLINE envelop #-}
-
--- | PIECE message.
-instance PeerMessage (Block BL.ByteString) where
-  envelop c = envelop c . Piece
-  {-# INLINE envelop #-}
+  stats (Request _  ) = ByteStats (4 + 1) (3 * 4) 0
+  stats (Piece   pi ) = ByteStats (4 + 1) (4 + 4 + blockSize pi) 0
+  stats (Cancel  _  ) = ByteStats (4 + 1) (3 * 4) 0
 
 {-----------------------------------------------------------------------
 --  Fast messages
@@ -424,11 +480,12 @@ data FastMessage =
     -- amount of IO.
   | SuggestPiece  !PieceIx
 
-    -- | Notifies a requesting peer that its request will not be satisfied.
+    -- | Notifies a requesting peer that its request will not be
+    -- satisfied.
   | RejectRequest !BlockIx
 
-    -- | This is an advisory messsage meaning "if you ask for this
-    -- piece, I'll give it to you even if you're choked." Used to
+    -- | This is an advisory messsage meaning \"if you ask for this
+    -- piece, I'll give it to you even if you're choked.\" Used to
     -- shorten starting phase.
   | AllowedFast   !PieceIx
     deriving (Show, Eq)
@@ -446,6 +503,12 @@ instance PeerMessage FastMessage where
 
   requires _ = Just ExtFast
   {-# INLINE requires #-}
+
+  stats  HaveAll          = ByteStats 4 1  0
+  stats  HaveNone         = ByteStats 4 1  0
+  stats (SuggestPiece  _) = ByteStats 5 4  0
+  stats (RejectRequest _) = ByteStats 5 12 0
+  stats (AllowedFast   _) = ByteStats 5 4  0
 
 {-----------------------------------------------------------------------
 --  Extension protocol
@@ -588,7 +651,7 @@ extHandshakeId = 0
 
 -- | Default 'Request' queue size.
 defaultQueueLength :: Int
-defaultQueueLength = 0
+defaultQueueLength = 1
 
 -- | All fields are empty.
 instance Default ExtendedHandshake where
@@ -619,12 +682,16 @@ instance BEncode ExtendedHandshake where
 instance Pretty ExtendedHandshake where
   pretty = PP.text . show
 
+-- | NOTE: Approximated 'stats'.
 instance PeerMessage ExtendedHandshake where
   envelop  c = envelop c . EHandshake
   {-# INLINE envelop #-}
 
   requires _ = Just ExtExtended
   {-# INLINE requires #-}
+
+  stats _ = ByteStats (4 + 1 + 1) 100 {- is it ok? -} 0 -- FIXME
+  {-# INLINE stats #-}
 
 -- | Set default values and the specified 'ExtendedCaps'.
 nullExtendedHandshake :: ExtendedCaps -> ExtendedHandshake
@@ -721,6 +788,7 @@ instance Pretty ExtendedMetadata where
   pretty (MetadataReject  pix  ) = "Reject"  <+> PP.int    pix
   pretty (MetadataUnknown bval ) = "Unknown" <+> ppBEncode bval
 
+-- | NOTE: Approximated 'stats'.
 instance PeerMessage ExtendedMetadata where
   envelop  c = envelop c . EMetadata (remoteMessageId ExtMetadata c)
   {-# INLINE envelop #-}
@@ -728,6 +796,14 @@ instance PeerMessage ExtendedMetadata where
   requires _ = Just ExtExtended
   {-# INLINE requires #-}
 
+  stats (MetadataRequest _) = ByteStats (4 + 1 + 1) {- ~ -} 25 0
+  stats (MetadataData pi t) = ByteStats (4 + 1 + 1) {- ~ -} 41 $
+                              BS.length (Data.pieceData pi)
+  stats (MetadataReject  _) = ByteStats (4 + 1 + 1) {- ~ -} 25 0
+  stats (MetadataUnknown _) = ByteStats (4 + 1 + 1) {- ? -} 0  0
+
+-- | All 'Piece's in 'MetadataData' messages MUST have size equal to
+-- this value. The last trailing piece can be shorter.
 metadataPieceSize :: Int
 metadataPieceSize = 16 * 1024
 
@@ -791,6 +867,10 @@ instance PeerMessage ExtendedMessage where
   requires _ = Just ExtExtended
   {-# INLINE requires #-}
 
+  stats (EHandshake  hs)  = stats hs
+  stats (EMetadata _ msg) = stats msg
+  stats (EUnknown  _ msg) = ByteStats (4 + 1 + 1) (BS.length msg) 0
+
 {-----------------------------------------------------------------------
 -- The message datatype
 -----------------------------------------------------------------------}
@@ -848,6 +928,14 @@ instance PeerMessage Message where
   requires (Port      _) = Just ExtDHT
   requires (Fast      _) = Just ExtFast
   requires (Extended  _) = Just ExtExtended
+
+  stats  KeepAlive    = ByteStats 4 0 0
+  stats (Status    m) = stats m
+  stats (Available m) = stats m
+  stats (Transfer  m) = stats m
+  stats (Port      _) = ByteStats 5 2 0
+  stats (Fast      m) = stats m
+  stats (Extended  m) = stats m
 
 -- | PORT message.
 instance PeerMessage PortNumber where

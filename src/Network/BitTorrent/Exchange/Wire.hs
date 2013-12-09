@@ -33,9 +33,12 @@ module Network.BitTorrent.Exchange.Wire
        , getExtCaps
 
          -- ** Messaging
+       , recvMessage
+       , sendMessage
+
        , validate
        , validateBoth
-       , keepStats
+       , trackStats
 
          -- ** Stats
        , ConnectionStats (..)
@@ -70,12 +73,16 @@ import Text.PrettyPrint.Class
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Message
+import Data.Torrent
+import Data.Torrent.Piece
+import Data.BEncode as BE
 
 -- TODO handle port message?
 -- TODO handle limits?
 -- TODO filter not requested PIECE messages
 -- TODO metadata piece request flood protection
 -- TODO piece request flood protection
+-- TODO protect against flood attacks
 {-----------------------------------------------------------------------
 --  Exceptions
 -----------------------------------------------------------------------}
@@ -130,50 +137,34 @@ isWireFailure _ = return ()
 --  Stats
 -----------------------------------------------------------------------}
 
-type ByteCount = Int
-
-data MessageStats = MessageStats
-  { overhead :: {-# UNPACK #-} !ByteCount
-  , payload  :: {-# UNPACK #-} !ByteCount
+data FlowStats = FlowStats
+  { messageBytes :: {-# UNPACK #-} !ByteStats
+  , messageCount :: {-# UNPACK #-} !Int
+    -- msgTypes :: Map MessageType Int
   } deriving Show
 
-instance Default MessageStats where
-  def = MessageStats 0 0
-
-instance Monoid MessageStats where
-  mempty      = mempty
-  mappend a b = MessageStats
-    { overhead = overhead a + overhead b
-    , payload  = payload  a + payload  b
-    }
-
-
-messageSize :: MessageStats -> Int
-messageSize MessageStats {..} = overhead + payload
-
-messageStats :: Message -> MessageStats
-messageStats = undefined
-
+-- | Note that this is stats is completely different from Progress:
+--   TODO explain why.
 data ConnectionStats = ConnectionStats
-  { incomingFlow  :: !MessageStats
-  , outcomingFlow :: !MessageStats
+  { incomingFlow  :: !ByteStats
+  , outcomingFlow :: !ByteStats
   } deriving Show
 
 instance Default ConnectionStats where
   def = ConnectionStats def def
 
-addStats :: ChannelSide -> MessageStats -> ConnectionStats -> ConnectionStats
+addStats :: ChannelSide -> ByteStats -> ConnectionStats -> ConnectionStats
 addStats ThisPeer   x s = s { outcomingFlow = outcomingFlow s <> x }
 addStats RemotePeer x s = s { incomingFlow  = incomingFlow  s <> x }
 
 recvBytes :: ConnectionStats -> Int
-recvBytes = messageSize . incomingFlow
+recvBytes = byteLength . incomingFlow
 
 sentBytes :: ConnectionStats -> Int
-sentBytes = messageSize . outcomingFlow
+sentBytes = byteLength . outcomingFlow
 
 wastedBytes :: ConnectionStats -> Int
-wastedBytes (ConnectionStats _in out) = overhead _in + overhead out
+wastedBytes (ConnectionStats _in out)  = overhead _in + overhead out
 
 payloadBytes :: ConnectionStats -> Int
 payloadBytes (ConnectionStats _in out) = payload _in + payload out
@@ -184,11 +175,11 @@ payloadBytes (ConnectionStats _in out) = payload _in + payload out
 
 data Connection = Connection
   { connCaps         :: !Caps
-  , connExtCaps      :: !(IORef ExtendedCaps)
   , connTopic        :: !InfoHash
   , connRemotePeerId :: !PeerId
   , connThisPeerId   :: !PeerId
   , connStats        :: !(IORef ConnectionStats)
+  , connExtCaps      :: !(IORef ExtendedCaps)
   }
 
 instance Pretty Connection where
@@ -278,7 +269,7 @@ askStats :: (ConnectionStats -> a) -> Wire a
 askStats f = f <$> getStats
 
 putStats :: ChannelSide -> Message -> Wire ()
-putStats side msg = modifyRef connStats (addStats side (messageStats msg))
+putStats side msg = modifyRef connStats (addStats side (stats msg))
 
 
 getConnection :: Wire Connection
@@ -301,8 +292,8 @@ validateBoth action = do
   action
   validate ThisPeer
 
-keepStats :: Wire ()
-keepStats = do
+trackStats :: Wire ()
+trackStats = do
   mmsg <- await
   case mmsg of
     Nothing  -> return ()
@@ -329,7 +320,7 @@ extendedHandshake caps = do
   sendMessage $ nullExtendedHandshake caps
   msg <- recvMessage
   case msg of
-    Extended (EHandshake ExtendedHandshake {..}) ->
+    Extended (EHandshake ExtendedHandshake {..}) -> do
       setExtCaps $ ehsCaps <> caps
     _ -> protocolError HandshakeRefused
 
@@ -356,10 +347,10 @@ connectWire hs addr extCaps wire =
     statsRef   <- newIORef def
     runWire wire' sock $ Connection
       { connCaps         = caps
-      , connExtCaps      = extCapsRef
       , connTopic        = hsInfoHash hs
       , connRemotePeerId = hsPeerId   hs'
       , connThisPeerId   = hsPeerId   hs
+      , connExtCaps      = extCapsRef
       , connStats        = statsRef
       }
 

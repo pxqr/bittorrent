@@ -2,6 +2,7 @@ module Network.BitTorrent.Exchange.MessageSpec (spec) where
 import Control.Applicative
 import Control.Exception
 import Data.ByteString as BS
+import Data.ByteString.Lazy as BL
 import Data.Default
 import Data.List as L
 import Data.Set as S
@@ -10,9 +11,11 @@ import Data.String
 import Test.Hspec
 import Test.QuickCheck
 
+import Data.Torrent.BitfieldSpec ()
 import Data.Torrent.InfoHashSpec ()
 import Network.BitTorrent.CoreSpec ()
 import Network.BitTorrent.Core
+import Network.BitTorrent.Exchange.BlockSpec ()
 import Network.BitTorrent.Exchange.Message
 
 instance Arbitrary Extension where
@@ -28,6 +31,45 @@ instance Arbitrary Handshake where
   arbitrary = Handshake <$> arbitrary <*> arbitrary
                         <*> arbitrary <*> arbitrary
 
+instance Arbitrary StatusUpdate where
+  arbitrary = frequency
+    [ (1, Choking    <$> arbitrary)
+    , (1, Interested <$> arbitrary)
+    ]
+
+instance Arbitrary Available where
+  arbitrary = frequency
+    [ (1, Have     <$> arbitrary)
+    , (1, Bitfield <$> arbitrary)
+    ]
+
+instance Arbitrary Transfer where
+  arbitrary = frequency
+    [ (1, Request <$> arbitrary)
+    , (1, Piece   <$> arbitrary)
+    , (1, Cancel  <$> arbitrary)
+    ]
+
+instance Arbitrary FastMessage where
+  arbitrary = frequency
+    [ (1, pure HaveAll)
+    , (1, pure HaveNone)
+    , (1, SuggestPiece  <$> arbitrary)
+    , (1, RejectRequest <$> arbitrary)
+    , (1, AllowedFast   <$> arbitrary)
+    ]
+
+instance Arbitrary Message where
+  arbitrary = frequency
+    [ (1, pure KeepAlive)
+    , (1, Status    <$> arbitrary)
+    , (1, Available <$> arbitrary)
+    , (1, Transfer  <$> arbitrary)
+    , (1, Fast      <$> arbitrary)
+    ]
+
+-- TODO test extension protocol
+
 spec :: Spec
 spec = do
   describe "Caps" $ do
@@ -37,6 +79,11 @@ spec = do
     it "preserve items" $ property $ \ extSet ->
       S.fromList (fromCaps (toCaps (S.toList extSet) :: Caps))
         `shouldBe` extSet
+
+  describe "ByteStats" $ do
+    it "preserve size" $ property $ \ msg ->
+      byteLength (stats msg) `shouldBe`
+        fromIntegral (BS.length (S.encode (msg :: Message)))
 
   describe "ProtocolString" $ do
     it "fail to construct invalid string" $ do
