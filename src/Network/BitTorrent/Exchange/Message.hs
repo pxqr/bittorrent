@@ -868,8 +868,8 @@ getMetadata len
   where
     parseError reason = "unable to parse metadata message: " ++ reason
 
-    parseRes (BS.Fail _ _ _) = fail $ parseError "bdict: possible corrupted"
-    parseRes (BS.Partial _)  = fail $ parseError "bdict: not enough bytes"
+    parseRes (BS.Fail _ _ m) = fail $ parseError $ "bdict: " ++ m
+    parseRes (BS.Partial _)  = fail $ parseError   "bdict: not enough bytes"
     parseRes (BS.Done piece bvalueBS)
       | BS.length piece > metadataPieceSize
       = fail "infodict piece: size exceeded limit"
