@@ -180,9 +180,9 @@ instance Default Caps where
   def = Caps 0
   {-# INLINE def #-}
 
--- | Monoid under intersection.
+-- | Monoid under intersection. 'mempty' includes all known extensions.
 instance Monoid Caps where
-  mempty  = Caps (-1)
+  mempty = toCaps [minBound .. maxBound]
   {-# INLINE mempty #-}
 
   mappend (Caps a) (Caps b) = Caps (a .&. b)
@@ -578,7 +578,7 @@ instance Default ExtendedCaps where
 
 -- | Monoid under intersection:
 --
---     * The 'mempty' caps include all known extensions;
+--     * The 'mempty' caps includes all known extensions;
 --
 --     * the 'mappend' operation is NOT commutative: it return message
 -- id from the first caps for the extensions existing in both caps.
