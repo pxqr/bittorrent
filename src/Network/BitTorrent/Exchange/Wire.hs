@@ -47,11 +47,6 @@ module Network.BitTorrent.Exchange.Wire
        , getConnection
        , getExtCaps
        , getStats
-
-         -- ** Conduits
-       , validate
-       , validateBoth
-       , trackStats
        ) where
 
 import Control.Applicative
@@ -59,7 +54,8 @@ import Control.Exception
 import Control.Monad.Reader
 import Data.ByteString as BS
 import Data.Conduit
-import Data.Conduit.Cereal as S
+import Data.Conduit.Cereal
+import Data.Conduit.List
 import Data.Conduit.Network
 import Data.Default
 import Data.IORef
@@ -185,21 +181,33 @@ instance Pretty WireFailure where
 isWireFailure :: Monad m => WireFailure -> m ()
 isWireFailure _ = return ()
 
+protocolError :: MonadThrow m => ProtocolError -> m a
+protocolError = monadThrow . ProtocolError
+
+-- | Forcefully terminate wire session and close socket.
+disconnectPeer :: Wire a
+disconnectPeer = monadThrow DisconnectPeer
+
 {-----------------------------------------------------------------------
 --  Stats
 -----------------------------------------------------------------------}
 
 -- | Message stats in one direction.
 data FlowStats = FlowStats
-  { -- | Sum of byte sequences of all messages.
-    messageBytes :: {-# UNPACK #-} !ByteStats
-    -- | Number of the messages sent or received.
-  , messageCount :: {-# UNPACK #-} !Int
+  { -- | Number of the messages sent or received.
+    messageCount :: {-# UNPACK #-} !Int
+    -- | Sum of byte sequences of all messages.
+  , messageBytes :: {-# UNPACK #-} !ByteStats
   } deriving Show
+
+instance Pretty FlowStats where
+  pretty FlowStats {..} =
+    PP.int messageCount <+> "messages" $+$
+    pretty messageBytes
 
 -- | Zeroed stats.
 instance Default FlowStats where
-  def = FlowStats def 0
+  def = FlowStats 0 def
 
 -- | Monoid under addition.
 instance Monoid FlowStats where
@@ -216,6 +224,14 @@ addFlowStats x FlowStats {..} = FlowStats
   , messageCount = succ messageCount
   }
 
+-- | Find average length of byte sequences per message.
+avgByteStats :: FlowStats -> ByteStats
+avgByteStats (FlowStats n ByteStats {..}) = ByteStats
+  { overhead = overhead `quot` n
+  , control  = control  `quot` n
+  , payload  = payload  `quot` n
+  }
+
 -- | Message stats in both directions. This data can be retrieved
 -- using 'getStats' function.
 --
@@ -230,6 +246,13 @@ data ConnectionStats = ConnectionStats
     -- | Sent messages stats.
   , outcomingFlow :: !FlowStats
   } deriving Show
+
+instance Pretty ConnectionStats where
+  pretty ConnectionStats {..} = vcat
+    [ "Recv:" <+> pretty incomingFlow
+    , "Sent:" <+> pretty outcomingFlow
+    , "Both:" <+> pretty (incomingFlow <> outcomingFlow)
+    ]
 
 -- | Zeroed stats.
 instance Default ConnectionStats where
@@ -337,86 +360,83 @@ connectToPeer p = do
 -----------------------------------------------------------------------}
 
 -- | do not expose this so we can change it without breaking api
-type Connectivity = ReaderT Connection
+type Connected = ReaderT Connection
 
 -- | A duplex channel connected to a remote peer which keep tracks
 -- connection parameters.
-type Wire a = ConduitM Message Message (Connectivity IO) a
+type Wire a = ConduitM Message Message (Connected IO) a
 
-protocolError :: ProtocolError -> Wire a
-protocolError = monadThrow . ProtocolError
+{-----------------------------------------------------------------------
+--  Query
+-----------------------------------------------------------------------}
 
--- | Forcefully terminate wire session and close socket.
-disconnectPeer :: Wire a
-disconnectPeer = monadThrow DisconnectPeer
-
-readRef :: (Connection -> IORef a) -> Wire a
+readRef :: (Connection -> IORef a) -> Connected IO a
 readRef f = do
-  ref <- lift (asks f)
+  ref <- asks f
   liftIO (readIORef ref)
 
-writeRef :: (Connection -> IORef a) -> a -> Wire ()
+writeRef :: (Connection -> IORef a) -> a -> Connected IO ()
 writeRef f v = do
-  ref <- lift (asks f)
+  ref <- asks f
   liftIO (writeIORef ref v)
 
-modifyRef :: (Connection -> IORef a) -> (a -> a) -> Wire ()
+modifyRef :: (Connection -> IORef a) -> (a -> a) -> Connected IO ()
 modifyRef f m = do
-  ref <- lift (asks f)
+  ref <- asks f
   liftIO (atomicModifyIORef' ref (\x -> (m x, ())))
 
 setExtCaps :: ExtendedCaps -> Wire ()
-setExtCaps = writeRef connExtCaps
+setExtCaps = lift . writeRef connExtCaps
 
 -- | Get current extended capabilities. Note that this value can
 -- change in current session if either this or remote peer will
 -- initiate rehandshaking.
 getExtCaps :: Wire ExtendedCaps
-getExtCaps = readRef connExtCaps
+getExtCaps = lift $ readRef connExtCaps
 
 -- | Get current stats. Note that this value will change with the next
 -- sent or received message.
 getStats :: Wire ConnectionStats
-getStats = readRef connStats
-
-putStats :: ChannelSide -> Message -> Wire ()
-putStats side msg = modifyRef connStats (addStats side (stats msg))
+getStats = lift $ readRef connStats
 
 -- | See the 'Connection' section for more info.
 getConnection :: Wire Connection
 getConnection = lift ask
 
-validate :: ChannelSide -> Wire ()
-validate side = await >>= maybe (return ()) yieldCheck
-  where
-    yieldCheck msg = do
-      caps <- lift $ asks connCaps
-      case requires msg of
-        Nothing  -> return ()
-        Just ext
-          | ext `allowed` caps -> yield msg
-          |     otherwise      -> protocolError $ DisallowedMessage side ext
+{-----------------------------------------------------------------------
+--  Wrapper
+-----------------------------------------------------------------------}
 
-validateBoth :: Wire () -> Wire ()
-validateBoth action = do
-  validate RemotePeer
-  action
-  validate ThisPeer
+putStats :: ChannelSide -> Message -> Connected IO ()
+putStats side msg = modifyRef connStats (addStats side (stats msg))
 
-trackStats :: Wire ()
-trackStats = do
-  mmsg <- await
-  case mmsg of
+validate :: ChannelSide -> Message -> Connected IO ()
+validate side msg = do
+  caps <- asks connCaps
+  case requires msg of
     Nothing  -> return ()
-    Just msg -> putStats ThisPeer msg -- FIXME not really ThisPeer
+    Just ext
+      | ext `allowed` caps -> return ()
+      |     otherwise      -> protocolError $ DisallowedMessage side ext
+
+trackFlow :: ChannelSide -> Wire ()
+trackFlow side = iterM $ do
+  validate side
+  putStats side
+
+{-----------------------------------------------------------------------
+--  Setup
+-----------------------------------------------------------------------}
 
 -- | Normally you should use 'connectWire' or 'acceptWire'.
 runWire :: Wire () -> Socket -> Connection -> IO ()
 runWire action sock = runReaderT $
-  sourceSocket sock     $=
-    S.conduitGet S.get  $=
-      action            $=
-    S.conduitPut S.put  $$
+  sourceSocket sock        $=
+    conduitGet get         $=
+      trackFlow RemotePeer $=
+         action            $=
+      trackFlow ThisPeer   $=
+    conduitPut put         $$
   sinkSocket sock
 
 -- | This function will block until a peer send new message. You can
@@ -475,7 +495,11 @@ connectWire hs addr extCaps wire =
                 else wire
 
     extCapsRef <- newIORef def
-    statsRef   <- newIORef def
+    statsRef   <- newIORef ConnectionStats
+      { outcomingFlow = FlowStats 1 $ handshakeStats hs
+      , incomingFlow  = FlowStats 1 $ handshakeStats hs'
+      }
+
     runWire wire' sock $ Connection
       { connProtocol     = hsProtocol hs
       , connCaps         = caps

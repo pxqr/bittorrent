@@ -45,6 +45,7 @@ module Network.BitTorrent.Exchange.Message
        , defaultHandshake
        , handshakeSize
        , handshakeMaxSize
+       , handshakeStats
 
          -- * Stats
        , ByteCount
@@ -296,6 +297,10 @@ handshakeMaxSize = handshakeSize maxProtocolNameSize
 defaultHandshake :: InfoHash -> PeerId -> Handshake
 defaultHandshake = Handshake def def
 
+handshakeStats :: Handshake -> ByteStats
+handshakeStats (Handshake (ProtocolName bs) _ _ _)
+  = ByteStats 1 (BS.length bs + 8 + 20 + 20) 0
+
 {-----------------------------------------------------------------------
 --  Stats
 -----------------------------------------------------------------------}
@@ -319,6 +324,16 @@ data ByteStats = ByteStats
     -- metadata.
   , payload  :: {-# UNPACK #-} !ByteCount
   } deriving Show
+
+instance Pretty ByteStats where
+  pretty s @ ByteStats {..} = fsep
+    [ PP.int overhead, "overhead"
+    , PP.int control,  "control"
+    , PP.int payload,  "payload"
+    , "bytes"
+    ] $+$ fsep
+    [ PP.int (byteLength s), "total bytes"
+    ]
 
 -- | Empty byte sequences.
 instance Default ByteStats where
