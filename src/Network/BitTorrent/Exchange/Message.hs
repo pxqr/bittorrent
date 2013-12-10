@@ -54,6 +54,7 @@ module Network.BitTorrent.Exchange.Message
 
          -- * Messages
        , Message        (..)
+       , defaultKeepAliveTimeout
        , defaultKeepAliveInterval
        , PeerMessage    (..)
 
@@ -982,9 +983,15 @@ instance PeerMessage PortNumber where
   requires _ = Just ExtDHT
   {-# INLINE requires #-}
 
--- | In seconds.
+-- | How long /this/ peer should wait before dropping connection, in
+-- seconds.
+defaultKeepAliveTimeout :: Int
+defaultKeepAliveTimeout = 2 * 60
+
+-- | How often /this/ peer should send 'KeepAlive' messages, in
+-- seconds.
 defaultKeepAliveInterval :: Int
-defaultKeepAliveInterval = 2 * 60
+defaultKeepAliveInterval = 60
 
 getInt :: S.Get Int
 getInt = fromIntegral <$> S.getWord32be
