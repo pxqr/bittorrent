@@ -474,7 +474,7 @@ instance PeerMessage Transfer where
   {-# INLINE envelop #-}
 
   stats (Request _  ) = ByteStats (4 + 1) (3 * 4) 0
-  stats (Piece   pi ) = ByteStats (4 + 1) (4 + 4 + blockSize pi) 0
+  stats (Piece   p  ) = ByteStats (4 + 1) (4 + 4 + blockSize p) 0
   stats (Cancel  _  ) = ByteStats (4 + 1) (3 * 4) 0
 
 {-----------------------------------------------------------------------
@@ -801,7 +801,7 @@ instance BEncode ExtendedMetadata where
 -- | Piece data bytes are omitted.
 instance Pretty ExtendedMetadata where
   pretty (MetadataRequest pix  ) = "Request" <+> PP.int    pix
-  pretty (MetadataData    pi  t) = "Data"    <+>    pretty pi  <+> PP.int t
+  pretty (MetadataData    p   t) = "Data"    <+>    pretty p   <+> PP.int t
   pretty (MetadataReject  pix  ) = "Reject"  <+> PP.int    pix
   pretty (MetadataUnknown bval ) = "Unknown" <+> ppBEncode bval
 
@@ -814,8 +814,8 @@ instance PeerMessage ExtendedMetadata where
   {-# INLINE requires #-}
 
   stats (MetadataRequest _) = ByteStats (4 + 1 + 1) {- ~ -} 25 0
-  stats (MetadataData pi t) = ByteStats (4 + 1 + 1) {- ~ -} 41 $
-                              BS.length (Data.pieceData pi)
+  stats (MetadataData p  _) = ByteStats (4 + 1 + 1) {- ~ -} 41 $
+                              BS.length (Data.pieceData p)
   stats (MetadataReject  _) = ByteStats (4 + 1 + 1) {- ~ -} 25 0
   stats (MetadataUnknown _) = ByteStats (4 + 1 + 1) {- ? -} 0  0
 
@@ -868,7 +868,7 @@ getMetadata len
     parseError reason = "unable to parse metadata message: " ++ reason
 
     parseRes (BS.Fail _ _ _) = fail $ parseError "bdict: possible corrupted"
-    parseRes (BS.Partial c)  = fail $ parseError "bdict: not enough bytes"
+    parseRes (BS.Partial _)  = fail $ parseError "bdict: not enough bytes"
     parseRes (BS.Done piece bvalueBS)
       | BS.length piece > metadataPieceSize
       = fail "infodict piece: size exceeded limit"
@@ -1157,6 +1157,6 @@ putExt mid lbs = do
 -- NOTE: in contrast to getExtendedMessage this function put length
 -- and message id too!
 putExtendedMessage :: Putter ExtendedMessage
-putExtendedMessage (EHandshake hs)     = putExt extHandshakeId (BE.encode hs)
-putExtendedMessage (EMetadata mid msg) = putExt mid (BE.encode msg)
-putExtendedMessage (EUnknown  mid  bs) = putExt mid (BL.fromStrict bs)
+putExtendedMessage (EHandshake hs)     = putExt extHandshakeId $ BE.encode hs
+putExtendedMessage (EMetadata mid msg) = putExt mid $ putMetadata msg
+putExtendedMessage (EUnknown  mid  bs) = putExt mid $ BL.fromStrict bs
