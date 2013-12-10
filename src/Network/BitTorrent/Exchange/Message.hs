@@ -84,6 +84,7 @@ module Network.BitTorrent.Exchange.Message
 
 import Control.Applicative
 import Control.Arrow ((&&&), (***))
+import Control.Monad (when)
 import Data.Attoparsec.ByteString.Char8 as BS
 import Data.BEncode as BE
 import Data.BEncode.BDict as BE
@@ -642,7 +643,7 @@ data ExtendedHandshake = ExtendedHandshake
   , ehsCaps        :: ExtendedCaps
 
     -- | Size of 'Data.Torrent.InfoDict' in bytes. This field should
-    -- be added if ExtMetadata is enabled in current session /and/
+    -- be added if 'ExtMetadata' is enabled in current session /and/
     -- peer have the torrent file.
   , ehsMetadataSize :: Maybe Int
 
@@ -757,7 +758,8 @@ data ExtendedMetadata
     --   factor.
   | MetadataReject  PieceIx
 
-    -- | Reserved.
+    -- | Reserved. By specification we should ignore unknown metadata
+    -- messages.
   | MetadataUnknown BValue
     deriving (Show, Eq, Typeable)
 
@@ -839,20 +841,40 @@ getMetadataPayload :: ExtendedMetadata -> Maybe BS.ByteString
 getMetadataPayload (MetadataData (Data.Piece _ bs) _) = Just bs
 getMetadataPayload _                                  = Nothing
 
+-- | Metadata BDict usually contain only 'msg_type_key', 'piece_key'
+-- and 'total_size_key' fields so it normally should take less than
+-- 100 bytes. This limit is two order of magnitude larger to be
+-- permissive to 'MetadataUnknown' messages.
+--
+--   See 'maxMessageSize' for further explanation.
+--
+maxMetadataBDictSize :: Int
+maxMetadataBDictSize = 16 * 1024
+
+maxMetadataSize :: Int
+maxMetadataSize = maxMetadataBDictSize + metadataPieceSize
+
 -- to make MetadataData constructor fields a little bit prettier we
 -- cheat here: first we read empty 'pieceData' from bdict, but then we
 -- fill that field with the actual piece data — trailing bytes of
 -- the message
 getMetadata :: Int -> S.Get ExtendedMetadata
-getMetadata len = do
-  bs <- getByteString len
-  case BS.parse BE.parser bs of
-    BS.Fail _ _ _ -> fail "unable to parse metadata bdict: possible corrupted"
-    BS.Partial c  -> fail "unable to parse metadata bdict: not enough bytes"
-    BS.Done piece bvalueBS -> do
-      let msg = "metadata dictionary is invalid"
-      metadata <- either (fail msg) pure $ fromBEncode bvalueBS
-      pure $ setMetadataPayload piece metadata
+getMetadata len
+    | len > maxMetadataSize = fail $ parseError "size exceeded limit"
+    | otherwise = do
+      bs <- getByteString len
+      parseRes $ BS.parse BE.parser bs
+  where
+    parseError reason = "unable to parse metadata message: " ++ reason
+
+    parseRes (BS.Fail _ _ _) = fail $ parseError "bdict: possible corrupted"
+    parseRes (BS.Partial c)  = fail $ parseError "bdict: not enough bytes"
+    parseRes (BS.Done piece bvalueBS)
+      | BS.length piece > metadataPieceSize
+      = fail "infodict piece: size exceeded limit"
+      | otherwise = do
+        metadata <- either (fail . parseError) pure $ fromBEncode bvalueBS
+        return $ setMetadataPayload piece metadata
 
 putMetadata :: ExtendedMetadata -> BL.ByteString
 putMetadata msg
@@ -972,9 +994,48 @@ putInt :: S.Putter Int
 putInt = S.putWord32be . fromIntegral
 {-# INLINE putInt #-}
 
+-- | This limit should protect against "out-of-memory" attacks: if a
+-- malicious peer have sent a long varlength message then receiver can
+-- accumulate too long bytestring in the 'Get'.
+--
+--   Normal messages should never exceed this limits.
+--
+--   See also 'maxBitfieldSize', 'maxBlockSize' limits.
+--
+maxMessageSize :: Int
+maxMessageSize = 20 + 1024 * 1024
+
+-- | This also limit max torrent size to:
+--
+--     max_bitfield_size * piece_ix_per_byte * max_piece_size =
+--     2 ^ 20 * 8 * 1MB =
+--     8TB
+--
+maxBitfieldSize :: Int
+maxBitfieldSize = 1024 * 1024
+
+getBitfield :: Int -> S.Get Bitfield
+getBitfield len
+  | len > maxBitfieldSize = fail "BITFIELD message size exceeded limit"
+  |       otherwise       = fromBitmap <$> getByteString len
+
+maxBlockSize :: Int
+maxBlockSize = 4 * defaultTransferSize
+
+getBlock :: Int -> S.Get (Block BL.ByteString)
+getBlock len
+  | len > maxBlockSize = fail "BLOCK message size exceeded limit"
+  | otherwise = Block <$> getInt <*> getInt
+                      <*> getLazyByteString (fromIntegral len)
+{-# INLINE getBlock #-}
+
 instance Serialize Message where
   get = do
     len <- getInt
+
+    when (len > maxMessageSize) $ do
+      fail "message body size exceeded the limit"
+
     if len == 0 then return KeepAlive
       else do
         mid <- S.getWord8
@@ -983,12 +1044,11 @@ instance Serialize Message where
           0x01 -> return $ Status (Choking False)
           0x02 -> return $ Status (Interested True)
           0x03 -> return $ Status (Interested False)
-          0x04 -> (Available . Have)    <$> getInt
-          0x05 -> (Available . Bitfield . fromBitmap)
-                                      <$> S.getByteString (pred len)
-          0x06 -> (Transfer . Request) <$> S.get
-          0x07 -> (Transfer . Piece)   <$> getBlock (len - 9)
-          0x08 -> (Transfer . Cancel)  <$> S.get
+          0x04 -> (Available . Have)     <$> getInt
+          0x05 -> (Available . Bitfield) <$> getBitfield (pred len)
+          0x06 -> (Transfer  . Request)  <$> S.get
+          0x07 -> (Transfer  . Piece)    <$> getBlock (len - 9)
+          0x08 -> (Transfer  . Cancel)   <$> S.get
           0x09 -> Port <$> S.get
           0x0D -> (Fast . SuggestPiece) <$> getInt
           0x0E -> return $ Fast HaveAll
@@ -1000,12 +1060,6 @@ instance Serialize Message where
             rm <- S.remaining >>= S.getBytes
             fail $ "unknown message ID: " ++ show mid ++ "\n"
                 ++ "remaining available bytes: " ++ show rm
-
-    where
-      getBlock :: Int -> S.Get (Block BL.ByteString)
-      getBlock len = Block <$> getInt <*> getInt
-                           <*> S.getLazyByteString (fromIntegral len)
-      {-# INLINE getBlock #-}
 
   put  KeepAlive      = putInt 0
   put (Status    msg) = putStatus    msg
@@ -1061,10 +1115,24 @@ putFast (SuggestPiece pix) = putInt 5  >> putWord8 0x0D >> putInt pix
 putFast (RejectRequest i ) = putInt 13 >> putWord8 0x10 >> put i
 putFast (AllowedFast   i ) = putInt 5  >> putWord8 0x11 >> putInt i
 
+maxEHandshakeSize :: Int
+maxEHandshakeSize = 16 * 1024
+
 getExtendedHandshake :: Int -> S.Get ExtendedHandshake
-getExtendedHandshake messageSize = do
-  bs <- getByteString messageSize
-  either fail pure $ BE.decode bs
+getExtendedHandshake messageSize
+  | messageSize > maxEHandshakeSize
+  = fail "extended handshake size exceeded limit"
+  | otherwise = do
+    bs <- getByteString messageSize
+    either fail pure $ BE.decode bs
+
+maxEUnknownSize :: Int
+maxEUnknownSize = 64 * 1024
+
+getExtendedUnknown :: Int -> S.Get BS.ByteString
+getExtendedUnknown len
+  | len > maxEUnknownSize = fail "unknown extended message size exceeded limit"
+  |        otherwise      = getByteString len
 
 getExtendedMessage :: Int -> S.Get ExtendedMessage
 getExtendedMessage messageSize = do
@@ -1073,8 +1141,9 @@ getExtendedMessage messageSize = do
   case msgId of
     0 -> EHandshake      <$> getExtendedHandshake msgBodySize
     1 -> EMetadata msgId <$> getMetadata          msgBodySize
-    _ -> EUnknown  msgId <$> getByteString        msgBodySize
+    _ -> EUnknown  msgId <$> getExtendedUnknown   msgBodySize
 
+-- | By spec.
 extendedMessageId :: MessageId
 extendedMessageId = 20
 
