@@ -29,6 +29,9 @@ module Network.BitTorrent.Exchange.Wire
          -- ** Flood detection
        , FloodDetector   (..)
 
+         -- ** Options
+       , Options         (..)
+
          -- ** Connection
        , Connection
        , connProtocol
@@ -36,6 +39,7 @@ module Network.BitTorrent.Exchange.Wire
        , connTopic
        , connRemotePeerId
        , connThisPeerId
+       , connOptions
 
          -- ** Setup
        , runWire
@@ -136,7 +140,7 @@ data ProtocolError
     -- | 'Network.BitTorrent.Exchange.Message.Bitfield' message MUST
     -- be send either once or zero times, but either this peer or
     -- remote peer send a bitfield message the second time.
-  | BitfieldAlreadySend ChannelSide
+  | BitfieldAlreadySent ChannelSide
 
     -- | Capabilities violation. For example this exception can occur
     -- when a peer have sent 'Port' message but 'ExtDHT' is not
@@ -331,20 +335,81 @@ data FloodDetector = FloodDetector
   , floodThreshold :: {-# UNPACK #-} !Int
 
     -- | Flood predicate on the /current/ 'ConnectionStats'.
-  , floodDetector  :: Detector ConnectionStats
+  , floodPredicate :: Detector ConnectionStats
   } deriving Show
 
-
+-- | Flood detector with very permissive options.
 instance Default FloodDetector where
   def = FloodDetector
     { floodFactor    = defaultFloodFactor
     , floodThreshold = defaultFloodThreshold
-    , floodDetector  = defaultDetector
+    , floodPredicate = defaultDetector
     }
 
 -- | This peer might drop connection if the detector gives positive answer.
 runDetector :: FloodDetector -> ConnectionStats -> Bool
-runDetector FloodDetector {..} = floodDetector floodFactor floodThreshold
+runDetector FloodDetector {..} = floodPredicate floodFactor floodThreshold
+
+{-----------------------------------------------------------------------
+--  Options
+-----------------------------------------------------------------------}
+
+-- | Various connection settings and limits.
+data Options = Options
+  { -- | How often /this/ peer should send 'KeepAlive' messages.
+    keepaliveInterval   :: {-# UNPACK #-} !Int
+
+    -- | /This/ peer will drop connection if a /remote/ peer did not
+    -- send any message for this period of time.
+  , keepaliveTimeout    :: {-# UNPACK #-} !Int
+
+    -- | Used to protect against flood attacks.
+  , floodDetector       :: FloodDetector
+
+    -- | Used to protect against flood attacks in /metadata
+    -- exchange/. Normally, a requesting peer should request each
+    -- 'InfoDict' piece only one time, but a malicious peer can
+    -- saturate wire with 'MetadataRequest' messages thus flooding
+    -- responding peer.
+    --
+    --   This value set upper bound for number of 'MetadataRequests'
+    --   for each piece.
+    --
+  , metadataFactor      :: {-# UNPACK #-} !Int
+
+    -- | Used to protect against out-of-memory attacks: malicious peer
+    -- can claim that 'totalSize' is, say, 100TB and send some random
+    -- data instead of infodict pieces. Since requesting peer unable
+    -- to check not completed infodict via the infohash, the
+    -- accumulated pieces will allocate the all available memory.
+    --
+    --   This limit set upper bound for 'InfoDict' size. See
+    --   'ExtendedMetadata' for more info.
+    --
+  , maxInfoDictSize     :: {-# UNPACK #-} !Int
+  } deriving Show
+
+-- | Allows a requesting peer to send 2 'MetadataRequest's for the
+-- each piece.
+defaultMetadataFactor :: Int
+defaultMetadataFactor = 2
+
+-- | Usually torrent size do not exceed 1MB. This value limit torrent
+-- /content/ size to about 8TB. See 'maxInfoDictSize' for explanation
+-- why do we need this limit.
+defaultMaxInfoDictSize :: Int
+defaultMaxInfoDictSize = 10 * 1024 * 1024
+
+-- | Permissive default parameters, most likely you don't need to
+-- change them.
+instance Default Options where
+  def = Options
+    { keepaliveInterval = defaultKeepAliveInterval
+    , keepaliveTimeout  = defaultKeepAliveTimeout
+    , floodDetector     = def
+    , metadataFactor    = defaultMetadataFactor
+    , maxInfoDictSize   = defaultMaxInfoDictSize
+    }
 
 {-----------------------------------------------------------------------
 --  Connection
@@ -371,6 +436,9 @@ data Connection = Connection
 
     -- | Typically extracted from handshake.
   , connThisPeerId   :: !PeerId
+
+    -- |
+  , connOptions      :: !Options
 
     -- | If @not (allowed ExtExtended connCaps)@ then this set is
     -- always empty. Otherwise it has extension protocol 'MessageId'
@@ -581,6 +649,7 @@ connectWire hs addr extCaps wire =
       , connTopic        = hsInfoHash hs
       , connRemotePeerId = hsPeerId   hs'
       , connThisPeerId   = hsPeerId   hs
+      , connOptions      = def
       , connExtCaps      = extCapsRef
       , connStats        = statsRef
       }
