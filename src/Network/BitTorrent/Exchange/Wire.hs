@@ -26,6 +26,9 @@ module Network.BitTorrent.Exchange.Wire
        , FlowStats       (..)
        , ConnectionStats (..)
 
+         -- ** Flood detection
+       , FloodDetector   (..)
+
          -- ** Connection
        , Connection
        , connProtocol
@@ -68,6 +71,7 @@ import Network.Socket
 import Network.Socket.ByteString as BS
 import Text.PrettyPrint as PP hiding (($$), (<>))
 import Text.PrettyPrint.Class
+import Text.Show.Functions
 
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
@@ -170,6 +174,10 @@ data WireFailure
 
     -- | See 'ProtocolError' for more details.
   | ProtocolError ProtocolError
+
+    -- | A possible malicious peer have sent too many control messages
+    -- without making any progress.
+  | FloodDetected ConnectionStats
     deriving (Show, Typeable)
 
 instance Exception WireFailure
@@ -270,6 +278,73 @@ instance Monoid ConnectionStats where
 addStats :: ChannelSide -> ByteStats -> ConnectionStats -> ConnectionStats
 addStats ThisPeer   x s = s { outcomingFlow = addFlowStats x (outcomingFlow s) }
 addStats RemotePeer x s = s { incomingFlow  = addFlowStats x (incomingFlow  s) }
+
+-- | Sum of overhead and control bytes in both directions.
+wastedBytes :: ConnectionStats -> Int
+wastedBytes ConnectionStats {..} = overhead + control
+  where
+    FlowStats _ ByteStats {..} = incomingFlow <> outcomingFlow
+
+-- | Sum of payload bytes in both directions.
+payloadBytes :: ConnectionStats -> Int
+payloadBytes ConnectionStats {..} =
+  payload (messageBytes (incomingFlow <> outcomingFlow))
+
+-- | Sum of any bytes in both directions.
+transmittedBytes :: ConnectionStats -> Int
+transmittedBytes ConnectionStats {..} =
+  byteLength (messageBytes (incomingFlow <> outcomingFlow))
+
+{-----------------------------------------------------------------------
+--  Flood protection
+-----------------------------------------------------------------------}
+
+defaultFloodFactor :: Int
+defaultFloodFactor = 1
+
+-- | This is a very permissive value, connection setup usually takes
+-- around 10-100KB, including both directions.
+defaultFloodThreshold :: Int
+defaultFloodThreshold = 2 * 1024 * 1024
+
+-- | A flood detection function.
+type Detector stats = Int   -- ^ Factor;
+                   -> Int   -- ^ Threshold;
+                   -> stats -- ^ Stats to analyse;
+                   -> Bool  -- ^ Is this a flooded connection?
+
+defaultDetector :: Detector ConnectionStats
+defaultDetector factor threshold s =
+  transmittedBytes s     > threshold &&
+  factor * wastedBytes s > payloadBytes s
+
+-- | Flood detection is used to protect /this/ peer against a /remote/
+-- malicious peer sending meaningless control messages.
+data FloodDetector = FloodDetector
+  { -- | Max ratio of payload bytes to control bytes.
+    floodFactor    :: {-# UNPACK #-} !Int
+
+    -- | Max count of bytes connection /setup/ can take including
+    -- 'Handshake', 'ExtendedHandshake', 'Bitfield', 'Have' and 'Port'
+    -- messages. This value is used to avoid false positives at the
+    -- connection initialization.
+  , floodThreshold :: {-# UNPACK #-} !Int
+
+    -- | Flood predicate on the /current/ 'ConnectionStats'.
+  , floodDetector  :: Detector ConnectionStats
+  } deriving Show
+
+
+instance Default FloodDetector where
+  def = FloodDetector
+    { floodFactor    = defaultFloodFactor
+    , floodThreshold = defaultFloodThreshold
+    , floodDetector  = defaultDetector
+    }
+
+-- | This peer might drop connection if the detector gives positive answer.
+runDetector :: FloodDetector -> ConnectionStats -> Bool
+runDetector FloodDetector {..} = floodDetector floodFactor floodThreshold
 
 {-----------------------------------------------------------------------
 --  Connection
