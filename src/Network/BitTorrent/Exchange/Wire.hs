@@ -677,7 +677,7 @@ connectWire hs addr extCaps wire =
 
 -- | Accept 'Wire' connection using already 'Network.Socket.accept'ed
 --   socket. For peer listener loop the 'acceptSafe' should be
---   prefered against 'accept'. The socket will be close at exit.
+--   prefered against 'accept'. The socket will be closed at exit.
 --
 --   This function can throw 'WireFailure' exception.
 --
