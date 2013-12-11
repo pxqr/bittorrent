@@ -18,6 +18,7 @@ module Network.BitTorrent.Exchange.Wire
        , ChannelSide   (..)
        , ProtocolError (..)
        , WireFailure   (..)
+       , peerPenalty
        , isWireFailure
        , disconnectPeer
 
@@ -158,6 +159,16 @@ data ProtocolError
 instance Pretty ProtocolError where
   pretty = PP.text . show
 
+errorPenalty :: ProtocolError -> Int
+errorPenalty (InvalidProtocol      _) = 1
+errorPenalty (UnexpectedProtocol   _) = 1
+errorPenalty (UnexpectedTopic      _) = 1
+errorPenalty (UnexpectedPeerId     _) = 1
+errorPenalty (UnknownTopic         _) = 0
+errorPenalty (HandshakeRefused      ) = 1
+errorPenalty (BitfieldAlreadySent  _) = 1
+errorPenalty (DisallowedMessage  _ _) = 1
+
 -- | Exceptions used to interrupt the current P2P session.
 data WireFailure
     -- | Force termination of wire connection.
@@ -188,6 +199,16 @@ instance Exception WireFailure
 
 instance Pretty WireFailure where
   pretty = PP.text . show
+
+-- TODO
+-- data Penalty = Ban | Penalty Int
+
+peerPenalty :: WireFailure -> Int
+peerPenalty  DisconnectPeer   = 0
+peerPenalty  PeerDisconnected = 0
+peerPenalty (DecodingError _) = 1
+peerPenalty (ProtocolError e) = errorPenalty e
+peerPenalty (FloodDetected _) = 1
 
 -- | Do nothing with exception, used with 'handle' or 'try'.
 isWireFailure :: Monad m => WireFailure -> m ()
