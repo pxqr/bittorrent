@@ -35,6 +35,7 @@ import Control.Applicative
 import Data.Aeson.TH
 import Data.ByteString.Lazy as BL
 import Data.Char
+import Data.Default
 import Data.List as L
 import Data.Serialize as S
 import Data.Typeable
@@ -86,6 +87,10 @@ data BlockIx = BlockIx {
   } deriving (Show, Eq, Typeable)
 
 $(deriveJSON omitRecordPrefix ''BlockIx)
+
+-- | First block in torrent. Useful for debugging.
+instance Default BlockIx where
+  def = BlockIx 0 0 defaultTransferSize
 
 getInt :: S.Get Int
 getInt = fromIntegral <$> S.getWord32be
