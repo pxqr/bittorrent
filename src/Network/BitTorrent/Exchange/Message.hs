@@ -81,6 +81,8 @@ module Network.BitTorrent.Exchange.Message
          -- *** Metadata
        , ExtendedMetadata  (..)
        , metadataPieceSize
+       , defaultMetadataFactor
+       , defaultMaxInfoDictSize
        ) where
 
 import Control.Applicative
@@ -881,6 +883,22 @@ putMetadata :: ExtendedMetadata -> BL.ByteString
 putMetadata msg
   | Just bs <- getMetadataPayload msg = BE.encode msg <> BL.fromStrict bs
   |              otherwise            = BE.encode msg
+
+-- | Allows a requesting peer to send 2 'MetadataRequest's for the
+--   each piece.
+--
+--   See 'Network.BitTorrent.Wire.Options.metadataFactor' for
+--   explanation why do we need this limit.
+defaultMetadataFactor :: Int
+defaultMetadataFactor = 2
+
+-- | Usually torrent size do not exceed 1MB. This value limit torrent
+--   /content/ size to about 8TB.
+--
+--   See 'Network.BitTorrent.Wire.Options.maxInfoDictSize' for
+--   explanation why do we need this limit.
+defaultMaxInfoDictSize :: Int
+defaultMaxInfoDictSize = 10 * 1024 * 1024
 
 {-----------------------------------------------------------------------
 --  Extension protocol messages

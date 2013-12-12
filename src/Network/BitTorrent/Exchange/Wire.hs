@@ -410,17 +410,6 @@ data Options = Options
   , maxInfoDictSize     :: {-# UNPACK #-} !Int
   } deriving Show
 
--- | Allows a requesting peer to send 2 'MetadataRequest's for the
--- each piece.
-defaultMetadataFactor :: Int
-defaultMetadataFactor = 2
-
--- | Usually torrent size do not exceed 1MB. This value limit torrent
--- /content/ size to about 8TB. See 'maxInfoDictSize' for explanation
--- why do we need this limit.
-defaultMaxInfoDictSize :: Int
-defaultMaxInfoDictSize = 10 * 1024 * 1024
-
 -- | Permissive default parameters, most likely you don't need to
 -- change them.
 instance Default Options where
