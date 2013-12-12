@@ -34,9 +34,7 @@ module Network.BitTorrent.Exchange.Block
 import Control.Applicative
 import Data.Aeson.TH
 import Data.ByteString.Lazy as BL
-import Data.Char
 import Data.Default
-import Data.List as L
 import Data.Serialize as S
 import Data.Typeable
 import Text.PrettyPrint
@@ -121,9 +119,9 @@ instance Pretty BlockIx where
 
 -- | Get location of payload bytes in the torrent content.
 blockIxRange :: (Num a, Integral a) => PieceSize -> BlockIx -> (a, a)
-blockIxRange pieceSize BlockIx {..} = (offset, offset + len)
+blockIxRange piSize BlockIx {..} = (offset, offset + len)
   where
-    offset = fromIntegral  pieceSize * fromIntegral ixPiece
+    offset = fromIntegral piSize * fromIntegral ixPiece
            + fromIntegral ixOffset
     len    = fromIntegral ixLength
 {-# INLINE blockIxRange #-}
@@ -158,8 +156,9 @@ blockIx :: Block BL.ByteString -> BlockIx
 blockIx = BlockIx <$> blkPiece <*> blkOffset <*> blockSize
 
 -- | Get location of payload bytes in the torrent content.
-blockRange :: (Num a, Integral a) => PieceSize -> Block BL.ByteString -> (a, a)
-blockRange pieceSize = blockIxRange pieceSize . blockIx
+blockRange :: (Num a, Integral a)
+           => PieceSize -> Block BL.ByteString -> (a, a)
+blockRange piSize = blockIxRange piSize . blockIx
 {-# INLINE blockRange #-}
 
 -- | Test if a block can be safely turned into a piece.
