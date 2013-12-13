@@ -458,6 +458,9 @@ data Connection = Connection
     -- | Various stats about messages sent and received. Stats can be
     -- used to protect /this/ peer against flood attacks.
   , connStats        :: !(IORef ConnectionStats)
+
+--    -- | Max request queue length.
+--  , connMaxQueueLen  :: !Int
   }
 
 instance Pretty Connection where
@@ -670,7 +673,7 @@ connectWire hs addr extCaps wire =
 --
 --   This function can throw 'WireFailure' exception.
 --
-acceptWire :: Socket -> Wire () -> IO ()
-acceptWire sock wire = do
+acceptWire :: Socket -> PeerAddr -> Wire () -> IO ()
+acceptWire sock peerAddr wire = do
   bracket (return sock) close $ \ _ -> do
     error "acceptWire: not implemented"
