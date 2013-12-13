@@ -79,7 +79,7 @@ getAnnounceR = undefined
 getScrapeR :: TrackerSettings -> ScrapeQuery -> ResourceT IO ScrapeInfo
 getScrapeR = undefined
 
--- content-type: "text/plain" ?
+-- content-type: "text/plain"!
 tracker :: TrackerSettings -> Application
 tracker settings Request {..}
   | requestMethod /= methodGet
