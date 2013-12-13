@@ -50,6 +50,7 @@ library
                        Data.Torrent.Progress
                        Data.Torrent.Tree
 --                     Network.BitTorrent
+                       Network.BitTorrent.Client
                        Network.BitTorrent.Core
                        Network.BitTorrent.Core.Fingerprint
                        Network.BitTorrent.Core.PeerId
