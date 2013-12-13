@@ -436,12 +436,6 @@ data PeerList
   | CompactPeerList { getPeerList :: [PeerAddr] }
     deriving (Show, Eq, Typeable)
 
-instance ToJSON PeerList where
-  toJSON      = toJSON . getPeerList
-
-instance FromJSON PeerList where
-  parseJSON v = PeerList <$> parseJSON v
-
 putCompactPeerList :: S.Putter [PeerAddr]
 putCompactPeerList = mapM_ put
 
@@ -484,8 +478,6 @@ data AnnounceInfo =
        -- | Human readable warning.
      , respWarning     :: !(Maybe Text)
      } deriving (Show, Typeable)
-
-$(deriveJSON omitRecordPrefix ''AnnounceInfo)
 
 -- | HTTP tracker protocol compatible encoding.
 instance BEncode AnnounceInfo where

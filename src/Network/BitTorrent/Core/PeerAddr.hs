@@ -26,6 +26,8 @@ import Data.Aeson (ToJSON, FromJSON)
 import Data.Aeson.TH
 import Data.BEncode   as BS
 import Data.BEncode.BDict (BKey)
+import Data.ByteString
+import Data.ByteString.Char8 as BS8
 import Data.Bits
 import Data.Char
 import Data.Default
@@ -35,6 +37,7 @@ import Data.Serialize as S
 import Data.String
 import Data.Typeable
 import Data.Word
+import Data.IP
 import Network.Socket
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
@@ -65,11 +68,13 @@ instance Serialize PortNumber where
 -- compact list encoding.
 data PeerAddr = PeerAddr
   { peerId   :: !(Maybe PeerId)
-  , peerIP   :: {-# UNPACK #-} !HostAddress
+  , peerIP   :: {-# UNPACK #-} !IP
   , peerPort :: {-# UNPACK #-} !PortNumber
-  } deriving (Show, Eq, Ord, Typeable)
+  } deriving (Show, Eq, Typeable)
 
-$(deriveJSON omitRecordPrefix ''PeerAddr)
+instance BEncode IP where
+    toBEncode ip = toBEncode $ BS8.pack $ show ip
+    fromBEncode (BString ip) = return $ fromString $ BS8.unpack ip
 
 peer_id_key, peer_ip_key, peer_port_key :: BKey
 peer_id_key   = "peer id"
@@ -81,7 +86,7 @@ peer_port_key = "port"
 instance BEncode PeerAddr where
   toBEncode PeerAddr {..} = toDict $
        peer_id_key   .=? peerId
-    .: peer_ip_key   .=! peerIP
+    .: peer_ip_key   .=! BS8.pack (show peerIP)
     .: peer_port_key .=! peerPort
     .: endDict
 
@@ -95,10 +100,10 @@ instance BEncode PeerAddr where
 --
 --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
 --
-instance Serialize PeerAddr where
-  put PeerAddr {..} = putWord32host peerIP >> put peerPort
+instance Serialize PeerAddr where -- TODO do it properly
+  put PeerAddr {..} = (putWord32host $ toHostAddress $ ipv4 peerIP) >> put peerPort
   {-# INLINE put #-}
-  get = PeerAddr Nothing <$> getWord32host <*> get
+  get = PeerAddr Nothing <$> (IPv4 . fromHostAddress <$> getWord32host) <*> get
   {-# INLINE get #-}
 
 -- | @127.0.0.1:6881@
@@ -118,9 +123,9 @@ unsafeCatchIO m = unsafePerformIO $
 --   @peerPort \"127.0.0.1:6881\" == 6881@
 --
 instance IsString PeerAddr where
-  fromString str
+  fromString str -- TODO IPv6
     | [hostAddrStr, portStr] <- splitWhen (== ':') str
-    , Just hostAddr <- unsafeCatchIO $ inet_addr hostAddrStr
+    , Just hostAddr <- read hostAddrStr
     , Just portNum  <- toEnum <$> readMaybe portStr
                 = PeerAddr Nothing hostAddr portNum
     | otherwise = error $ "fromString: unable to parse PeerAddr: " ++ str
@@ -141,4 +146,6 @@ defaultPorts =  [6881..6889]
 --   for establish connection between peers.
 --
 peerSockAddr :: PeerAddr -> SockAddr
-peerSockAddr = SockAddrInet <$> peerPort <*> peerIP
+peerSockAddr PeerAddr {..}
+    | IPv4 v4 <- peerIP = SockAddrInet peerPort (toHostAddress v4)
+    | IPv6 v6 <- peerIP = SockAddrInet6 peerPort 0 (toHostAddress6 v6) 0
