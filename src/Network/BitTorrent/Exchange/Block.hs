@@ -7,6 +7,7 @@
 --
 --   Blocks are used to transfer pieces.
 --
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE DeriveFunctor              #-}
@@ -29,15 +30,40 @@ module Network.BitTorrent.Exchange.Block
        , blockSize
        , blockRange
        , isPiece
+
+         -- * Block bucket
+       , Bucket
+
+         -- ** Query
+       , Network.BitTorrent.Exchange.Block.null
+       , Network.BitTorrent.Exchange.Block.full
+       , Network.BitTorrent.Exchange.Block.size
+       , Network.BitTorrent.Exchange.Block.spans
+
+         -- ** Construction
+       , Network.BitTorrent.Exchange.Block.empty
+       , Network.BitTorrent.Exchange.Block.insert
+       , Network.BitTorrent.Exchange.Block.merge
+
+         -- ** Rendering
+       , Network.BitTorrent.Exchange.Block.toPiece
+
+         -- ** Debug
+       , Network.BitTorrent.Exchange.Block.valid
        ) where
 
+import Prelude hiding (span)
 import Control.Applicative
 import Data.Aeson.TH
-import Data.ByteString.Lazy as BL
+import Data.ByteString as BS hiding (span)
+import Data.ByteString.Lazy as BL hiding (span)
+import Data.ByteString.Lazy.Builder as BS
 import Data.Default
+import Data.Monoid
+import Data.List hiding (span)
 import Data.Serialize as S
 import Data.Typeable
-import Text.PrettyPrint
+import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.JSON
@@ -113,9 +139,9 @@ instance Serialize BlockIx where
 
 instance Pretty BlockIx where
   pretty BlockIx {..} =
-    "piece  = " <> int ixPiece  <> "," <+>
-    "offset = " <> int ixOffset <> "," <+>
-    "length = " <> int ixLength
+    ("piece  = " <> int ixPiece  <> ",") <+>
+    ("offset = " <> int ixOffset <> ",") <+>
+    ("length = " <> int ixLength)
 
 -- | Get location of payload bytes in the torrent content.
 blockIxRange :: (Num a, Integral a) => PieceSize -> BlockIx -> (a, a)
@@ -166,3 +192,139 @@ isPiece :: PieceSize -> Block BL.ByteString -> Bool
 isPiece pieceLen blk @ (Block i offset _) =
      offset == 0 && blockSize blk == pieceLen && i >= 0
 {-# INLINE isPiece #-}
+
+{-----------------------------------------------------------------------
+--  Bucket
+-----------------------------------------------------------------------}
+
+type Pos  = Int
+type ChunkSize = Int
+
+-- | A sparse set of blocks used to represent an /in progress/ piece.
+data Bucket
+  = Nil
+  | Span {-# UNPACK #-} !ChunkSize          !Bucket
+  | Fill {-# UNPACK #-} !ChunkSize !Builder !Bucket
+
+-- | INVARIANT: 'Nil' should appear only after 'Span' of 'Fill'.
+nilInvFailed :: a
+nilInvFailed = error "Nil: bucket invariant failed"
+
+valid :: Bucket -> Bool
+valid = check Nothing
+  where
+    check Nothing     Nil           = False -- see 'nilInvFailed'
+    check (Just _)    _             = True
+    check prevIsSpan (Span sz   xs) =
+      prevIsSpan /= Just True &&    -- Span n (NotSpan .. ) invariant
+      sz > 0 &&                     -- Span is always non-empty
+      check (Just True) xs
+    check prevIsSpan (Fill sz b xs) =
+      prevIsSpan /= Just True &&    -- Fill n (NotFill .. ) invariant
+      sz > 0 &&                     -- Fill is always non-empty
+      check (Just False) xs
+
+instance Pretty Bucket where
+  pretty Nil = nilInvFailed
+  pretty bkt = go bkt
+    where
+      go  Nil           = PP.empty
+      go (Span sz   xs) = "Span" <+> PP.int sz <+> go xs
+      go (Fill sz b xs) = "Fill" <+> PP.int sz <+> go xs
+
+-- | Smart constructor: use it when some block is /deleted/ from
+-- bucket.
+span :: ChunkSize -> Bucket -> Bucket
+span sz (Span sz'   xs) = Span (sz + sz') xs
+span sz  xxs            = Span  sz        xxs
+{-# INLINE span #-}
+
+-- | Smart constructor: use it when some block is /inserted/ to
+-- bucket.
+fill :: ChunkSize -> Builder -> Bucket -> Bucket
+fill sz b (Fill sz' b' xs) = Fill (sz + sz') (b <> b') xs
+fill sz b  xxs             = Fill  sz         b        xxs
+{-# INLINE fill #-}
+
+{-----------------------------------------------------------------------
+--  Bucket queries
+-----------------------------------------------------------------------}
+
+-- | /O(1)/. Test if this bucket is empty.
+null :: Bucket -> Bool
+null  Nil         = nilInvFailed
+null (Span _ Nil) = True
+null  _           = False
+{-# INLINE null #-}
+
+-- | /O(1)/. Test if this bucket is complete.
+full :: Bucket -> Bool
+full  Nil           = nilInvFailed
+full (Fill _ _ Nil) = True
+full  _             = False
+{-# INLINE full #-}
+
+-- | /O(n)/. Total size of the incompleted piece.
+size :: Bucket -> PieceSize
+size Nil = nilInvFailed
+size bkt = go bkt
+  where
+    go  Nil           = 0
+    go (Span sz   xs) = sz + go xs
+    go (Fill sz _ xs) = sz + go xs
+
+-- | /O(n)/. List incomplete blocks to download.
+spans :: BlockSize -> Bucket -> [(BlockOffset, BlockSize)]
+spans = undefined
+
+{-----------------------------------------------------------------------
+--  Bucket contstruction
+-----------------------------------------------------------------------}
+
+-- | /O(1)/. A new empty bucket capable to alloof specified size.
+empty :: PieceSize -> Bucket
+empty 0  = error "empty: Bucket size is zero"
+empty sz = Span sz Nil
+{-# INLINE empty #-}
+
+insertSpan :: Pos -> BS.ByteString -> ChunkSize -> Bucket -> Bucket
+insertSpan !pos !bs !span_sz !xs =
+  let pref_len = pos
+      fill_len = span_sz - pos `min` BS.length bs
+      suff_len = (span_sz - pos) - fill_len
+  in mkSpan pref_len $
+     fill   fill_len (byteString (BS.take fill_len bs)) $
+     mkSpan suff_len $
+     xs
+  where
+    mkSpan 0  xs = xs
+    mkSpan sz xs = Span sz xs
+
+-- | /O(n)/. Insert a strict bytestring at specified position.
+--
+--   Best case: if blocks are inserted in sequential order, then this
+--   operation should take /O(1)/.
+--
+insert :: Pos -> BS.ByteString -> Bucket -> Bucket
+insert _      _  Nil    = nilInvFailed
+insert dstPos bs bucket = go 0 bucket
+  where
+    intersects curPos sz = dstPos >= curPos && dstPos <= curPos + sz
+
+    go _             Nil     = Nil
+    go curPos       (Span sz xs)
+      | intersects curPos sz = insertSpan (dstPos - curPos) bs sz xs
+      |       otherwise      = span sz    (go (curPos + sz) xs)
+    go curPos bkt @ (Fill sz br xs)
+      | intersects curPos sz = bkt
+      |       otherwise      = fill sz br (go (curPos + sz) xs)
+
+-- | /O(n)/.
+merge :: Bucket -> Bucket -> Bucket
+merge = undefined
+
+-- | /O(1)/.
+toPiece :: Bucket -> Maybe BL.ByteString
+toPiece  Nil           = nilInvFailed
+toPiece (Fill _ b Nil) = Just (toLazyByteString b)
+toPiece  _             = Nothing
