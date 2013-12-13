@@ -13,4 +13,7 @@ instance Arbitrary BlockIx where
   arbitrary = BlockIx <$> arbitrary <*> arbitrary <*> arbitrary
 
 spec :: Spec
-spec = return ()
+spec = do
+  describe "bucket" $ do
+    it "render to piece when it is full" $ property $ \ bkt ->
+      if full bkt then isJust (toPiece bkt)
