@@ -77,7 +77,6 @@ import Data.BEncode.Types as BE
 import           Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
 import qualified Data.ByteString.Lazy  as BL
-import           Data.Char as Char
 import           Data.Convertible
 import           Data.Default
 import           Data.Hashable   as Hashable
