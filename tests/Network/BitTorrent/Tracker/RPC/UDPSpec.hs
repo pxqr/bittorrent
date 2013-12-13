@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module Network.BitTorrent.Tracker.RPC.UDPSpec (spec) where
+module Network.BitTorrent.Tracker.RPC.UDPSpec (spec, trackerURIs) where
 
 import Control.Monad
 import Data.Default

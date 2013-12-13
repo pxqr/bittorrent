@@ -1,41 +1,43 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
 module Network.BitTorrent.Tracker.RPC
-       ( module Network.BitTorrent.Tracker.RPC.Message
-       , TrackerRPC (..)
+       ( Tracker
+       , Network.BitTorrent.Tracker.RPC.connect
+       , Network.BitTorrent.Tracker.RPC.announce
+       , Network.BitTorrent.Tracker.RPC.scrape
        ) where
 
-import Network.BitTorrent.Tracker.RPC.Message
+import Control.Applicative
+import Control.Exception
+import Control.Monad.Trans.Resource
+import Network.URI
+
+import Network.BitTorrent.Tracker.Message
 import Network.BitTorrent.Tracker.RPC.HTTP as HTTP
 import Network.BitTorrent.Tracker.RPC.UDP  as UDP
 
--- | Set of tracker RPCs.
-class Tracker s where
-  connect  :: URI -> IO s
-  announce :: s -> AnnounceQuery -> IO AnnounceInfo
-  scrape   :: s -> ScrapeQuery   -> IO Scrape
 
-instance Tracker HTTP.Tracker where
-  connect  = return . HTTP.Tracker
-  announce = HTTP.announce
-  scrape   = undefined
+data Tracker
+  = HTracker Connection
+  | UTracker UDPTracker
 
-instance Tracker UDP.Tracker where
-  connect  = initialTracker
-  announce = announce
-  scrape   = undefined
+connect :: URI -> IO Tracker
+connect uri @ URI {..}
+  | uriScheme == "http:" = HTracker <$> runResourceT (HTTP.connect uri)
+  | uriScheme == "udp:"  = UTracker <$> UDP.connect uri
+  |       otherwise      = throwIO $ userError msg
+  where
+    msg = "unknown tracker protocol scheme: " ++ show uriScheme
 
-data BitTracker = HTTPTr HTTPTracker
-                | UDPTr UDPTracker
+announce :: AnnounceQuery -> Tracker -> IO AnnounceInfo
+announce q (HTracker t) = runResourceT $ HTTP.announce q t
+announce q (UTracker t) = UDP.announce q t
 
-instance Tracker BitTracker where
-  connect uri @ URI {..}
-    | uriScheme == "udp:"  = UDPTr  <$> connect uri
-    | uriScheme == "http:" = HTTPTr <$> connect uri
-    |       otherwise      = throwIO $ userError msg
-    where
-      msg = "unknown tracker protocol scheme: " ++ show uriScheme
-
-  announce (HTTPTr t) = Tracker.announce t
-  announce (UDPTr  t) = Tracker.announce t
-
-  scrape (HTTPTr t) = scrape t
-  scrape (UDPTr  t) = scrape t
+scrape :: ScrapeQuery -> Tracker -> IO ScrapeInfo
+scrape q (HTracker t) = runResourceT $ HTTP.scrape q t
+scrape q (UTracker t) = UDP.scrape q t

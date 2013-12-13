@@ -68,7 +68,7 @@ library
                        Network.BitTorrent.Exchange.Wire
 --                     Network.BitTorrent.Tracker
                        Network.BitTorrent.Tracker.Message
---                     Network.BitTorrent.Tracker.RPC
+                       Network.BitTorrent.Tracker.RPC
                        Network.BitTorrent.Tracker.RPC.HTTP
                        Network.BitTorrent.Tracker.RPC.UDP
                        Network.BitTorrent.Tracker.Wai
@@ -163,6 +163,7 @@ test-suite spec
                        Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.Core.FingerprintSpec
                        Network.BitTorrent.Tracker.MessageSpec
+                       Network.BitTorrent.Tracker.RPCSpec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
                        Network.BitTorrent.Tracker.RPC.UDPSpec
                        Network.BitTorrent.Exchange.MessageSpec
