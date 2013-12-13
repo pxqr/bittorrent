@@ -47,6 +47,7 @@ module Network.BitTorrent.Tracker.Message
        , defaultNumWant
        , defaultMaxNumWant
        , defaultReannounceInterval
+       , announceType
        , parseFailureStatus
 
          -- * Scrape
@@ -570,6 +571,10 @@ parseFailureMessage :: ParamParseFailure -> BS.ByteString
 parseFailureMessage e = BS.concat $ case e of
   Missing p   -> ["Missing parameter: ", paramName p]
   Invalid p v -> ["Invalid parameter: ", paramName p, " = ", v]
+
+-- | HTTP response /content type/.
+announceType :: ByteString
+announceType = "text/plain"
 
 -- | Get HTTP response status from a announce params parse failure.
 --
