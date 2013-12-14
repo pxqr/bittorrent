@@ -24,7 +24,7 @@ layout =
 
 spec :: Spec
 spec = do
-  describe "FileMap" $ do
+  describe "mmapFiles" $ do
     it "creates new files" $ do
       m <- mmapFiles ReadWriteEx layout
       unmapFiles m
@@ -32,17 +32,35 @@ spec = do
       (doesFileExist . fst) `allM` layout
         `shouldReturn` True
 
-    it "have specified size" $ do
+  describe "size" $ do
+    it "is equal to the layout size" $ do
       m <- mmapFiles ReadOnly layout
       FM.size m `shouldBe` L.sum (L.map snd layout)
       unmapFiles m
 
+  describe "readBytes" $ do
     it "read from files" $ do
       let thisFile = [("tests/System/Torrent/FileMapSpec.hs", 15)]
       m <- mmapFiles ReadOnly thisFile
       readBytes 3 15 m `shouldReturn` "this is test"
       unmapFiles m
 
+    it "ignore underflow reads" $ do
+      m <- mmapFiles ReadOnly layout
+      readBytes (-1) 1  m `shouldReturn` ""
+      readBytes (-5) 12 m `shouldReturn` ""
+      unmapFiles m
+
+    it "crop overflow reads" $ do
+      _m <- mmapFiles ReadWrite layout
+      writeBytes 5 "cc" _m
+      unmapFiles _m
+
+      m <- mmapFiles ReadOnly layout
+      readBytes 5 10 m `shouldReturn` "cc"
+      unmapFiles m
+
+  describe "writeBytes" $ do
     it "writes to files" $ do
       m <- mmapFiles ReadWriteEx layout
       writeBytes 0 "a"   m
@@ -75,30 +93,15 @@ spec = do
       writeBytes 5 long_bs m
       unmapFiles m
 
-    it "ignore underflow reads" $ do
-      m <- mmapFiles ReadOnly layout
-      readBytes (-1) 1  m `shouldReturn` ""
-      readBytes (-5) 12 m `shouldReturn` ""
-      unmapFiles m
-
     it "ignore underflow writes" $ do
-      m <- mmapFiles ReadWrite layout
-      writeBytes 0 "aa" m
-      unmapFiles m
+      _m <- mmapFiles ReadWrite layout
+      writeBytes 0 "aa" _m
+      unmapFiles _m
 
       m <- mmapFiles ReadWrite layout
       writeBytes (-1) "hhh" m
       unmapFiles m
       BL.readFile (fst (layout !! 0)) `shouldReturn` "aa"
-
-    it "crop overflow reads" $ do
-      m <- mmapFiles ReadWrite layout
-      writeBytes 5 "cc" m
-      unmapFiles m
-
-      m <- mmapFiles ReadOnly layout
-      readBytes 5 10 m `shouldReturn` "cc"
-      unmapFiles m
 
     it "crop overflow writes" $ do
       m <- mmapFiles ReadWrite layout
@@ -106,6 +109,7 @@ spec = do
       unmapFiles m
       BL.readFile (fst (layout !! 2)) `shouldReturn` "dd"
 
+  describe "from/to lazy bytestring" $ do
     it "isomorphic to lazy bytestring" $ do
       m <- mmapFiles ReadOnly layout
       fromLazyByteString (toLazyByteString m) `shouldBe` m
