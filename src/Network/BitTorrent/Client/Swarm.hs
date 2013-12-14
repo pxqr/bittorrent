@@ -43,7 +43,7 @@ getAnnounceQuery Swarm {..} = AnnounceQuery
   , reqEvent    = Nothing
   }
 
-askPeers :: Swarm -> IO [PeerAddr]
+askPeers :: Swarm -> IO [PeerAddr IP]
 askPeers s @ Swarm {..} = do
   AnnounceInfo {..} <- RPC.announce (getAnnounceQuery s) trackerConn
   return (getPeerList respPeers)

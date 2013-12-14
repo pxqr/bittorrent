@@ -65,6 +65,7 @@ import Data.IntMap.Strict as IM
 import Data.List as L
 import Data.Map as M
 import Data.Maybe
+import Data.IP
 
 import Data.Torrent.Piece
 import Network.BitTorrent.Core
@@ -79,7 +80,7 @@ type PieceMap = IntMap
 
 data Assembler = Assembler
   { -- | A set of blocks that have been 'Request'ed but not yet acked.
-    _inflight :: Map PeerAddr (PieceMap [BlockRange])
+    _inflight :: Map (PeerAddr IP) (PieceMap [BlockRange])
 
     -- | A set of blocks that but not yet assembled.
   , _pending  :: PieceMap Bucket
@@ -114,7 +115,7 @@ allowPiece pix a @ Assembler {..}  = over pending (IM.insert pix bkt) a
   where
     bkt = B.empty (piPieceLength info)
 
-allowedSet :: PeerAddr -> Assembler -> [BlockIx]
+allowedSet :: (PeerAddr IP) -> Assembler -> [BlockIx]
 allowedSet = undefined
 
 --inflight :: PeerAddr -> BlockIx -> Assembler -> Assembler
@@ -123,7 +124,7 @@ allowedSet = undefined
 --  You should check if a returned by peer block is actually have
 -- been requested and in-flight. This is needed to avoid "I send
 -- random corrupted block" attacks.
-insert :: PeerAddr -> Block a -> Assembler -> Assembler
+insert :: (PeerAddr IP) -> Block a -> Assembler -> Assembler
 insert = undefined
 
 {-
