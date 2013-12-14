@@ -34,6 +34,7 @@ module System.Torrent.Storage
          -- * Modification
        , writePiece
        , readPiece
+       , hintRead
        , unsafeReadPiece
        ) where
 
@@ -102,6 +103,10 @@ readPiece pix s @ Storage {..}
   where
     offset = fromIntegral pix * fromIntegral pieceLen
     sz     = fromIntegral pieceLen
+
+-- | Hint about the coming 'readPiece'.
+hintRead :: PieceIx -> Storage -> IO ()
+hintRead _pix Storage {..} = return ()
 
 unsafeReadPiece :: PieceIx -> Storage -> IO (Piece BL.ByteString)
 unsafeReadPiece pix s @ Storage {..}
