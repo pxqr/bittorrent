@@ -115,7 +115,7 @@ library
                      , vector       >= 0.10
 
                        -- Hashing
-                     , cryptohash   == 0.10.*
+                     , cryptohash   >= 0.10
                      , hashable >= 1.2
 
                        -- Codecs & Serialization
@@ -135,7 +135,7 @@ library
                      , network      >= 2.4
 --                     , krpc        >= 0.4
                      , http-types   >= 0.8
-                     , http-conduit >= 1.9
+                     , http-conduit >= 1.9 && < 2.0
                      , wai          >= 1.4 && < 2.0
 
                        -- System
