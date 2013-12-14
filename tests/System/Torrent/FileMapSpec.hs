@@ -69,8 +69,8 @@ spec = do
       unmapFiles m
 
     it "no buffer overflow errors" $ do
-      m <- mmapFiles ReadOnly layout
-      writeBytes 5 "ddddddddd" m -- cause segfault
+      m <- mmapFiles ReadWrite layout
+      writeBytes 5 "ddddddddd" m
       unmapFiles m
 
       BL.readFile (fst (layout !! 2)) `shouldReturn` "dd"
