@@ -14,8 +14,11 @@
 --       data in the filesystem.
 --
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 module System.Torrent.Storage
-       ( Storage
+       ( -- * Storage
+         Storage
+       , StorageFailure (..)
 
          -- * Construction
        , Mode (..)
@@ -34,7 +37,9 @@ module System.Torrent.Storage
        ) where
 
 import Control.Applicative
+import Control.Exception
 import Data.ByteString.Lazy as BL
+import Data.Typeable
 
 import Data.Torrent.Bitfield
 import Data.Torrent.Layout
@@ -42,34 +47,62 @@ import Data.Torrent.Piece
 import System.Torrent.FileMap
 
 
+data StorageFailure
+    -- | Occurs on a write operation if the storage has been opened
+    --   using 'ReadOnly' mode.
+  = StorageIsRO
+
+    -- | Piece index is out of bounds.
+  | InvalidIndex PieceIx
+
+    -- | Piece size do not match with one passed to the 'open'
+    -- function.
+  | InvalidSize  PieceSize
+    deriving (Show, Typeable)
+
+instance Exception StorageFailure
+
 -- TODO validation
 data Storage = Storage
-  { pieceLen :: {-# UNPACK #-} !PieceSize
+  { mode     ::                !Mode
+  , pieceLen :: {-# UNPACK #-} !PieceSize
   , fileMap  :: {-# UNPACK #-} !FileMap
   }
 
 -- ResourceT ?
 open :: Mode -> PieceSize -> FileLayout FileSize -> IO Storage
-open mode s l = Storage s <$> mmapFiles mode l
+open mode s l = Storage mode s <$> mmapFiles mode l
 
 close :: Storage -> IO ()
 close Storage {..} = unmapFiles fileMap
 
+isValidIx :: PieceIx -> Storage -> Bool
+isValidIx i s = 0 <= i && i < undefined s
+
 writePiece :: Piece BL.ByteString -> Storage -> IO ()
-writePiece Piece {..} Storage {..} = do
-  writeBytes (fromIntegral (pieceIndex * pieceLen)) pieceData fileMap
+writePiece p @ Piece {..} s @ Storage {..}
+  | mode        == ReadOnly      = throwIO  StorageIsRO
+  | pieceSize p /= pieceLen      = throwIO (InvalidSize (pieceSize p))
+  | not (isValidIx pieceIndex s) = throwIO (InvalidIndex pieceIndex)
+  | otherwise = writeBytes offset pieceData fileMap
+  where
+    offset = fromIntegral pieceIndex * fromIntegral pieceLen
 
 readPiece :: PieceIx -> Storage -> IO (Piece BL.ByteString)
-readPiece pix Storage {..} = do
-  bs <- readBytes (fromIntegral (pix * pieceLen))
-                  (fromIntegral pieceLen) fileMap
-  return $ Piece pix bs
+readPiece pix s @ Storage {..}
+  | not (isValidIx pix s) = throwIO (InvalidIndex pix)
+  | otherwise = Piece pix <$> readBytes offset sz fileMap
+  where
+    offset = fromIntegral pix * fromIntegral pieceLen
+    sz     = fromIntegral pieceLen
 
 unsafeReadPiece :: PieceIx -> Storage -> IO (Piece BL.ByteString)
-unsafeReadPiece pix Storage {..} = return $ Piece pix lbs
+unsafeReadPiece pix s @ Storage {..}
+  | not (isValidIx pix s) = throwIO (InvalidIndex pix)
+  | otherwise = return $ Piece pix (unsafeReadBytes offset sz fileMap)
   where
-    lbs = unsafeReadBytes (fromIntegral (pix * pieceLen))
-                          (fromIntegral pieceLen) fileMap
+    offset = fromIntegral pix * fromIntegral pieceLen
+    sz     = fromIntegral pieceLen
 
 -- | TODO examples of use
 genPieceInfo :: Storage -> IO PieceInfo
