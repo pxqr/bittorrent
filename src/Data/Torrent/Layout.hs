@@ -56,6 +56,7 @@ module Data.Torrent.Layout
        , fileOffset
 
          -- * Internal
+       , sizeInBase
        , getLayoutInfo
        , putLayoutInfo
        ) where

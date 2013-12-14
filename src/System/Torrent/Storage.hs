@@ -45,7 +45,7 @@ import Data.Typeable
 import Data.Torrent.Bitfield
 import Data.Torrent.Layout
 import Data.Torrent.Piece
-import System.Torrent.FileMap
+import System.Torrent.FileMap as FM
 
 
 data StorageFailure
@@ -82,7 +82,9 @@ withStorage :: Mode -> PieceSize -> FileLayout FileSize
 withStorage m s l = bracket (open m s l) close
 
 isValidIx :: PieceIx -> Storage -> Bool
-isValidIx i s = 0 <= i && i < undefined s
+isValidIx i Storage {..} = 0 <= i && i < pcount
+  where
+    pcount = FM.size fileMap `sizeInBase` pieceLen
 
 writePiece :: Piece BL.ByteString -> Storage -> IO ()
 writePiece p @ Piece {..} s @ Storage {..}
