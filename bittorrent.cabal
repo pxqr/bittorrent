@@ -159,6 +159,7 @@ test-suite spec
                        Data.Torrent.LayoutSpec
                        Data.Torrent.MagnetSpec
                        Data.Torrent.MetainfoSpec
+                       Data.Torrent.PieceSpec
                        Data.Torrent.ProgressSpec
                        Network.BitTorrent.CoreSpec
                        Network.BitTorrent.Core.PeerIdSpec
@@ -168,6 +169,7 @@ test-suite spec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
                        Network.BitTorrent.Tracker.RPC.UDPSpec
                        Network.BitTorrent.Exchange.MessageSpec
+                       System.Torrent.StorageSpec
                        System.Torrent.FileMapSpec
   build-depends:       base == 4.*
                      , bytestring

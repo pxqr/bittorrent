@@ -25,6 +25,7 @@ module System.Torrent.Storage
        , def
        , open
        , close
+       , withStorage
 
          -- * Query
        , genPieceInfo
@@ -58,7 +59,7 @@ data StorageFailure
     -- | Piece size do not match with one passed to the 'open'
     -- function.
   | InvalidSize  PieceSize
-    deriving (Show, Typeable)
+    deriving (Show, Eq, Typeable)
 
 instance Exception StorageFailure
 
@@ -75,6 +76,10 @@ open mode s l = Storage mode s <$> mmapFiles mode l
 
 close :: Storage -> IO ()
 close Storage {..} = unmapFiles fileMap
+
+withStorage :: Mode -> PieceSize -> FileLayout FileSize
+            -> (Storage -> IO ()) -> IO ()
+withStorage m s l = bracket (open m s l) close
 
 isValidIx :: PieceIx -> Storage -> Bool
 isValidIx i s = 0 <= i && i < undefined s
