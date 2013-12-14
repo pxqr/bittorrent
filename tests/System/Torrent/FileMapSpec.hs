@@ -62,17 +62,48 @@ spec = do
       BL.readFile (fst (layout !! 1)) `shouldReturn` "bbb"
       BL.readFile (fst (layout !! 2)) `shouldReturn` "cc"
 
+    let max_page_size = 4 * 1024 * 1024
+    let long_bs = BL.replicate (fromIntegral max_page_size) 0
+
     it "no buffer underflow errors" $ do
+      m <- mmapFiles ReadWrite layout
+      writeBytes (1 - max_page_size) long_bs m
+      unmapFiles m
+
+    it "no buffer overflow errors" $ do
+      m <- mmapFiles ReadWrite layout
+      writeBytes 5 long_bs m
+      unmapFiles m
+
+    it "ignore underflow reads" $ do
       m <- mmapFiles ReadOnly layout
       readBytes (-1) 1  m `shouldReturn` ""
       readBytes (-5) 12 m `shouldReturn` ""
       unmapFiles m
 
-    it "no buffer overflow errors" $ do
+    it "ignore underflow writes" $ do
+      m <- mmapFiles ReadWrite layout
+      writeBytes 0 "aa" m
+      unmapFiles m
+
+      m <- mmapFiles ReadWrite layout
+      writeBytes (-1) "hhh" m
+      unmapFiles m
+      BL.readFile (fst (layout !! 0)) `shouldReturn` "aa"
+
+    it "crop overflow reads" $ do
+      m <- mmapFiles ReadWrite layout
+      writeBytes 5 "cc" m
+      unmapFiles m
+
+      m <- mmapFiles ReadOnly layout
+      readBytes 5 10 m `shouldReturn` "cc"
+      unmapFiles m
+
+    it "crop overflow writes" $ do
       m <- mmapFiles ReadWrite layout
       writeBytes 5 "ddddddddd" m
       unmapFiles m
-
       BL.readFile (fst (layout !! 2)) `shouldReturn` "dd"
 
     it "isomorphic to lazy bytestring" $ do
