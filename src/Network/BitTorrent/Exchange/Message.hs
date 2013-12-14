@@ -678,8 +678,8 @@ instance Default ExtendedHandshake where
 
 instance BEncode ExtendedHandshake where
   toBEncode ExtendedHandshake {..} = toDict $
-       "ipv4"   .=? ehsIPv4 -- FIXME invalid encoding
-    .: "ipv6"   .=? ehsIPv6 -- FIXME invalid encoding
+       "ipv4"   .=? (S.encode <$> ehsIPv4)
+    .: "ipv6"   .=? (S.encode <$> ehsIPv6)
     .: "m"      .=! ehsCaps
     .: "metadata_size" .=? ehsMetadataSize
     .: "p"      .=? ehsPort

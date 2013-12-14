@@ -505,7 +505,7 @@ initiateHandshake sock hs = do
   recvHandshake sock
 
 -- | Tries to connect to peer using reasonable default parameters.
-connectToPeer :: PeerAddr -> IO Socket
+connectToPeer :: (IPAddress i) => PeerAddr i -> IO Socket
 connectToPeer p = do
   sock <- socket AF_INET Stream Network.Socket.defaultProtocol
   connect sock (peerSockAddr p)
@@ -628,7 +628,7 @@ reconnect = undefined
 --
 -- This function can throw 'WireFailure' exception.
 --
-connectWire :: Handshake -> PeerAddr -> ExtendedCaps -> Wire () -> IO ()
+connectWire :: (IPAddress i) => Handshake -> PeerAddr i -> ExtendedCaps -> Wire () -> IO ()
 connectWire hs addr extCaps wire =
   bracket (connectToPeer addr) close $ \ sock -> do
     hs' <- initiateHandshake sock hs
@@ -673,7 +673,7 @@ connectWire hs addr extCaps wire =
 --
 --   This function can throw 'WireFailure' exception.
 --
-acceptWire :: Socket -> PeerAddr -> Wire () -> IO ()
+acceptWire :: (IPAddress i) => Socket -> PeerAddr i -> Wire () -> IO ()
 acceptWire sock peerAddr wire = do
   bracket (return sock) close $ \ _ -> do
     error "acceptWire: not implemented"

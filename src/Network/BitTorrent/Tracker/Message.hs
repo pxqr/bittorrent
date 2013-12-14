@@ -22,6 +22,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# OPTIONS -fno-warn-orphans           #-}
 module Network.BitTorrent.Tracker.Message
        ( -- * Announce
@@ -83,6 +85,7 @@ import Data.Text (Text)
 import Data.Text.Encoding
 import Data.Typeable
 import Data.Word
+import Data.IP
 import Network
 import Network.HTTP.Types.QueryLike
 import Network.HTTP.Types.URI hiding (urlEncode)
@@ -431,24 +434,18 @@ renderAnnounceRequest = queryToSimpleQuery . toQuery
 --
 --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
 --
-data PeerList
-  =        PeerList { getPeerList :: [PeerAddr] }
-  | CompactPeerList { getPeerList :: [PeerAddr] }
-    deriving (Show, Eq, Typeable)
+data PeerList a
+  =        PeerList { getPeerList :: [PeerAddr a] }
+  | CompactPeerList { getPeerList :: [PeerAddr a] }
+    deriving (Show, Eq, Typeable, Functor)
 
-instance ToJSON PeerList where
-  toJSON      = toJSON . getPeerList
-
-instance FromJSON PeerList where
-  parseJSON v = PeerList <$> parseJSON v
-
-putCompactPeerList :: S.Putter [PeerAddr]
+putCompactPeerList :: (Serialize a) => S.Putter [PeerAddr a]
 putCompactPeerList = mapM_ put
 
-getCompactPeerList :: S.Get [PeerAddr]
+getCompactPeerList :: (Serialize a) => S.Get [PeerAddr a]
 getCompactPeerList = many get
 
-instance BEncode PeerList where
+instance (Typeable a, BEncode a, Serialize a) => BEncode (PeerList a) where
   toBEncode (PeerList        xs) = toBEncode xs
   toBEncode (CompactPeerList xs) = toBEncode $ runPut (putCompactPeerList xs)
 
@@ -479,13 +476,11 @@ data AnnounceInfo =
      , respMinInterval :: !(Maybe Int)
 
        -- | Peers that must be contacted.
-     , respPeers       :: !PeerList
+     , respPeers       :: !(PeerList IP)
 
        -- | Human readable warning.
      , respWarning     :: !(Maybe Text)
      } deriving (Show, Typeable)
-
-$(deriveJSON omitRecordPrefix ''AnnounceInfo)
 
 -- | HTTP tracker protocol compatible encoding.
 instance BEncode AnnounceInfo where
@@ -498,19 +493,21 @@ instance BEncode AnnounceInfo where
     .: "incomplete"      .=? respIncomplete
     .: "interval"        .=! respInterval
     .: "min interval"    .=? respMinInterval
-    .: "peers"           .=! respPeers
+    .: "peers"           .=! peers
+    .: "peers6"          .=! peers6
     .: "warning message" .=? respWarning
     .: endDict
+        where (peers,peers6) = splitIPList $ getPeerList respPeers
 
   fromBEncode (BDict d)
     | Just t <- BE.lookup "failure reason" d = Failure <$> fromBEncode t
-    | otherwise = (`fromDict` (BDict d)) $ do
-      AnnounceInfo
+    | otherwise = (`fromDict` (BDict d)) $
+       AnnounceInfo
         <$>? "complete"
         <*>? "incomplete"
         <*>! "interval"
         <*>? "min interval"
-        <*>! "peers"
+        <*>  (PeerList <$> (mergeIPLists <$>! "peers" <*>? "peers6"))
         <*>? "warning message"
   fromBEncode _ = decodingError "Announce info"
 
@@ -521,13 +518,13 @@ instance Serialize AnnounceInfo where
     putWord32be $ fromIntegral respInterval
     putWord32be $ fromIntegral $ fromMaybe 0 respIncomplete
     putWord32be $ fromIntegral $ fromMaybe 0 respComplete
-    forM_ (getPeerList respPeers) put
+    forM_ (fmap ipv4 <$> getPeerList respPeers) put
 
   get = do
     interval <- getWord32be
     leechers <- getWord32be
     seeders  <- getWord32be
-    peers    <- many get
+    peers    <- many $ fmap IPv4 <$> get
 
     return $ AnnounceInfo {
         respWarning     = Nothing

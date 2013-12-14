@@ -137,6 +137,7 @@ library
                      , http-types   >= 0.8
                      , http-conduit >= 1.9 && < 2.0
                      , wai          >= 1.4 && < 2.0
+                     , iproute
 
                        -- System
                      , directory   >= 1.2
