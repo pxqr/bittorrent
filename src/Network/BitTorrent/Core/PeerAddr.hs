@@ -20,6 +20,8 @@ module Network.BitTorrent.Core.PeerAddr
          PeerAddr(..)
        , defaultPorts
        , peerSockAddr
+
+         -- * IP
        , mergeIPLists
        , splitIPList
        , IP, IPv4, IPv6 --re-export Data.IP constructors
@@ -27,14 +29,10 @@ module Network.BitTorrent.Core.PeerAddr
        ) where
 
 import Control.Applicative
-import Control.Exception
 import Data.Aeson (ToJSON, FromJSON)
-import Data.Aeson.TH
 import Data.BEncode   as BS
 import Data.BEncode.BDict (BKey)
-import Data.ByteString
 import Data.ByteString.Char8 as BS8
-import Data.Bits
 import Data.Char
 import Data.Default
 import Data.List      as L
@@ -42,9 +40,7 @@ import Data.List.Split
 import Data.Serialize as S
 import Data.String
 import Data.Typeable
-import Data.Word
 import Data.IP
-import Data.Maybe
 import Data.Foldable
 import Data.Either
 import Network.Socket
@@ -52,9 +48,7 @@ import Text.PrettyPrint
 import Text.PrettyPrint.Class
 import Text.Read (readMaybe)
 import qualified Text.ParserCombinators.ReadP as RP
-import System.IO.Unsafe
 
-import Data.Torrent.JSON
 import Network.BitTorrent.Core.PeerId
 
 
@@ -95,8 +89,12 @@ deriving instance Typeable IP
 deriving instance Typeable IPv4
 deriving instance Typeable IPv6
 
+ipToBEncode :: IPAddress i => i -> BValue
 ipToBEncode ip = BString $ BS8.pack $ showIp ip
+
+ipFromBEncode :: Monad m => IPAddress a => BValue -> m a
 ipFromBEncode (BString ip) = return $ readIp $ BS8.unpack ip
+ipFromBEncode _            = fail "ipFromBEncode"
 
 instance BEncode IP where
     toBEncode = ipToBEncode
@@ -119,7 +117,6 @@ instance Serialize IPv6 where
     get = fromHostAddress6 <$> get
 
 -- TODO check semantic of ord and eq instances
--- TODO use SockAddr instead of peerIP and peerPort
 
 -- | Peer address info normally extracted from peer list or peer
 -- compact list encoding.
@@ -158,7 +155,6 @@ splitIPList xs = partitionEithers $ toEither <$> xs
       toEither pa@(PeerAddr _ (IPv4 _) _) = Left  (ipv4 <$> pa)
       toEither pa@(PeerAddr _ (IPv6 _) _) = Right (ipv6 <$> pa)
 
-
 -- | The tracker's 'compact peer list' compatible encoding. The
 -- 'peerId' is always 'Nothing'.
 --
@@ -175,14 +171,6 @@ instance (Serialize a) => Serialize (PeerAddr a) where
 instance Default (PeerAddr IPv4) where
   def = "127.0.0.1:6881"
 
--- inet_addr is pure; so it is safe to throw IO
-unsafeCatchIO :: IO a -> Maybe a
-unsafeCatchIO m = unsafePerformIO $
-    catch (m >>= evaluate >>= return . Just) handler
-  where
-    handler :: IOError -> IO (Maybe a)
-    handler _ = pure Nothing
-
 -- | Example:
 --
 --   @peerPort \"127.0.0.1:6881\" == 6881@
@@ -198,7 +186,7 @@ instance IsString (PeerAddr IPv4) where
 readsIPv6_port :: String -> [((IPv6, PortNumber), String)]
 readsIPv6_port = RP.readP_to_S $ do
   ip <- RP.char '[' *> (RP.readS_to_P reads) <* RP.char ']'
-  RP.char ':'
+  _ <- RP.char ':'
   port <- toEnum <$> read <$> (RP.many1 $ RP.satisfy isDigit) <* RP.eof
   return (ip,port)
 
@@ -211,7 +199,7 @@ instance IsString (PeerAddr IPv6) where
 -- | fingerprint + "at" + dotted.host.inet.addr:port
 -- TODO: instances for IPv6, HostName
 instance Pretty (PeerAddr IP) where
-  pretty p @ PeerAddr {..}
+  pretty PeerAddr {..}
     | Just pid <- peerId = pretty (fingerprint pid) <+> "at" <+> paddr
     |     otherwise      = paddr
     where
@@ -221,15 +209,14 @@ instance Pretty (PeerAddr IP) where
 defaultPorts :: [PortNumber]
 defaultPorts =  [6881..6889]
 
-resolvePeerAddr :: (IPAddress i) => PeerAddr HostName -> PeerAddr i
-resolvePeerAddr = undefined
+_resolvePeerAddr :: (IPAddress i) => PeerAddr HostName -> PeerAddr i
+_resolvePeerAddr = undefined
 
 -- | Convert peer info from tracker response to socket address.  Used
 --   for establish connection between peers.
 --
 peerSockAddr :: (IPAddress i) => PeerAddr i -> SockAddr
-peerSockAddr PeerAddr {..}
-    | Left hAddr <- toHostAddr peerAddr =
-        SockAddrInet peerPort hAddr
-    | Right hAddr <- toHostAddr peerAddr =
-        SockAddrInet6 peerPort 0 hAddr 0
+peerSockAddr PeerAddr {..} =
+  case toHostAddr peerAddr of
+    Left  host4 -> SockAddrInet  peerPort   host4
+    Right host6 -> SockAddrInet6 peerPort 0 host6 0
