@@ -136,7 +136,7 @@ instance Serialize IPv6 where
 -- compact list encoding.
 data PeerAddr a = PeerAddr
   { peerId   :: !(Maybe PeerId)
-  , peerHost :: a
+  , peerHost :: !a
   , peerPort :: {-# UNPACK #-} !PortNumber
   } deriving (Show, Eq, Typeable, Functor)
 
