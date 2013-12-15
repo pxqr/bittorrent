@@ -136,7 +136,7 @@ instance Serialize IPv6 where
 -- compact list encoding.
 data PeerAddr a = PeerAddr
   { peerId   :: !(Maybe PeerId)
-  , peerAddr :: a
+  , peerHost :: a
   , peerPort :: {-# UNPACK #-} !PortNumber
   } deriving (Show, Eq, Typeable, Functor)
 
@@ -148,7 +148,7 @@ peer_port_key = "port"
 -- | The tracker's 'announce response' compatible encoding.
 instance (Typeable a, BEncode a) => BEncode (PeerAddr a) where
   toBEncode PeerAddr {..} = toDict $
-       peer_ip_key   .=! peerAddr
+       peer_ip_key   .=! peerHost
     .: peer_id_key   .=? peerId
     .: peer_port_key .=! peerPort
     .: endDict
@@ -178,7 +178,7 @@ splitIPList xs = partitionEithers $ toEither <$> xs
 --
 -- TODO: test byte order
 instance (Serialize a) => Serialize (PeerAddr a) where
-  put PeerAddr {..} = put peerAddr >> put peerPort
+  put PeerAddr {..} = put peerHost >> put peerPort
   get = PeerAddr Nothing <$> get <*> get
 
 -- | @127.0.0.1:6881@
@@ -217,12 +217,12 @@ instance IsString (PeerAddr IP) where
 
 -- | fingerprint + "at" + dotted.host.inet.addr:port
 -- TODO: instances for IPv6, HostName
-instance Pretty (PeerAddr IP) where
+instance Pretty a => Pretty (PeerAddr a) where
   pretty PeerAddr {..}
     | Just pid <- peerId = pretty (fingerprint pid) <+> "at" <+> paddr
     |     otherwise      = paddr
     where
-      paddr = text (show peerAddr ++ ":" ++ show peerPort)
+      paddr = pretty peerHost <> ":" <> text (show peerPort)
 
 -- | Ports typically reserved for bittorrent P2P listener.
 defaultPorts :: [PortNumber]
@@ -236,6 +236,6 @@ _resolvePeerAddr = undefined
 --
 peerSockAddr :: PeerAddr IP -> SockAddr
 peerSockAddr PeerAddr {..} =
-  case peerAddr of
+  case peerHost of
     IPv4 ipv4 -> SockAddrInet  peerPort   (toHostAddress  ipv4)
     IPv6 ipv6 -> SockAddrInet6 peerPort 0 (toHostAddress6 ipv6) 0
