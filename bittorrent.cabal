@@ -163,8 +163,9 @@ test-suite spec
                        Data.Torrent.PieceSpec
                        Data.Torrent.ProgressSpec
                        Network.BitTorrent.CoreSpec
-                       Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.Core.FingerprintSpec
+                       Network.BitTorrent.Core.PeerAddrSpec
+                       Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.Tracker.MessageSpec
                        Network.BitTorrent.Tracker.RPCSpec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
@@ -181,6 +182,7 @@ test-suite spec
                      , data-default
                      , monad-loops
                      , containers
+                     , iproute
 
                      , aeson
                      , cereal

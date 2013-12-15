@@ -7,6 +7,8 @@ module Network.BitTorrent.Tracker.MessageSpec
        ) where
 
 import Control.Applicative
+import Control.Exception
+import Data.BEncode as BE
 import Data.List as L
 import Data.Maybe
 import Data.Word
@@ -56,10 +58,42 @@ arbitrarySample = L.head <$> sample' arbitrary
 
 spec :: Spec
 spec = do
-  describe "Announce" $ do
+  describe "AnnounceQuery" $ do
     it "properly url encoded" $ property $ \ q ->
       parseAnnounceQuery (renderAnnounceQuery q)
         `shouldBe` Right q
+
+  describe "AnnounceInfo" $ do
+    it "parses minimal sample" $ do
+      "d8:intervali0e5:peerslee"
+        `shouldBe`
+        AnnounceInfo Nothing Nothing 0 Nothing (PeerList []) Nothing
+
+    it "parses optional fields" $ do
+      "d8:completei1e\
+       \10:incompletei2e\
+       \8:intervali3e\
+       \12:min intervali4e\
+       \5:peersle\
+       \15:warning message3:str\
+       \e"
+        `shouldBe`
+        AnnounceInfo (Just 1) (Just 2) 3 (Just 4) (PeerList []) (Just "str")
+
+    it "parses failed response" $ do
+      "d14:failure reason10:any reasone"
+                 `shouldBe`
+        Message.Failure "any reason"
+
+    it "fail if no peer list present" $ do
+      evaluate ("d8:intervali0ee" :: AnnounceInfo)
+        `shouldThrow`
+         errorCall "fromString: unable to decode AnnounceInfo: \
+                   \required field `peers' not found"
+
+    it "parses peer list" $ do -- TODO
+      "d8:intervali0e5:peerslee" `shouldBe`
+        AnnounceInfo Nothing Nothing 0 Nothing (PeerList []) Nothing
 
   describe "Scrape" $ do
     return ()

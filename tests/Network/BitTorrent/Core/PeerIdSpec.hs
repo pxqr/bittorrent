@@ -1,6 +1,7 @@
 {-# OPTIONS -fno-warn-orphans #-}
 module Network.BitTorrent.Core.PeerIdSpec (spec) where
 import Control.Applicative
+import Data.BEncode as BE
 import Data.Text.Encoding as T
 import Test.Hspec
 import Test.QuickCheck
@@ -17,4 +18,8 @@ instance Arbitrary PeerId where
     ]
 
 spec :: Spec
-spec = return ()
+spec = do
+  describe "PeerId" $ do
+    it "properly bencoded" $ do
+      BE.decode "20:01234567890123456789"
+        `shouldBe` Right ("01234567890123456789" :: PeerId)

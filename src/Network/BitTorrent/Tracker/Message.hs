@@ -81,6 +81,7 @@ import Data.Default
 import Data.List as L
 import Data.Maybe
 import Data.Serialize as S hiding (Result)
+import Data.String
 import Data.Text (Text)
 import Data.Text.Encoding
 import Data.Typeable
@@ -480,7 +481,7 @@ data AnnounceInfo =
 
        -- | Human readable warning.
      , respWarning     :: !(Maybe Text)
-     } deriving (Show, Typeable)
+     } deriving (Show, Eq, Typeable)
 
 -- | HTTP tracker protocol compatible encoding.
 instance BEncode AnnounceInfo where
@@ -534,6 +535,12 @@ instance Serialize AnnounceInfo where
       , respComplete    = Just $ fromIntegral seeders
       , respPeers       = PeerList peers
       }
+
+-- | Decodes announce response from bencoded string, for debugging only.
+instance IsString AnnounceInfo where
+  fromString str = either (error . format) id $ BE.decode (fromString str)
+    where
+      format msg = "fromString: unable to decode AnnounceInfo: " ++ msg
 
 -- | Above 25, new peers are highly unlikely to increase download
 --   speed.  Even 30 peers is /plenty/, the official client version 3
