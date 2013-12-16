@@ -1,8 +1,9 @@
 -- |
 --   Copyright   :  (c) Sam Truzjan 2013
+--                  (c) Daniel Gröber 2013
 --   License     :  BSD3
 --   Maintainer  :  pxqr.sta@gmail.com
---   Stability   :  experimental
+--   Stability   :  provisional
 --   Portability :  portable
 --
 --   'PeerAddr' is used to represent peer address. Currently it's
@@ -103,8 +104,6 @@ ipFromBEncode (BString (BS8.unpack -> ipStr))
   | Just ip <- readMaybe (ipStr) = pure ip
   |         otherwise            = decodingError $ "IP: " ++ ipStr
 ipFromBEncode _    = decodingError $ "IP: addr should be a bstring"
-
-instance Ord IP where
 
 instance BEncode IP where
   toBEncode   = ipToBEncode

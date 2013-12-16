@@ -1,5 +1,6 @@
 -- |
 --   Copyright   :  (c) Sam Truzjan 2013
+--                  (c) Daniel Gröber 2013
 --   License     :  BSD3
 --   Maintainer  :  pxqr.sta@gmail.com
 --   Stability   :  experimental
@@ -149,6 +150,8 @@ getEvent = do
 {-----------------------------------------------------------------------
   Announce query
 -----------------------------------------------------------------------}
+-- TODO add &ipv6= and &ipv4= params to AnnounceQuery
+-- http://www.bittorrent.org/beps/bep_0007.html#announce-parameter
 
 -- | A tracker request is HTTP GET request; used to include metrics
 --   from clients that help the tracker keep overall statistics about
@@ -433,6 +436,7 @@ renderAnnounceRequest = queryToSimpleQuery . toQuery
 {-----------------------------------------------------------------------
 --  Announce response
 -----------------------------------------------------------------------}
+-- TODO check if announceinterval/complete/incomplete is positive ints
 
 -- | Tracker can return peer list in either compact(BEP23) or not
 -- compact form.
