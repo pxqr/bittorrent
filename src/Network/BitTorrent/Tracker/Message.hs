@@ -45,6 +45,7 @@ module Network.BitTorrent.Tracker.Message
 
          -- ** Info
        , PeerList (..)
+       , getPeerList
        , AnnounceInfo(..)
        , defaultNumWant
        , defaultMaxNumWant
@@ -435,24 +436,22 @@ renderAnnounceRequest = queryToSimpleQuery . toQuery
 --
 --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
 --
-data PeerList a
-  =        PeerList { getPeerList :: [PeerAddr a] }
-  | CompactPeerList { getPeerList :: [PeerAddr a] }
+data PeerList ip
+  = PeerList        [PeerAddr IP]
+  | CompactPeerList [PeerAddr ip]
     deriving (Show, Eq, Typeable, Functor)
 
-putCompactPeerList :: (Serialize a) => S.Putter [PeerAddr a]
-putCompactPeerList = mapM_ put
+getPeerList :: PeerList IP -> [PeerAddr IP]
+getPeerList (PeerList        xs) = xs
+getPeerList (CompactPeerList xs) = xs
 
-getCompactPeerList :: (Serialize a) => S.Get [PeerAddr a]
-getCompactPeerList = many get
-
-instance (Typeable a, BEncode a, Serialize a) => BEncode (PeerList a) where
+instance Serialize a => BEncode (PeerList a) where
   toBEncode (PeerList        xs) = toBEncode xs
-  toBEncode (CompactPeerList xs) = toBEncode $ runPut (putCompactPeerList xs)
+  toBEncode (CompactPeerList xs) = toBEncode $ runPut (mapM_ put xs)
 
   fromBEncode (BList    l ) = PeerList        <$> fromBEncode (BList l)
-  fromBEncode (BString  s ) = CompactPeerList <$> runGet getCompactPeerList s
-  fromBEncode  _            = decodingError "Peer list"
+  fromBEncode (BString  s ) = CompactPeerList <$> runGet (many get) s
+  fromBEncode  _ = decodingError "PeerList: should be a BString or BList"
 
 -- | The tracker response includes a peer list that helps the client
 --   participate in the torrent. The most important is 'respPeer' list

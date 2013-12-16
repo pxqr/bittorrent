@@ -154,11 +154,11 @@ instance (Typeable a, BEncode a) => BEncode (PeerAddr a) where
     .: endDict
 
   fromBEncode = fromDict $ do
-    peerAddr <$>? peer_id_key
-             <*>! peer_ip_key
+    peerAddr <$>! peer_ip_key
+             <*>? peer_id_key
              <*>! peer_port_key
     where
-      peerAddr ip pid port = PeerAddr ip pid port
+      peerAddr = flip PeerAddr
 
 mergeIPLists :: [PeerAddr IPv4] -> Maybe [PeerAddr IPv6] -> [PeerAddr IP]
 mergeIPLists v4 v6 = (fmap IPv4 `L.map` v4)
