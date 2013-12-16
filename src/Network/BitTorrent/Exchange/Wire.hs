@@ -673,7 +673,7 @@ connectWire hs addr extCaps wire =
 --
 --   This function can throw 'WireFailure' exception.
 --
-acceptWire :: (IPAddress i) => Socket -> PeerAddr i -> Wire () -> IO ()
+acceptWire :: Socket -> PeerAddr IP -> Wire () -> IO ()
 acceptWire sock peerAddr wire = do
   bracket (return sock) close $ \ _ -> do
     error "acceptWire: not implemented"

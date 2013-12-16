@@ -1,7 +1,6 @@
 module Network.BitTorrent.Tracker.RPC.HTTPSpec (spec, trackerURIs) where
 
 import Control.Monad
-import Control.Monad.Trans
 import Control.Monad.Trans.Resource
 import Data.Default
 import Data.List as L

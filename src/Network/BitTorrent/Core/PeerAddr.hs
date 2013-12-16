@@ -21,11 +21,6 @@ module Network.BitTorrent.Core.PeerAddr
          PeerAddr(..)
        , defaultPorts
        , peerSockAddr
-
-         -- * IP
-       , mergeIPLists
-       , splitIPList
-       , IPAddress ()
        ) where
 
 import Control.Applicative
@@ -36,8 +31,6 @@ import Data.BEncode.BDict (BKey)
 import Data.ByteString.Char8 as BS8
 import Data.Char
 import Data.Default
-import Data.Either
-import Data.Foldable
 import Data.IP
 import Data.List      as L
 import Data.List.Split
@@ -86,13 +79,16 @@ class IPAddress i where
 
 instance IPAddress IPv4 where
   toHostAddr = Left . toHostAddress
+  {-# INLINE toHostAddr #-}
 
 instance IPAddress IPv6 where
   toHostAddr = Right . toHostAddress6
+  {-# INLINE toHostAddr #-}
 
 instance IPAddress IP where
   toHostAddr (IPv4 ip) = toHostAddr ip
   toHostAddr (IPv6 ip) = toHostAddr ip
+  {-# INLINE toHostAddr #-}
 
 deriving instance Typeable IP
 deriving instance Typeable IPv4
@@ -100,6 +96,7 @@ deriving instance Typeable IPv6
 
 ipToBEncode :: Show i => i -> BValue
 ipToBEncode ip = BString $ BS8.pack $ show ip
+{-# INLINE ipToBEncode #-}
 
 ipFromBEncode :: Read a => BValue -> BS.Result a
 ipFromBEncode (BString (BS8.unpack -> ipStr))
@@ -107,17 +104,25 @@ ipFromBEncode (BString (BS8.unpack -> ipStr))
   |         otherwise            = decodingError $ "IP: " ++ ipStr
 ipFromBEncode _    = decodingError $ "IP: addr should be a bstring"
 
+instance Ord IP where
+
 instance BEncode IP where
   toBEncode   = ipToBEncode
+  {-# INLINE toBEncode #-}
   fromBEncode = ipFromBEncode
+  {-# INLINE fromBEncode #-}
 
 instance BEncode IPv4 where
   toBEncode   = ipToBEncode
+  {-# INLINE toBEncode #-}
   fromBEncode = ipFromBEncode
+  {-# INLINE fromBEncode #-}
 
 instance BEncode IPv6 where
   toBEncode   = ipToBEncode
+  {-# INLINE toBEncode #-}
   fromBEncode = ipFromBEncode
+  {-# INLINE fromBEncode #-}
 
 instance Serialize IPv4 where
     put = putWord32host    .  toHostAddress
@@ -136,9 +141,14 @@ instance Serialize IPv6 where
 -- compact list encoding.
 data PeerAddr a = PeerAddr
   { peerId   :: !(Maybe PeerId)
+
+    -- | This is usually 'IPv4', 'IPv6', 'IP' or unresolved
+    -- 'HostName'.
   , peerHost :: !a
+
+    -- | The port the peer listenning for incoming P2P sessions.
   , peerPort :: {-# UNPACK #-} !PortNumber
-  } deriving (Show, Eq, Typeable, Functor)
+  } deriving (Show, Eq, Ord, Typeable, Functor)
 
 peer_ip_key, peer_id_key, peer_port_key :: BKey
 peer_ip_key   = "ip"
@@ -159,17 +169,6 @@ instance (Typeable a, BEncode a) => BEncode (PeerAddr a) where
              <*>! peer_port_key
     where
       peerAddr = flip PeerAddr
-
-mergeIPLists :: [PeerAddr IPv4] -> Maybe [PeerAddr IPv6] -> [PeerAddr IP]
-mergeIPLists v4 v6 = (fmap IPv4 `L.map` v4)
-                  ++ (fmap IPv6 `L.map` Data.Foldable.concat v6)
-
-splitIPList :: [PeerAddr IP] -> ([PeerAddr IPv4],[PeerAddr IPv6])
-splitIPList xs = partitionEithers $ toEither <$> xs
-    where
-      toEither :: PeerAddr IP -> Either (PeerAddr IPv4) (PeerAddr IPv6)
-      toEither pa@(PeerAddr _ (IPv4 _) _) = Left  (ipv4 <$> pa)
-      toEither pa@(PeerAddr _ (IPv6 _) _) = Right (ipv6 <$> pa)
 
 -- | The tracker's 'compact peer list' compatible encoding. The
 -- 'peerId' is always 'Nothing'.
@@ -231,8 +230,8 @@ defaultPorts =  [6881..6889]
 _resolvePeerAddr :: (IPAddress i) => PeerAddr HostName -> PeerAddr i
 _resolvePeerAddr = undefined
 
--- | Convert peer info from tracker response to socket address.  Used
---   for establish connection between peers.
+-- | Convert peer info from tracker or DHT announce query response to
+-- socket address. Usually used to intiate connection between peers.
 --
 peerSockAddr :: PeerAddr IP -> SockAddr
 peerSockAddr PeerAddr {..} =

@@ -1,6 +1,7 @@
-{-# LANGUAGE RecordWildCards  #-}
-{-# LANGUAGE ViewPatterns     #-}
-{-# OPTIONS -fno-warn-orphans #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS -fno-warn-orphans  #-}
 module Network.BitTorrent.Tracker.MessageSpec
        ( spec
        , validateInfo
@@ -39,6 +40,20 @@ instance Arbitrary AnnounceQuery where
     <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
     <*> arbitrary <*> arbitrary <*> arbitrary
 
+instance Arbitrary (PeerList IP) where
+  arbitrary = frequency
+    [ (1,        (PeerList . maybeToList) <$> arbitrary)
+    , (1, (CompactPeerList . maybeToList . fmap zeroPeerId) <$> arbitrary)
+    ]
+
+  shrink (       PeerList xs) =        PeerList <$> shrink xs
+  shrink (CompactPeerList xs) = CompactPeerList <$> shrink xs
+
+instance Arbitrary AnnounceInfo where
+  arbitrary = AnnounceInfo
+    <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+    <*> arbitrary <*> arbitrary
+
 validateInfo :: AnnounceQuery -> AnnounceInfo -> Expectation
 validateInfo _ Message.Failure {..} = error "validateInfo: failure"
 validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
@@ -47,7 +62,8 @@ validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
     respMinInterval `shouldSatisfy` isNothing
     respWarning     `shouldSatisfy` isNothing
     peerList `shouldSatisfy` L.all (isNothing . peerId)
-    fromJust respComplete + fromJust respIncomplete `shouldBe` L.length peerList
+    fromJust respComplete + fromJust respIncomplete
+       `shouldBe` L.length peerList
   where
     peerList = getPeerList respPeers
 
@@ -125,15 +141,47 @@ spec = do
          errorCall "fromString: unable to decode AnnounceInfo: \
                    \required field `peers' not found"
 
-    it "parses peer list" $ do -- TODO
+    it "parses `peer' list" $ do -- TODO
       "d8:intervali0e\
        \5:peersl\
                \d2:ip7:1.2.3.4\
-               \4:porti80e\
+                \4:porti80e\
+               \e\
+               \d2:ip3:::1\
+                \4:porti80e\
                \e\
               \e\
        \e" `shouldBe`
-        AnnounceInfo Nothing Nothing 0 Nothing (PeerList ["1.2.3.4:80"]) Nothing
+        let xs = PeerList ["1.2.3.4:80", "[::1]:80"] in
+        AnnounceInfo Nothing Nothing 0 Nothing xs Nothing
+
+    it "parses `peers6' list" $ do
+      "d8:intervali0e\
+       \5:peers0:\
+       \6:peers60:\
+      \e" `shouldBe`
+        AnnounceInfo Nothing Nothing 0 Nothing (CompactPeerList []) Nothing
+
+    it "fails on invalid combinations of the peer lists" $ do
+      BE.decode "d8:intervali0e\
+                 \5:peers0:\
+                 \6:peers6le\
+                \e"
+        `shouldBe` (Left
+        "PeerList: the `peers6' field value should contain \
+                  \*compact* peer list" :: BE.Result AnnounceInfo)
+
+      BE.decode "d8:intervali0e\
+                 \5:peersle\
+                 \6:peers60:\
+                \e"
+        `shouldBe` (Left
+        "PeerList: non-compact peer list provided, \
+                  \but the `peers6' field present" :: BE.Result AnnounceInfo)
+
+    it "properly bencoded (iso)" $ property $ \ info ->
+      BE.decode (BL.toStrict (BE.encode info))
+        `shouldBe` Right (info :: AnnounceInfo)
 
   describe "Scrape" $ do
     return ()

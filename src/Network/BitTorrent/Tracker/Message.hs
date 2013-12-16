@@ -70,7 +70,6 @@ module Network.BitTorrent.Tracker.Message
 
 import Control.Applicative
 import Control.Monad
-import Data.Aeson (ToJSON(..), FromJSON(..))
 import Data.Aeson.TH
 import Data.BEncode as BE hiding (Result)
 import Data.BEncode.BDict as BE
@@ -79,8 +78,10 @@ import Data.ByteString.Char8 as BC
 import Data.Char as Char
 import Data.Convertible
 import Data.Default
+import Data.Either
 import Data.List as L
 import Data.Maybe
+import Data.Monoid
 import Data.Serialize as S hiding (Result)
 import Data.String
 import Data.Text (Text)
@@ -193,9 +194,9 @@ instance Serialize AnnounceQuery where
     put           reqPeerId
     put           reqProgress
     putEvent      reqEvent
-    putWord32be $ fromMaybe 0 reqIP
-    putWord32be $ 0 -- TODO what the fuck is "key"?
-    putWord32be $ fromIntegral $ fromMaybe (-1) reqNumWant
+    putWord32host $ fromMaybe 0 reqIP
+    putWord32be   $ 0 -- TODO what the fuck is "key"?
+    putWord32be   $ fromIntegral $ fromMaybe (-1) reqNumWant
 
     put           reqPort
 
@@ -415,7 +416,9 @@ data AnnounceRequest = AnnounceRequest
   } deriving (Show, Eq, Typeable)
 
 instance QueryLike AnnounceRequest where
-  toQuery AnnounceRequest{..} = toQuery announceAdvises ++ toQuery announceQuery
+  toQuery AnnounceRequest{..} =
+    toQuery announceAdvises <>
+    toQuery announceQuery
 
 -- | Parse announce request from query string.
 parseAnnounceRequest :: SimpleQuery -> ParseResult AnnounceRequest
@@ -440,6 +443,11 @@ data PeerList ip
   = PeerList        [PeerAddr IP]
   | CompactPeerList [PeerAddr ip]
     deriving (Show, Eq, Typeable, Functor)
+
+-- | The empty non-compact peer list.
+instance Default (PeerList IP) where
+  def = PeerList []
+  {-# INLINE def #-}
 
 getPeerList :: PeerList IP -> [PeerAddr IP]
 getPeerList (PeerList        xs) = xs
@@ -482,6 +490,17 @@ data AnnounceInfo =
      , respWarning     :: !(Maybe Text)
      } deriving (Show, Eq, Typeable)
 
+-- | Empty peer list with default reannounce interval.
+instance Default AnnounceInfo where
+  def = AnnounceInfo
+    { respComplete    = Nothing
+    , respIncomplete  = Nothing
+    , respInterval    = defaultReannounceInterval
+    , respMinInterval = Nothing
+    , respPeers       = def
+    , respWarning     = Nothing
+    }
+
 -- | HTTP tracker protocol compatible encoding.
 instance BEncode AnnounceInfo where
   toBEncode (Failure t)        = toDict $
@@ -494,10 +513,24 @@ instance BEncode AnnounceInfo where
     .: "interval"        .=! respInterval
     .: "min interval"    .=? respMinInterval
     .: "peers"           .=! peers
-    .: "peers6"          .=! peers6
+    .: "peers6"          .=? peers6
     .: "warning message" .=? respWarning
     .: endDict
-        where (peers,peers6) = splitIPList $ getPeerList respPeers
+    where
+      (peers, peers6) = prttn respPeers
+
+      prttn :: PeerList IP -> (PeerList IPv4, Maybe (PeerList IPv6))
+      prttn (PeerList        xs) = (PeerList xs, Nothing)
+      prttn (CompactPeerList xs) = mk $ partitionEithers $ toEither <$> xs
+        where
+          mk (v4s, v6s)
+            | L.null v6s = (CompactPeerList v4s, Nothing)
+            | otherwise  = (CompactPeerList v4s, Just (CompactPeerList v6s))
+
+          toEither :: PeerAddr IP -> Either (PeerAddr IPv4) (PeerAddr IPv6)
+          toEither PeerAddr {..} = case peerHost of
+            IPv4 ipv4 -> Left  $ PeerAddr peerId ipv4 peerPort
+            IPv6 ipv6 -> Right $ PeerAddr peerId ipv6 peerPort
 
   fromBEncode (BDict d)
     | Just t <- BE.lookup "failure reason" d = Failure <$> fromBEncode t
@@ -507,8 +540,26 @@ instance BEncode AnnounceInfo where
         <*>? "incomplete"
         <*>! "interval"
         <*>? "min interval"
-        <*>  (PeerList <$> (mergeIPLists <$>! "peers" <*>? "peers6"))
+        <*>  (uncurry merge =<< (,) <$>! "peers" <*>? "peers6")
         <*>? "warning message"
+    where
+      merge :: PeerList IPv4 -> Maybe (PeerList IPv6) -> BE.Get (PeerList IP)
+      merge (PeerList ips)          Nothing  = pure (PeerList ips)
+      merge (PeerList _  )          (Just _)
+        = fail "PeerList: non-compact peer list provided, \
+                         \but the `peers6' field present"
+
+      merge (CompactPeerList ipv4s) Nothing
+        = pure $ CompactPeerList (fmap IPv4 <$> ipv4s)
+
+      merge (CompactPeerList _    ) (Just (PeerList _))
+        = fail "PeerList: the `peers6' field value \
+                         \should contain *compact* peer list"
+
+      merge (CompactPeerList ipv4s) (Just (CompactPeerList ipv6s))
+        = pure $ CompactPeerList $
+                 (fmap IPv4 <$> ipv4s) <> (fmap IPv6 <$> ipv6s)
+
   fromBEncode _ = decodingError "Announce info"
 
 -- | UDP tracker protocol compatible encoding.
