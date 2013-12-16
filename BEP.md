@@ -27,6 +27,7 @@ too)
 | 4     | [Known Number Allocations][bep4]                   | [In progress][bep4-impl]
 | 5     | [DHT][bep5]                                        | [In progress][bep5-impl]
 | 6     | [Fast Extension][bep6]                             | [In progress][bep6-impl]
+| 7     | [IPv6 Tracker Extension][bep7]                     | [In progress][bep7-impl]
 | 9     | [Extension for Peers to Send Metadata Files][bep9] | [In progress][bep9-impl]
 | 10    | [Extension protocol][bep10]                        | [In progress][bep10-impl]
 | 12    | [Multitracker Metadata Extension][bep10]           | [In progress][bep12-impl]
@@ -39,6 +40,7 @@ too)
 [bep4]:  http://www.bittorrent.org/beps/bep_0004.html
 [bep5]:  http://www.bittorrent.org/beps/bep_0005.html
 [bep6]:  http://www.bittorrent.org/beps/bep_0006.html
+[bep7]:  http://www.bittorrent.org/beps/bep_0007.html
 [bep9]:  http://www.bittorrent.org/beps/bep_0009.html
 [bep10]: http://www.bittorrent.org/beps/bep_0010.html
 [bep12]: http://www.bittorrent.org/beps/bep_0012.html
@@ -50,6 +52,7 @@ too)
 [bep4-impl]:  src/Network/BitTorrent/Exchange/Message.hs
 [bep5-impl]:  src/Network/BitTorrent/DHT/Protocol.hs
 [bep6-impl]:  src/Network/BitTorrent/Exchange/Message.hs
+[bep7-impl]:  src/Network/BitTorrent/Tracker/Message.hs
 [bep9-impl]:  src/Network/BitTorrent/Exchange/Wire.hs
 [bep10-impl]: src/Network/BitTorrent/Exchange/Message.hs
 [bep12-impl]: src/Data/Torrent.hs
