@@ -22,6 +22,11 @@ module Network.BitTorrent.Core.PeerAddr
          PeerAddr(..)
        , defaultPorts
        , peerSockAddr
+
+         -- * Peer storage
+       , PeerStore
+       , Network.BitTorrent.Core.PeerAddr.lookup
+       , Network.BitTorrent.Core.PeerAddr.insert
        ) where
 
 import Control.Applicative
@@ -32,19 +37,23 @@ import Data.BEncode.BDict (BKey)
 import Data.ByteString.Char8 as BS8
 import Data.Char
 import Data.Default
+import Data.HashMap.Strict as HM
 import Data.IP
 import Data.List      as L
 import Data.List.Split
+import Data.Maybe
+import Data.Monoid
 import Data.Serialize as S
 import Data.String
 import Data.Typeable
 import Data.Word
 import Network.Socket
-import Text.PrettyPrint
+import Text.PrettyPrint hiding ((<>))
 import Text.PrettyPrint.Class
 import Text.Read (readMaybe)
 import qualified Text.ParserCombinators.ReadP as RP
 
+import Data.Torrent.InfoHash
 import Network.BitTorrent.Core.PeerId
 
 
@@ -237,3 +246,40 @@ peerSockAddr PeerAddr {..} =
   case peerHost of
     IPv4 ipv4 -> SockAddrInet  peerPort   (toHostAddress  ipv4)
     IPv6 ipv6 -> SockAddrInet6 peerPort 0 (toHostAddress6 ipv6) 0
+
+{-----------------------------------------------------------------------
+--  Peer storage
+-----------------------------------------------------------------------}
+-- TODO use more memory efficient representation
+
+-- | Storage used to keep track a set of known peers in client,
+-- tracker or DHT sessions.
+newtype PeerStore a = PeerStore (HashMap InfoHash [PeerAddr a])
+
+-- | Empty store.
+instance Default (PeerStore a) where
+  def = PeerStore HM.empty
+  {-# INLINE def #-}
+
+-- | Monoid under union operation.
+instance Eq a => Monoid (PeerStore a) where
+  mempty  = def
+  {-# INLINE mempty #-}
+
+  mappend (PeerStore a) (PeerStore b) =
+    PeerStore (HM.unionWith L.union a b)
+  {-# INLINE mappend #-}
+
+-- | Can be used to store peers between invocations of the client
+-- software.
+instance Serialize (PeerStore a) where
+  get = undefined
+  put = undefined
+
+-- | Used in 'get_peers' DHT queries.
+lookup :: InfoHash -> PeerStore a -> [PeerAddr a]
+lookup ih (PeerStore m) = fromMaybe [] $ HM.lookup ih m
+
+-- | Used in 'announce_peer' DHT queries.
+insert :: Eq a => InfoHash -> PeerAddr a -> PeerStore a -> PeerStore a
+insert ih a (PeerStore m) = PeerStore (HM.insertWith L.union ih [a] m)
