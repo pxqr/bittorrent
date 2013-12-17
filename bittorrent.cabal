@@ -54,9 +54,11 @@ library
                        Network.BitTorrent.Client.Swarm
                        Network.BitTorrent.Core
                        Network.BitTorrent.Core.Fingerprint
+                       Network.BitTorrent.Core.Node
                        Network.BitTorrent.Core.PeerId
                        Network.BitTorrent.Core.PeerAddr
 --                     Network.BitTorrent.DHT
+--                     Network.BitTorrent.DHT.Message
 --                     Network.BitTorrent.DHT.Protocol
 --                     Network.BitTorrent.DHT.Session
 --                     Network.BitTorrent.Exchange
@@ -133,7 +135,7 @@ library
 
                        -- Network
                      , network      >= 2.4
---                     , krpc        >= 0.4
+                     , krpc         >= 0.4
                      , http-types   >= 0.8
                      , http-conduit >= 1.9 && < 2.0
                      , wai          >= 1.4 && < 2.0
