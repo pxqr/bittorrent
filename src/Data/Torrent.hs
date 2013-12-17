@@ -94,7 +94,7 @@ import Data.Torrent.InfoHash as IH
 import Data.Torrent.JSON
 import Data.Torrent.Layout
 import Data.Torrent.Piece
-
+import Network.BitTorrent.Core.Node
 
 {-----------------------------------------------------------------------
 --  Info dictionary
@@ -215,6 +215,12 @@ data Torrent = Torrent
   , tInfoDict     :: !InfoDict
     -- ^ Info about each content file.
 
+  , tNodes        :: Maybe [NodeAddr ByteString]
+    -- ^ This key should be set to the /K closest/ nodes in the
+    -- torrent generating client's routing table. Alternatively, the
+    -- key could be set to a known good 'Network.BitTorrent.Core.Node'
+    -- such as one operated by the person generating the torrent.
+
   , tPublisher    :: !(Maybe URI)
     -- ^ Containing the RSA public key of the publisher of the
     -- torrent.  Private counterpart of this key that has the
@@ -285,6 +291,7 @@ instance BEncode Torrent where
     .: "creation date" .=? tCreationDate
     .: "encoding"      .=? tEncoding
     .: "info"          .=! tInfoDict
+    .: "nodes"         .=? tNodes
     .: "publisher"     .=? tPublisher
     .: "publisher-url" .=? tPublisherURL
     .: "signature"     .=? tSignature
@@ -298,6 +305,7 @@ instance BEncode Torrent where
             <*>? "creation date"
             <*>? "encoding"
             <*>! "info"
+            <*>? "nodes"
             <*>? "publisher"
             <*>? "publisher-url"
             <*>? "signature"
@@ -336,7 +344,7 @@ instance Pretty Torrent where
 nullTorrent :: URI -> InfoDict -> Torrent
 nullTorrent ann info = Torrent
     ann  Nothing Nothing Nothing Nothing Nothing
-    info Nothing Nothing Nothing
+    info Nothing Nothing Nothing Nothing
 
 -- | Mime type of torrent files.
 typeTorrent :: BS.ByteString

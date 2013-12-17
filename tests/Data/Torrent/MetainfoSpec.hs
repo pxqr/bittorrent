@@ -17,6 +17,7 @@ import Data.Torrent.Piece
 import Data.Torrent.Layout
 import Data.Torrent
 import Data.Torrent.LayoutSpec ()
+import Network.BitTorrent.Core.NodeSpec ()
 
 {-----------------------------------------------------------------------
 --  Common
@@ -57,6 +58,7 @@ instance Arbitrary Torrent where
   arbitrary = Torrent <$> arbitrary
                  <*> arbitrary <*> arbitrary    <*> arbitrary
                  <*> pico      <*> arbitrary    <*> arbitrary
+                 <*> arbitrary
                  <*> arbitrary <*> pure Nothing <*> arbitrary
 
 {-----------------------------------------------------------------------
