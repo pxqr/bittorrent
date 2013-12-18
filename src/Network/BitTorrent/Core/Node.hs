@@ -20,6 +20,7 @@ import Data.Aeson.TH
 import Data.Bits
 import Data.ByteString as BS
 import Data.BEncode as BE
+import Data.Ord
 import Data.Serialize as S
 import Data.Word
 import Network
@@ -70,7 +71,7 @@ genNodeId = NodeId <$> getEntropy nodeIdSize
 data NodeAddr a = NodeAddr
   { nodeHost ::                !a
   , nodePort :: {-# UNPACK #-} !PortNumber
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq)
 
 $(deriveJSON omitRecordPrefix ''NodeAddr)
 
@@ -93,9 +94,12 @@ instance BEncode a => BEncode (NodeAddr a) where
 data NodeInfo a = NodeInfo
   { nodeId   :: !NodeId
   , nodeAddr :: !(NodeAddr a)
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq)
 
 $(deriveJSON omitRecordPrefix ''NodeInfo)
+
+instance Eq a => Ord (NodeInfo a) where
+  compare = comparing nodeId
 
 -- | KRPC 'compact list' compatible encoding.
 instance Serialize a => Serialize (NodeInfo a) where
