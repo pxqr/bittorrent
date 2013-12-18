@@ -19,5 +19,6 @@ module Network.BitTorrent.Core
 import Data.IP
 
 import Network.BitTorrent.Core.Fingerprint as Core
+import Network.BitTorrent.Core.Node        as Core
 import Network.BitTorrent.Core.PeerId      as Core
 import Network.BitTorrent.Core.PeerAddr    as Core

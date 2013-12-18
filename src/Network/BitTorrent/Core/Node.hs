@@ -4,6 +4,7 @@
 module Network.BitTorrent.Core.Node
        (  -- * Node ID
          NodeId
+       , testIdBit
        , genNodeId
 
          -- * Node address
@@ -16,9 +17,11 @@ module Network.BitTorrent.Core.Node
 import Control.Applicative
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Aeson.TH
+import Data.Bits
 import Data.ByteString as BS
 import Data.BEncode as BE
 import Data.Serialize as S
+import Data.Word
 import Network
 import System.Entropy
 
@@ -28,11 +31,12 @@ import Network.BitTorrent.Core.PeerAddr ()
 {-----------------------------------------------------------------------
 --  Node id
 -----------------------------------------------------------------------}
+-- TODO more compact representation ('ShortByteString's?)
 
 -- | Normally, /this/ node id should we saved between invocations of
 -- the client software.
 newtype NodeId = NodeId ByteString
-  deriving (Show, Eq, FromJSON, ToJSON)
+  deriving (Show, Eq, Ord, FromJSON, ToJSON)
 
 nodeIdSize :: Int
 nodeIdSize = 20
@@ -43,14 +47,21 @@ instance Serialize NodeId where
   put (NodeId bs) = putByteString bs
   {-# INLINE put #-}
 
+-- | Test if the nth bit is set.
+testIdBit :: NodeId -> Word -> Bool
+testIdBit (NodeId bs) i
+  | fromIntegral i < nodeIdSize * 8
+  , (q, r) <- quotRem (fromIntegral i) 8
+  = testBit (BS.index bs q) r
+  |     otherwise      = False
+{-# INLINE testIdBit #-}
+
 -- TODO WARN is the 'system' random suitable for this?
 -- | Generate random NodeID used for the entire session.
 --   Distribution of ID's should be as uniform as possible.
 --
 genNodeId :: IO NodeId
 genNodeId = NodeId <$> getEntropy nodeIdSize
-
-type Distance = NodeId
 
 {-----------------------------------------------------------------------
 --  Node address
@@ -59,7 +70,7 @@ type Distance = NodeId
 data NodeAddr a = NodeAddr
   { nodeHost ::                !a
   , nodePort :: {-# UNPACK #-} !PortNumber
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Ord)
 
 $(deriveJSON omitRecordPrefix ''NodeAddr)
 
@@ -82,7 +93,7 @@ instance BEncode a => BEncode (NodeAddr a) where
 data NodeInfo a = NodeInfo
   { nodeId   :: !NodeId
   , nodeAddr :: !(NodeAddr a)
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Ord)
 
 $(deriveJSON omitRecordPrefix ''NodeInfo)
 

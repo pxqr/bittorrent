@@ -60,6 +60,7 @@ library
 --                     Network.BitTorrent.DHT
 --                     Network.BitTorrent.DHT.Message
 --                     Network.BitTorrent.DHT.Protocol
+                       Network.BitTorrent.DHT.Routing
 --                     Network.BitTorrent.DHT.Session
 --                     Network.BitTorrent.Exchange
                        Network.BitTorrent.Exchange.Assembler
@@ -111,6 +112,7 @@ library
                      , data-default >= 0.4
 --                     , data-dword
                      , intset       >= 0.1
+                     , PSQueue      >= 1.1
                      , split        >= 0.2
                      , text         >= 0.11.0
                      , unordered-containers
