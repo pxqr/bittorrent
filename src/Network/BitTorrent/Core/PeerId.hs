@@ -305,7 +305,7 @@ fingerprint pid = either (const def) id $ runGet getCI (getPeerId pid)
         'e' -> Fingerprint <$> getBitCometImpl <*> getBitCometVersion
         'F' -> Fingerprint <$> getBitCometImpl <*> getBitCometVersion
         c   -> do
-          c1 <- w2c <$> lookAhead getWord8
+          c1 <- w2c <$> S.lookAhead getWord8
           if c1 == 'P'
             then do
                  _ <- getWord8
@@ -324,7 +324,7 @@ fingerprint pid = either (const def) id $ runGet getCI (getPeerId pid)
 
     getBitCometImpl = do
       bs <- getByteString 3
-      lookAhead $ do
+      S.lookAhead $ do
         _  <- getByteString 2
         lr <- getByteString 4
         return $
