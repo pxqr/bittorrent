@@ -115,7 +115,7 @@ import Text.PrettyPrint.Class
 
 import Data.Torrent.Bitfield
 import Data.Torrent.InfoHash
-import qualified Data.Torrent.Piece as Data
+import qualified Data.Torrent.Piece as P
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block
 
@@ -744,7 +744,7 @@ data ExtendedMetadata
     -- message.
   | MetadataData
     { -- | A piece of 'Data.Torrent.InfoDict'.
-      piece     :: Data.Piece BS.ByteString
+      piece     :: P.Piece BS.ByteString
 
       -- | This key has the same semantics as the 'ehsMetadataSize' in
       -- the 'ExtendedHandshake' — it is size of the torrent info
@@ -780,7 +780,7 @@ instance BEncode ExtendedMetadata where
        msg_type_key   .=! (0 :: MetadataId)
     .: piece_key      .=! pix
     .: endDict
-  toBEncode (MetadataData (Data.Piece pix _) totalSize) = toDict $
+  toBEncode (MetadataData (P.Piece pix _) totalSize) = toDict $
        msg_type_key   .=! (1 :: MetadataId)
     .: piece_key      .=! pix
     .: total_size_key .=! totalSize
@@ -799,7 +799,7 @@ instance BEncode ExtendedMetadata where
       2 -> MetadataReject  <$>! piece_key
       _ -> pure (MetadataUnknown bval)
    where
-     metadataData pix s = MetadataData (Data.Piece pix BS.empty) s
+     metadataData pix s = MetadataData (P.Piece pix BS.empty) s
 
 -- | Piece data bytes are omitted.
 instance Pretty ExtendedMetadata where
@@ -818,7 +818,7 @@ instance PeerMessage ExtendedMetadata where
 
   stats (MetadataRequest _) = ByteStats (4 + 1 + 1) {- ~ -} 25 0
   stats (MetadataData p  _) = ByteStats (4 + 1 + 1) {- ~ -} 41 $
-                              BS.length (Data.pieceData p)
+                              BS.length (P.pieceData p)
   stats (MetadataReject  _) = ByteStats (4 + 1 + 1) {- ~ -} 25 0
   stats (MetadataUnknown _) = ByteStats (4 + 1 + 1) {- ? -} 0  0
 
@@ -836,12 +836,12 @@ checkPiece :: ExtendedMetadata -> Bool
 checkPiece = undefined -- FIXME
 
 setMetadataPayload :: BS.ByteString -> ExtendedMetadata -> ExtendedMetadata
-setMetadataPayload bs (MetadataData (Data.Piece pix _) t) =
-  MetadataData (Data.Piece pix bs) t
+setMetadataPayload bs (MetadataData (P.Piece pix _) t) =
+  MetadataData (P.Piece pix bs) t
 setMetadataPayload _   msg               = msg
 
 getMetadataPayload :: ExtendedMetadata -> Maybe BS.ByteString
-getMetadataPayload (MetadataData (Data.Piece _ bs) _) = Just bs
+getMetadataPayload (MetadataData (P.Piece _ bs) _) = Just bs
 getMetadataPayload _                                  = Nothing
 
 -- | Metadata BDict usually contain only 'msg_type_key', 'piece_key'

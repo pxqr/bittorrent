@@ -171,8 +171,8 @@ spec = do
 
 
     it "properly bencoded (ipv4)" $ do
-      BE.decode "d7:peer id20:01234567890123456789\
-                 \2:ip11:168.192.0.1\
+      BE.decode "d2:ip11:168.192.0.1\
+                 \7:peer id20:01234567890123456789\
                  \4:porti6881e\
                  \e"
         `shouldBe`
@@ -181,8 +181,8 @@ spec = do
                         6881)
 
     it "properly bencoded (ipv6)" $ do
-      BE.decode "d7:peer id20:01234567890123456789\
-                 \2:ip3:::1\
+      BE.decode "d2:ip3:::1\
+                 \7:peer id20:01234567890123456789\
                  \4:porti6881e\
                  \e"
         `shouldBe`
