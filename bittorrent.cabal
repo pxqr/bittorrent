@@ -58,7 +58,7 @@ library
                        Network.BitTorrent.Core.PeerId
                        Network.BitTorrent.Core.PeerAddr
 --                     Network.BitTorrent.DHT
---                     Network.BitTorrent.DHT.Message
+                       Network.BitTorrent.DHT.Message
 --                     Network.BitTorrent.DHT.Protocol
                        Network.BitTorrent.DHT.Routing
 --                     Network.BitTorrent.DHT.Session

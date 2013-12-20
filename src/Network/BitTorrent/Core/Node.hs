@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 module Network.BitTorrent.Core.Node
        (  -- * Node ID
          NodeId
@@ -20,7 +21,9 @@ import Data.Aeson.TH
 import Data.Bits
 import Data.ByteString as BS
 import Data.BEncode as BE
+import Data.Default
 import Data.Ord
+import Data.Typeable
 import Data.Serialize as S
 import Data.Word
 import Network
@@ -37,10 +40,14 @@ import Network.BitTorrent.Core.PeerAddr ()
 -- | Normally, /this/ node id should we saved between invocations of
 -- the client software.
 newtype NodeId = NodeId ByteString
-  deriving (Show, Eq, Ord, BEncode, FromJSON, ToJSON)
+  deriving (Show, Eq, Ord, BEncode, FromJSON, ToJSON, Typeable)
 
 nodeIdSize :: Int
 nodeIdSize = 20
+
+-- | Meaningless node id, for testing purposes only.
+instance Default NodeId where
+  def = NodeId (BS.replicate nodeIdSize 0)
 
 instance Serialize NodeId where
   get = NodeId <$> getByteString nodeIdSize
