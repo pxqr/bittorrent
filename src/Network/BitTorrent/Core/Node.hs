@@ -37,7 +37,7 @@ import Network.BitTorrent.Core.PeerAddr ()
 -- | Normally, /this/ node id should we saved between invocations of
 -- the client software.
 newtype NodeId = NodeId ByteString
-  deriving (Show, Eq, Ord, FromJSON, ToJSON)
+  deriving (Show, Eq, Ord, BEncode, FromJSON, ToJSON)
 
 nodeIdSize :: Int
 nodeIdSize = 20
