@@ -677,6 +677,24 @@ defaultQueueLength = 1
 instance Default ExtendedHandshake where
   def = ExtendedHandshake def def def def def def def def
 
+instance Monoid ExtendedHandshake where
+    mempty = def { ehsCaps = mempty }
+    mappend old new =
+        ExtendedHandshake {
+      ehsCaps         = ehsCaps old <> ehsCaps new,
+      ehsIPv4         = ehsIPv4 old         `mergeOld` ehsIPv4 new,
+      ehsIPv6         = ehsIPv6 old         `mergeOld` ehsIPv6 new,
+      ehsMetadataSize = ehsMetadataSize old `mergeNew` ehsMetadataSize new,
+      ehsPort         = ehsPort old         `mergeOld` ehsPort new,
+      ehsQueueLength  = ehsQueueLength old  `mergeNew` ehsQueueLength new,
+      ehsVersion      = ehsVersion old      `mergeOld` ehsVersion new,
+      ehsYourIp       = ehsYourIp old       `mergeOld` ehsYourIp new
+    }
+      where
+        mergeOld old new = old <|> new
+        mergeNew old new = new <|> old
+
+
 instance BEncode ExtendedHandshake where
   toBEncode ExtendedHandshake {..} = toDict $
        "ipv4"   .=? (S.encode <$> ehsIPv4)
