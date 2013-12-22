@@ -455,6 +455,9 @@ data Connection = Connection
     -- map.
   , connExtCaps      :: !(IORef ExtendedCaps)
 
+    -- | Current extended handshake information from the remote peer
+  , connRemoteEhs    :: !(IORef ExtendedHandshake)
+
     -- | Various stats about messages sent and received. Stats can be
     -- used to protect /this/ peer against flood attacks.
   , connStats        :: !(IORef ConnectionStats)
@@ -550,6 +553,12 @@ setExtCaps = lift . writeRef connExtCaps
 getExtCaps :: Wire ExtendedCaps
 getExtCaps = lift $ readRef connExtCaps
 
+setRemoteEhs :: ExtendedHandshake -> Wire ()
+setRemoteEhs = lift . writeRef connRemoteEhs
+
+getRemoteEhs :: Wire ExtendedHandshake
+getRemoteEhs = lift $ readRef connRemoteEhs
+
 -- | Get current stats. Note that this value will change with the next
 -- sent or received message.
 getStats :: Wire ConnectionStats
@@ -612,8 +621,9 @@ extendedHandshake caps = do
   sendMessage $ nullExtendedHandshake caps
   msg <- recvMessage
   case msg of
-    Extended (EHandshake ExtendedHandshake {..}) -> do
+    Extended (EHandshake remoteEhs@(ExtendedHandshake {..})) -> do
       setExtCaps $ ehsCaps <> caps
+      setRemoteEhs remoteEhs
     _ -> protocolError HandshakeRefused
 
 rehandshake :: ExtendedCaps -> Wire ()
@@ -651,6 +661,7 @@ connectWire hs addr extCaps wire =
                 else wire
 
     extCapsRef <- newIORef def
+    remoteEhs  <- newIORef def
     statsRef   <- newIORef ConnectionStats
       { outcomingFlow = FlowStats 1 $ handshakeStats hs
       , incomingFlow  = FlowStats 1 $ handshakeStats hs'
@@ -664,6 +675,7 @@ connectWire hs addr extCaps wire =
       , connThisPeerId   = hsPeerId   hs
       , connOptions      = def
       , connExtCaps      = extCapsRef
+      , connRemoteEhs    = remoteEhs
       , connStats        = statsRef
       }
 
