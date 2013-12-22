@@ -108,6 +108,7 @@ import Data.String
 import Data.Text as T
 import Data.Typeable
 import Data.Word
+import Data.IP
 import Network
 import Network.Socket hiding (KeepAlive)
 import Text.PrettyPrint as PP hiding ((<>))
@@ -661,8 +662,8 @@ data ExtendedHandshake = ExtendedHandshake
     -- | Client name and version.
   , ehsVersion     :: Maybe Text
 
---    -- |
---  , yourip  :: Maybe (Either HostAddress HostAddress6)
+    -- | IP of the remote end
+  , ehsYourIp      :: Maybe IP
   } deriving (Show, Eq, Typeable)
 
 extHandshakeId :: ExtendedMessageId
@@ -674,7 +675,7 @@ defaultQueueLength = 1
 
 -- | All fields are empty.
 instance Default ExtendedHandshake where
-  def = ExtendedHandshake def def def def def def def
+  def = ExtendedHandshake def def def def def def def def
 
 instance BEncode ExtendedHandshake where
   toBEncode ExtendedHandshake {..} = toDict $
@@ -685,8 +686,11 @@ instance BEncode ExtendedHandshake where
     .: "p"      .=? ehsPort
     .: "reqq"   .=? ehsQueueLength
     .: "v"      .=? ehsVersion
---    .: "yourip" .=? yourip
+    .: "yourip" .=? (runPut <$> either put put <$> toEither <$> ehsYourIp)
     .: endDict
+    where
+      toEither (IPv4 v4) = Left v4
+      toEither (IPv6 v6) = Right v6
 
   fromBEncode = fromDict $ ExtendedHandshake
     <$>? "ipv4"
@@ -696,7 +700,17 @@ instance BEncode ExtendedHandshake where
     <*>? "p"
     <*>? "reqq"
     <*>? "v"
---    <*>? "yourip"
+    <*> (opt "yourip" >>= getYourIp)
+
+getYourIp :: Maybe BValue -> BE.Get (Maybe IP)
+getYourIp f =
+  return $ do
+    BString ip <- f
+    either (const Nothing) Just $
+           case BS.length ip of
+             4  -> IPv4 <$> S.decode ip
+             16 -> IPv6 <$> S.decode ip
+             _ -> fail ""
 
 instance Pretty ExtendedHandshake where
   pretty = PP.text . show
@@ -722,6 +736,7 @@ nullExtendedHandshake caps = ExtendedHandshake
     , ehsPort         = Nothing
     , ehsQueueLength  = Just defaultQueueLength
     , ehsVersion      = Just $ T.pack $ render $ pretty libFingerprint
+    , ehsYourIp       = Nothing
     }
 
 {-----------------------------------------------------------------------
