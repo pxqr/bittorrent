@@ -158,8 +158,9 @@ test-suite spec
   default-extensions:  OverloadedStrings
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
-  main-is:             Spec.hs
-  other-modules:       Data.Torrent.BitfieldSpec
+  main-is:             Main.hs
+  other-modules:       Spec
+                       Data.Torrent.BitfieldSpec
                        Data.Torrent.InfoHashSpec
                        Data.Torrent.LayoutSpec
                        Data.Torrent.MagnetSpec
@@ -202,6 +203,7 @@ test-suite spec
                      , quickcheck-instances
                      , http-types
                      , bencoding
+                     , process
                      , bittorrent
   ghc-options:         -Wall -fno-warn-orphans
 
