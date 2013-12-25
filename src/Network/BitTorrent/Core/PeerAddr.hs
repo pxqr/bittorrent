@@ -133,13 +133,13 @@ instance BEncode IPv6 where
   fromBEncode = ipFromBEncode
   {-# INLINE fromBEncode #-}
 
+-- | When 'get'ing an IP it must be 'isolate'd to the appropriate
+-- number of bytes since we have no other way of telling which
+-- address type we are trying to parse
 instance Serialize IP where
     put (IPv4 ip) = put ip
     put (IPv6 ip) = put ip
 
-    -- | When 'get'ing an IP it must be 'isolate'd to the appropriate number of
-    -- bytes since we have no other way of telling which address type we are
-    -- trying to parse
     get = do
       n <- remaining
       case n of
