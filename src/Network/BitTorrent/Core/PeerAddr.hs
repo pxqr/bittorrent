@@ -1,4 +1,5 @@
 -- |
+--   Module      :  Network.BitTorrent.Core.PeerAddr
 --   Copyright   :  (c) Sam Truzjan 2013
 --                  (c) Daniel Gröber 2013
 --   License     :  BSD3
