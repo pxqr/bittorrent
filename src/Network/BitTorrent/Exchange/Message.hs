@@ -679,8 +679,7 @@ instance Default ExtendedHandshake where
 
 instance Monoid ExtendedHandshake where
     mempty = def { ehsCaps = mempty }
-    mappend old new =
-        ExtendedHandshake {
+    mappend old new = ExtendedHandshake {
       ehsCaps         = ehsCaps old <> ehsCaps new,
       ehsIPv4         = ehsIPv4 old         `mergeOld` ehsIPv4 new,
       ehsIPv6         = ehsIPv6 old         `mergeOld` ehsIPv6 new,
@@ -691,8 +690,8 @@ instance Monoid ExtendedHandshake where
       ehsYourIp       = ehsYourIp old       `mergeOld` ehsYourIp new
     }
       where
-        mergeOld old new = old <|> new
-        mergeNew old new = new <|> old
+        mergeOld mold mnew = mold <|> mnew
+        mergeNew mold mnew = mnew <|> mold
 
 
 instance BEncode ExtendedHandshake where
