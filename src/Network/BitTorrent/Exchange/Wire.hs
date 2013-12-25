@@ -518,13 +518,6 @@ initiateHandshake sock hs = do
   sendHandshake sock hs
   recvHandshake sock
 
--- | Tries to connect to peer using reasonable default parameters.
-connectToPeer :: PeerAddr IP -> IO Socket
-connectToPeer p = do
-  sock <- socket AF_INET Stream Network.Socket.defaultProtocol
-  connect sock (peerSockAddr p)
-  return sock
-
 {-----------------------------------------------------------------------
 --  Wire
 -----------------------------------------------------------------------}
@@ -648,7 +641,7 @@ reconnect = undefined
 --
 connectWire :: Handshake -> PeerAddr IP -> ExtendedCaps -> Wire () -> IO ()
 connectWire hs addr extCaps wire =
-  bracket (connectToPeer addr) close $ \ sock -> do
+  bracket (peerSocket Stream addr) close $ \ sock -> do
     hs' <- initiateHandshake sock hs
 
     Prelude.mapM_ (\(t,e) -> unless t $ throwIO $ ProtocolError e) [

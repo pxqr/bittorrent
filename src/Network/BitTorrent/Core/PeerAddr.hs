@@ -23,6 +23,7 @@ module Network.BitTorrent.Core.PeerAddr
          PeerAddr(..)
        , defaultPorts
        , peerSockAddr
+       , peerSocket
 
          -- * Peer storage
        , PeerStore
@@ -296,14 +297,24 @@ defaultPorts =  [6881..6889]
 _resolvePeerAddr :: (IPAddress i) => PeerAddr HostName -> PeerAddr i
 _resolvePeerAddr = undefined
 
--- | Convert peer info from tracker or DHT announce query response to
--- socket address. Usually used to intiate connection between peers.
---
+_peerSockAddr :: PeerAddr IP -> (Family, SockAddr)
+_peerSockAddr PeerAddr {..} =
+    case peerHost of
+          IPv4 ipv4 ->
+              (AF_INET, SockAddrInet peerPort (toHostAddress  ipv4))
+          IPv6 ipv6 ->
+              (AF_INET6, SockAddrInet6 peerPort 0 (toHostAddress6 ipv6) 0)
+
 peerSockAddr :: PeerAddr IP -> SockAddr
-peerSockAddr PeerAddr {..} =
-  case peerHost of
-    IPv4 ipv4 -> SockAddrInet  peerPort   (toHostAddress  ipv4)
-    IPv6 ipv6 -> SockAddrInet6 peerPort 0 (toHostAddress6 ipv6) 0
+peerSockAddr = snd . _peerSockAddr
+
+-- | Create a socket connected to the address specified in a peerAddr
+peerSocket :: SocketType -> PeerAddr IP -> IO Socket
+peerSocket socketType pa = do
+    let (family, addr) = _peerSockAddr pa
+    sock <- socket family socketType defaultProtocol
+    connect sock addr
+    return sock
 
 {-----------------------------------------------------------------------
 --  Peer storage
