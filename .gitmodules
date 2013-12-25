@@ -4,3 +4,6 @@
 [submodule "sub/krpc"]
 	path = sub/krpc
 	url = git://github.com/pxqr/krpc.git
+[submodule "sub/hspec"]
+	path = sub/hspec
+	url = https://github.com/DanielG/hspec.git
