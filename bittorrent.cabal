@@ -58,10 +58,9 @@ library
                        Network.BitTorrent.Core.PeerId
                        Network.BitTorrent.Core.PeerAddr
 --                     Network.BitTorrent.DHT
---                     Network.BitTorrent.DHT.Message
+                       Network.BitTorrent.DHT.Message
 --                     Network.BitTorrent.DHT.Protocol
                        Network.BitTorrent.DHT.Routing
---                     Network.BitTorrent.DHT.Session
 --                     Network.BitTorrent.Exchange
                        Network.BitTorrent.Exchange.Assembler
                        Network.BitTorrent.Exchange.Block
@@ -137,7 +136,7 @@ library
 
                        -- Network
                      , network      >= 2.4
-                     , krpc         >= 0.4
+                     , krpc         >= 0.5
                      , http-types   >= 0.8
                      , http-conduit >= 1.9 && < 2.0
                      , wai          >= 1.4 && < 2.0
