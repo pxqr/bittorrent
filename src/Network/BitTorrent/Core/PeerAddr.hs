@@ -132,6 +132,20 @@ instance BEncode IPv6 where
   fromBEncode = ipFromBEncode
   {-# INLINE fromBEncode #-}
 
+instance Serialize IP where
+    put (IPv4 ip) = put ip
+    put (IPv6 ip) = put ip
+
+    -- | When 'get'ing an IP it must be 'isolate'd to the appropriate number of
+    -- bytes since we have no other way of telling which address type we are
+    -- trying to parse
+    get = do
+      n <- remaining
+      case n of
+        4  -> IPv4 <$> get
+        16 -> IPv6 <$> get
+        _ -> fail "Wrong number of bytes remaining to parse IP"
+
 instance Serialize IPv4 where
     put = putWord32host    .  toHostAddress
     get = fromHostAddress <$> getWord32host
