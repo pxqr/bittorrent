@@ -7,6 +7,7 @@ import System.Process
 import Control.Exception
 import Data.List
 import Data.Maybe
+import Data.Functor
 
 clients :: [(String, String)]
 clients = [
