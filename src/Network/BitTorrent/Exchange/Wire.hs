@@ -432,8 +432,9 @@ data Connection = Connection
     -- future.
     connProtocol     :: !ProtocolName
 
-    -- | A set of enabled extensions. This value used to check if a
-    -- message is allowed to be sent or received.
+    -- | Set of enabled core extensions, i.e. the pre BEP10 extension
+    -- mecahnism. This value is used to check if a message is allowed to be sent
+    -- or received.
   , connCaps         :: !Caps
 
     -- | /Both/ peers handshaked with this infohash. A connection can
@@ -450,9 +451,9 @@ data Connection = Connection
     -- |
   , connOptions      :: !Options
 
-    -- | If @not (allowed ExtExtended connCaps)@ then this set is
-    -- always empty. Otherwise it has extension protocol 'MessageId'
-    -- map.
+    -- | If @not (allowed ExtExtended connCaps)@ then this set is always
+    -- empty. Otherwise it has the BEP10 extension protocol mandated mapping of
+    -- 'MessageId' to the message type for the remote peer.
   , connExtCaps      :: !(IORef ExtendedCaps)
 
     -- | Current extended handshake information from the remote peer
@@ -632,9 +633,9 @@ rehandshake caps = undefined
 reconnect :: Wire ()
 reconnect = undefined
 
--- | Initiate 'Wire' connection and handshake with a peer. This
--- function will also do extension protocol handshake if 'ExtExtended'
--- is enabled on both sides.
+-- | Initiate 'Wire' connection and handshake with a peer. This function will
+-- also do the BEP10 extension protocol handshake if 'ExtExtended' is enabled on
+-- both sides.
 --
 -- This function can throw 'WireFailure' exception.
 --
@@ -643,20 +644,19 @@ connectWire hs addr extCaps wire =
   bracket (connectToPeer addr) close $ \ sock -> do
     hs' <- initiateHandshake sock hs
 
-    unless (def           == hsProtocol hs') $ do
-      throwIO $ ProtocolError $ InvalidProtocol (hsProtocol hs')
-
-    unless (hsProtocol hs == hsProtocol hs') $ do
-      throwIO $ ProtocolError $ UnexpectedProtocol (hsProtocol hs')
-
-    unless (hsInfoHash hs == hsInfoHash hs') $ do
-      throwIO $ ProtocolError $ UnexpectedTopic (hsInfoHash hs')
-
-    unless (hsPeerId hs' == fromMaybe (hsPeerId hs') (peerId addr)) $ do
-      throwIO $ ProtocolError $ UnexpectedPeerId (hsPeerId hs')
+    Prelude.mapM_ (\(t,e) -> unless t $ throwIO $ ProtocolError e) [
+      (def == hsProtocol hs'
+      , InvalidProtocol $ hsProtocol hs'),
+      (hsProtocol hs == hsProtocol hs'
+      , UnexpectedProtocol $ hsProtocol hs'),
+      (hsInfoHash hs == hsInfoHash hs'
+      , UnexpectedTopic $ hsInfoHash hs'),
+      (hsPeerId hs' == fromMaybe (hsPeerId hs') (peerId addr)
+      , UnexpectedPeerId $ hsPeerId hs')
+      ]
 
     let caps = hsReserved hs <> hsReserved hs'
-    let wire' = if ExtExtended `allowed` caps
+        wire' = if ExtExtended `allowed` caps
                 then extendedHandshake extCaps >> wire
                 else wire
 
