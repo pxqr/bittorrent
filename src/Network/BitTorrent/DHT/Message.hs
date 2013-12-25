@@ -163,7 +163,7 @@ data GotPeers ip = GotPeers
   { -- | If the queried node has no peers for the infohash, returned
     -- the K nodes in the queried nodes routing table closest to the
     -- infohash supplied in the query.
-    peers        :: Either [NodeAddr ip] [PeerAddr ip]
+    peers        :: Either [NodeInfo ip] [PeerAddr ip]
 
     -- | The token value is a required argument for a future
     -- announce_peer query.
@@ -171,7 +171,7 @@ data GotPeers ip = GotPeers
   } deriving Typeable
 
 peers_key :: BKey
-peers_key = "peers"
+peers_key = "values"
 
 token_key :: BKey
 token_key = "token"
@@ -204,7 +204,7 @@ data Announce = Announce
   { -- | infohash of the torrent;
     topic    :: InfoHash
 
-    -- | the port /this/ peer is listenning;
+    -- | the port /this/ peer is listening;
   , port     :: PortNumber
 
     -- | received in response to a previous get_peers query.

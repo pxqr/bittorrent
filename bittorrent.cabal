@@ -61,7 +61,6 @@ library
                        Network.BitTorrent.DHT.Message
 --                     Network.BitTorrent.DHT.Protocol
                        Network.BitTorrent.DHT.Routing
---                     Network.BitTorrent.DHT.Session
 --                     Network.BitTorrent.Exchange
                        Network.BitTorrent.Exchange.Assembler
                        Network.BitTorrent.Exchange.Block

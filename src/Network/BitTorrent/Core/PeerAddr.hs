@@ -254,7 +254,7 @@ peerSockAddr PeerAddr {..} =
 
 -- | Storage used to keep track a set of known peers in client,
 -- tracker or DHT sessions.
-newtype PeerStore a = PeerStore (HashMap InfoHash [PeerAddr a])
+newtype PeerStore ip = PeerStore (HashMap InfoHash [PeerAddr ip])
 
 -- | Empty store.
 instance Default (PeerStore a) where
