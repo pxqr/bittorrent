@@ -55,7 +55,7 @@ node_id_key = "id"
 data Query a = Query
   { thisNodeId  :: NodeId
   , queryParams :: a
-  }
+  } deriving (Show, Eq)
 
 instance BEncode a => BEncode (Query a) where
   toBEncode Query {..} = toDict $
@@ -75,7 +75,7 @@ instance BEncode a => BEncode (Query a) where
 data Response a = Response
   { remoteNodeId :: NodeId
   , responseVals :: a
-  }
+  } deriving (Show, Eq)
 
 instance BEncode a => BEncode (Response a) where
   toBEncode = toBEncode . toQuery
@@ -91,9 +91,10 @@ instance BEncode a => BEncode (Response a) where
 -- ping method
 -----------------------------------------------------------------------}
 
--- | The most basic query is a ping.
+-- | The most basic query is a ping. Ping query is used to check if a
+-- quered node is still alive.
 data Ping = Ping
-  deriving Typeable
+  deriving (Show, Eq, Typeable)
 
 instance BEncode Ping where
   toBEncode Ping = toDict endDict
@@ -110,7 +111,7 @@ instance KRPC (Query Ping) [Ping] where
 -- | Find node is used to find the contact information for a node
 -- given its ID.
 newtype FindNode = FindNode NodeId
-  deriving Typeable
+  deriving (Show, Eq, Typeable)
 
 target_key :: BKey
 target_key = "target"
@@ -119,12 +120,12 @@ instance BEncode FindNode where
   toBEncode (FindNode nid) = toDict   $ target_key .=! nid .: endDict
   fromBEncode              = fromDict $ FindNode  <$>! target_key
 
--- | When a node receives a find_node query, it should respond with a
+-- | When a node receives a 'FindNode' query, it should respond with a
 -- the compact node info for the target node or the K (8) closest good
 -- nodes in its own routing table.
 --
 newtype NodeFound ip = NodeFound [NodeInfo ip]
-  deriving Typeable
+  deriving (Show, Eq, Typeable)
 
 nodes_key :: BKey
 nodes_key = "nodes"
