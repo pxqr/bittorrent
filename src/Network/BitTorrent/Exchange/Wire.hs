@@ -433,8 +433,8 @@ data Connection = Connection
     connProtocol     :: !ProtocolName
 
     -- | Set of enabled core extensions, i.e. the pre BEP10 extension
-    -- mecahnism. This value is used to check if a message is allowed to be sent
-    -- or received.
+    -- mechanism. This value is used to check if a message is allowed
+    -- to be sent or received.
   , connCaps         :: !Caps
 
     -- | /Both/ peers handshaked with this infohash. A connection can
