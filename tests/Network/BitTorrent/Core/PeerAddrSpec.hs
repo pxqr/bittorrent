@@ -99,7 +99,7 @@ spec = do
         `shouldBe`
         "\x1\x2\x3\x4\x5\x6\x7\x8\x9\xa\xb\xc\xd\xe\xf\x10"
 
-    it "properly serialized iso" $ property $ \ ip ->
+    it "properly serialized (iso)" $ property $ \ ip ->
       S.decode (S.encode ip) `shouldBe` Right (ip :: IPv6)
 
     it "properly bencoded" $ do
@@ -125,6 +125,25 @@ spec = do
 
 
   describe "Peer IP" $ do
+    it "properly serialized IPv6" $ do
+      S.decode "\x1\x2\x3\x4\x5\x6\x7\x8\x9\xa\xb\xc\xd\xe\xf\x10"
+        `shouldBe`
+        Right ("102:304:506:708:90a:b0c:d0e:f10" :: IP)
+
+      S.encode ("102:304:506:708:90a:b0c:d0e:f10" :: IP)
+        `shouldBe`
+        "\x1\x2\x3\x4\x5\x6\x7\x8\x9\xa\xb\xc\xd\xe\xf\x10"
+
+    it "properly serialized (iso) IPv6" $ property $ \ ip ->
+      S.decode (S.encode ip) `shouldBe` Right (ip :: IP)
+
+    it "properly serialized IPv4" $ do
+      S.decode "\x1\x2\x3\x4" `shouldBe` Right (IPv4 $ toIPv4 [1, 2, 3, 4])
+      S.encode (toIPv4 [1, 2, 3, 4]) `shouldBe` "\x1\x2\x3\x4"
+
+    it "properly serialized (iso) IPv4" $ property $ \ ip -> do
+      S.decode (S.encode ip) `shouldBe` Right (ip :: IP)
+
     it "properly bencoded" $ do
       BE.decode "11:168.192.0.1" `shouldBe`
         Right (IPv4 (toIPv4 [168, 192, 0, 1]))
