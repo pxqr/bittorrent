@@ -101,7 +101,7 @@ instance BEncode Ping where
   fromBEncode _  = pure Ping
 
 -- | \"q\" = \"ping\"
-instance KRPC (Query Ping) [Ping] where
+instance KRPC (Query Ping) (Response Ping) where
   method = "ping"
 
 {-----------------------------------------------------------------------
@@ -130,15 +130,18 @@ newtype NodeFound ip = NodeFound [NodeInfo ip]
 nodes_key :: BKey
 nodes_key = "nodes"
 
-binary :: Serialize a => BE.Get BS.ByteString -> BE.Get a
-binary m = m >>= either fail return . S.decode
+binary :: Serialize a => BKey -> BE.Get [a]
+binary k = field (req k) >>= either (fail . format) return .
+    runGet (many get)
+  where
+    format str = "fail to deserialize " ++ show k ++ " field: " ++ str
 
 instance (Typeable ip, Serialize ip) => BEncode (NodeFound ip) where
   toBEncode (NodeFound ns) = toDict $
        nodes_key .=! S.encode ns
     .: endDict
 
-  fromBEncode = fromDict $ NodeFound <$> binary (field (req nodes_key))
+  fromBEncode = fromDict $ NodeFound <$> binary nodes_key
 
 -- | \"q\" == \"find_node\"
 instance (Serialize ip, Typeable ip)
@@ -188,8 +191,8 @@ instance (Typeable ip, Serialize ip) => BEncode (GotPeers ip) where
 
   fromBEncode = fromDict $ GotPeers <$> getPeerList  <*>! token_key
     where
-      getPeerList = Right <$> binary (field (req peers_key))
-                <|> Left  <$> binary (field (req nodes_key))
+      getPeerList = Right <$> binary peers_key
+                <|> Left  <$> binary nodes_key
 
 instance (Typeable ip, Serialize ip) =>
          KRPC (Query GetPeers) (Response (GotPeers ip)) where
