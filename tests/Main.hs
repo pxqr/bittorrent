@@ -4,6 +4,7 @@ import Spec
 import System.Exit
 import System.Environment
 import System.Process
+import System.Directory
 import Control.Exception
 import Data.List
 import Data.Maybe
@@ -11,7 +12,7 @@ import Data.Functor
 
 clients :: [(String, String)]
 clients = [
- ("rtorrent","rtorrent -p 51234-51234 res/testfile.torrent") ]
+ ("rtorrent","rtorrent -p 51234-51234 testfile.torrent") ]
 
 main :: IO ()
 main = do
@@ -24,7 +25,9 @@ main = do
         return cmd
   case cmd' of
     Just cmd -> do _ <- system "screen -S bittorrent-testsuite -X quit"
-                   createProcess (shell cmd) >> return ()
+                   dir <- getCurrentDirectory
+                   _ <- createProcess (shell cmd) { cwd = Just (dir ++ "/res") }
+                   return ()
     Nothing -> return ()
 
   let args' = (filter (not . isPrefixOf "--bittorrent-client=") args)
