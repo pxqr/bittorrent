@@ -1,11 +1,4 @@
 * TODO Rename Ext,Extension -> Cap
-* TODO Use System.IO instead of Network.recv/send
-  The functions in System.IO use GHC/base's built in support for epoll/kqueue
-  and the like which makes them a whole lot more efficient for file descriptor
-  I/O. Network.recv/send on the other hand just use a plain FFI call to
-  recvmsg/sendmsg which will block the whole OS thread.
-
-** TODO Compare performance of the two
 * TODO Proper handling of transaction ids in UDP tracker
 
 Just like the krpc package does.
