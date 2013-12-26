@@ -198,7 +198,7 @@ test-suite spec
                      , mtl
                      , resourcet
 
-                     , hspec
+                     , hspec >= 1.8.1.1
                      , QuickCheck
                      , quickcheck-instances
                      , http-types
