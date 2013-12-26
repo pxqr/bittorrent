@@ -204,6 +204,7 @@ test-suite spec
                      , http-types
                      , bencoding
                      , process
+                     , krpc  >= 0.5.0.0
                      , bittorrent
   ghc-options:         -Wall -fno-warn-orphans
 
