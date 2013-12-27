@@ -39,6 +39,7 @@ import Data.Bits
 import Data.ByteString as BS
 import Data.BEncode as BE
 import Data.Default
+import Data.Hashable
 import Data.IP
 import Data.List as L
 import Data.Ord
@@ -126,6 +127,10 @@ instance BEncode a => BEncode (NodeAddr a) where
   fromBEncode b = uncurry NodeAddr <$> fromBEncode b
   {-# INLINE fromBEncode #-}
 
+instance Hashable a => Hashable (NodeAddr a) where
+  hashWithSalt s NodeAddr {..} = hashWithSalt s (nodeHost, nodePort)
+  {-# INLINE hashWithSalt #-}
+
 -- | Example:
 --
 --   @nodePort \"127.0.0.1:6881\" == 6881@
@@ -160,7 +165,7 @@ instance Eq a => Ord (NodeInfo a) where
 instance Serialize a => Serialize (NodeInfo a) where
   get = NodeInfo <$> get <*> get
   put NodeInfo {..} = put nodeId >> put nodeAddr
-
+{-
 type CompactInfo = ByteString
 
 data NodeList a = CompactNodeList [NodeInfo a]
@@ -176,3 +181,4 @@ encodeCompact = S.runPut . mapM_ put
 
 --encodePeerList :: [PeerAddr] -> [BEncode]
 --encodePeerList = undefined
+-}

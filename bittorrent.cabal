@@ -61,6 +61,7 @@ library
                        Network.BitTorrent.DHT.Message
 --                     Network.BitTorrent.DHT.Protocol
                        Network.BitTorrent.DHT.Routing
+                       Network.BitTorrent.DHT.Token
 --                     Network.BitTorrent.Exchange
                        Network.BitTorrent.Exchange.Assembler
                        Network.BitTorrent.Exchange.Block
@@ -147,6 +148,7 @@ library
                      , entropy     >= 0.2
                      , filepath    >= 1.3
                      , mmap        >= 0.5
+                     , random      >= 1.0.0.2
 
   ghc-options:         -Wall
   ghc-prof-options:
@@ -173,6 +175,7 @@ test-suite spec
                        Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.DHT.MessageSpec
                        Network.BitTorrent.DHT.RoutingSpec
+                       Network.BitTorrent.DHT.TokenSpec
                        Network.BitTorrent.Tracker.MessageSpec
                        Network.BitTorrent.Tracker.RPCSpec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec

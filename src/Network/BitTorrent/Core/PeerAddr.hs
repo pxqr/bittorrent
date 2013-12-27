@@ -38,6 +38,7 @@ import Data.BEncode.BDict (BKey)
 import Data.ByteString.Char8 as BS8
 import Data.Char
 import Data.Default
+import Data.Hashable
 import Data.HashMap.Strict as HM
 import Data.IP
 import Data.List      as L
@@ -80,6 +81,10 @@ instance Serialize PortNumber where
   {-# INLINE get #-}
   put = putWord16be . fromIntegral
   {-# INLINE put #-}
+
+instance Hashable PortNumber where
+  hashWithSalt s = hashWithSalt s . fromEnum
+  {-# INLINE hashWithSalt #-}
 
 {-----------------------------------------------------------------------
 --  IP addr

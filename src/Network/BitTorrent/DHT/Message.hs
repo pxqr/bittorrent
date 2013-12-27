@@ -30,7 +30,6 @@ module Network.BitTorrent.DHT.Message
 import Control.Applicative
 import Data.BEncode as BE
 import Data.BEncode.BDict
-import Data.ByteString as BS
 import Data.List as L
 import Data.Monoid
 import Data.Serialize as S
@@ -40,13 +39,12 @@ import Network.KRPC
 
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
+import Network.BitTorrent.DHT.Token
 import Network.KRPC ()
 
 {-----------------------------------------------------------------------
 -- envelopes
 -----------------------------------------------------------------------}
-
-type Token = ByteString
 
 node_id_key :: BKey
 node_id_key = "id"

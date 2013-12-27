@@ -12,9 +12,9 @@ import Network.Socket (PortNumber)
 import Test.Hspec
 import Test.QuickCheck
 
-import Network.BitTorrent.CoreSpec ()
-import Data.Torrent.InfoHashSpec   ()
-
+import Network.BitTorrent.CoreSpec      ()
+import Network.BitTorrent.DHT.TokenSpec ()
+import Data.Torrent.InfoHashSpec        ()
 
 remoteAddr :: SockAddr
 remoteAddr = SockAddrInet 6881 (256 * 256 * 256 + 127)
