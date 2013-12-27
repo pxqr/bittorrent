@@ -143,15 +143,24 @@ spec = do
                  \5:token8:aoeusnth\
                 \e" `shouldBe` Right
         (Query "abcdefghij0123456789"
-                   (Announce "mnopqrstuvwxyz123456" 6881 "aoeusnth"))
+                   (Announce False "mnopqrstuvwxyz123456" 6881 "aoeusnth"))
+
+      BE.decode "d2:id20:abcdefghij0123456789\
+                 \12:implied_porti1e\
+                 \9:info_hash20:mnopqrstuvwxyz123456\
+                 \4:porti6881e\
+                 \5:token8:aoeusnth\
+                \e" `shouldBe` Right
+        (Query "abcdefghij0123456789"
+                   (Announce True "mnopqrstuvwxyz123456" 6881 "aoeusnth"))
 
 
       BE.decode "d2:id20:mnopqrstuvwxyz123456e"
         `shouldBe` Right
         (Response "mnopqrstuvwxyz123456" Announced)
 
-    it "properly bencoded (iso)" $ property $ \ nid topic port token -> do
-      prop_bencode (Query nid    (Announce topic port token))
+    it "properly bencoded (iso)" $ property $ \ nid flag topic port token -> do
+      prop_bencode (Query    nid (Announce flag topic port token))
       prop_bencode (Response nid (Announced))
 
 
@@ -160,7 +169,7 @@ spec = do
       Response _remoteId Announced <- rpc $ do
         Response _ GotPeers {..} <- query remoteAddr (Query nid (GetPeers def))
         let _ = peers :: Either [NodeInfo IPv4] [PeerAddr IPv4]
-        query remoteAddr (Query nid (Announce def thisPort grantedToken))
+        query remoteAddr (Query nid (Announce False def thisPort grantedToken))
       return ()
 
     it "does fail on invalid token" $ do
@@ -169,6 +178,6 @@ spec = do
         Response _ GotPeers {..} <- query remoteAddr (Query nid (GetPeers def))
         let _ = peers :: Either [NodeInfo IPv4] [PeerAddr IPv4]
         let invalidToken = ""
-        query remoteAddr (Query nid (Announce def thisPort invalidToken)))
+        query remoteAddr (Query nid (Announce False def thisPort invalidToken)))
           `shouldThrow` isProtocolError
       return ()

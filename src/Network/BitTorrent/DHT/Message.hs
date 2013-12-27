@@ -214,8 +214,15 @@ instance (Typeable ip, Serialize ip) =>
 -- | Announce that the peer, controlling the querying node, is
 -- downloading a torrent on a port.
 data Announce = Announce
-  { -- | infohash of the torrent;
-    topic    :: InfoHash
+  { -- | If set, the 'port' field should be ignored and the source
+    -- port of the UDP packet should be used as the peer's port
+    -- instead. This is useful for peers behind a NAT that may not
+    -- know their external port, and supporting uTP, they accept
+    -- incoming connections on the same port as the DHT port.
+    impliedPort :: Bool
+
+    -- | infohash of the torrent;
+  , topic    :: InfoHash
 
     -- | the port /this/ peer is listening;
   , port     :: PortNumber
@@ -227,16 +234,26 @@ data Announce = Announce
 port_key :: BKey
 port_key = "port"
 
+implied_port_key :: BKey
+implied_port_key = "implied_port"
+
 instance BEncode Announce where
   toBEncode Announce {..} = toDict $
-       info_hash_key .=! topic
-    .: port_key      .=! port
-    .: token_key     .=! sessionToken
+       implied_port_key .=? flagField impliedPort
+    .: info_hash_key    .=! topic
+    .: port_key         .=! port
+    .: token_key        .=! sessionToken
     .: endDict
+    where
+      flagField flag = if flag then Just (1 :: Int) else Nothing
+
   fromBEncode = fromDict $ do
-    Announce <$>! info_hash_key
+    Announce <$> (boolField <$> optional (field (req implied_port_key)))
+             <*>! info_hash_key
              <*>! port_key
              <*>! token_key
+    where
+      boolField = maybe False (/= (0 :: Int))
 
 -- | The queried node must verify that the token was previously sent
 -- to the same IP address as the querying node. Then the queried node
