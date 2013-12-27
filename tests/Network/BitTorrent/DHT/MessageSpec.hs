@@ -1,14 +1,19 @@
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.DHT.MessageSpec (spec) where
 import Control.Monad.Reader
-import Test.Hspec
 import Data.BEncode as BE
+import Data.ByteString.Lazy as BL
 import Data.Default
 import Data.List as L
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Message
 import Network.KRPC
 import Network.Socket (PortNumber)
+import Test.Hspec
+import Test.QuickCheck
+
+import Network.BitTorrent.CoreSpec ()
+import Data.Torrent.InfoHashSpec   ()
 
 
 remoteAddr :: SockAddr
@@ -29,6 +34,9 @@ rpc action = do
 isProtocolError :: KError -> Bool
 isProtocolError KError {..} = errorCode == ProtocolError
 
+prop_bencode :: Eq a => Show a => BEncode a => a -> Expectation
+prop_bencode x = BE.decode (BL.toStrict (BE.encode x)) `shouldBe` Right x
+
 spec :: Spec
 spec = do
  context ("you need running DHT node at " ++ show remoteAddr) $ do
@@ -46,8 +54,9 @@ spec = do
       BE.encode (Response "mnopqrstuvwxyz123456" Ping)
         `shouldBe` "d2:id20:mnopqrstuvwxyz123456e"
 
-    it "properly bencoded (iso)" $ do
-      pending
+    it "properly bencoded (iso)" $ property $ \ nid -> do
+      prop_bencode (Query    nid Ping)
+      prop_bencode (Response nid Ping)
 
     it "does compatible with existing DHT" $ do
       nid <- genNodeId
@@ -74,8 +83,9 @@ spec = do
                 \e"
        `shouldBe` Right (Response nid (NodeFound [NodeInfo nid' naddr]))
 
-    it "properly bencoded (iso)" $ do
-      pending
+    it "properly bencoded (iso)" $ property $ \ nid x xs -> do
+      prop_bencode (Query    nid (FindNode  x))
+      prop_bencode (Response nid (NodeFound (xs :: [NodeInfo IPv4] )))
 
     it "does compatible with existing DHT" $ do
       nid <- genNodeId
@@ -85,10 +95,38 @@ spec = do
 
   describe "get_peers" $ do
     it "properly bencoded" $ do
-      pending
+       BE.decode "d2:id20:abcdefghij0123456789\
+                  \9:info_hash20:mnopqrstuvwxyz123456\
+                  \e"
+         `shouldBe` Right (Query "abcdefghij0123456789"
+                           (GetPeers "mnopqrstuvwxyz123456"))
 
-    it "properly bencoded (iso)" $ do
-      pending
+       BE.decode "d2:id20:abcdefghij0123456789\
+                  \5:token8:aoeusnth\
+                  \6:valuesl6:\127\0\0\1\1\2\&6:\192\168\1\100\1\2e\
+                 \e"
+         `shouldBe` Right (Response "abcdefghij0123456789"
+             (GotPeers (Right [ "127.0.0.1:258" :: PeerAddr IPv4
+                              , "192.168.1.100:258"
+                              ]) "aoeusnth"))
+
+       BE.decode "d2:id20:abcdefghij0123456789\
+                  \5:nodes26:mnopqrstuvwxyz123456\127\0\0\1\1\2\
+                  \5:token8:aoeusnth\
+                 \e"
+         `shouldBe` Right (Response "abcdefghij0123456789"
+            (GotPeers
+             { peers = Left [NodeInfo "mnopqrstuvwxyz123456" "127.0.0.1:258"
+                                 :: NodeInfo IPv4]
+             , grantedToken = "aoeusnth"
+             }))
+
+    it "properly bencoded (iso)" $ property $ \ nid topic exs token -> do
+      prop_bencode (Query    nid (GetPeers topic))
+      let _ = exs :: Either [NodeInfo IPv4] [PeerAddr IPv4]
+      let nullPeerId paddr = paddr {peerId = Nothing}
+      let nullPeerIds      = either Left (Right . L.map nullPeerId)
+      prop_bencode (Response nid (GotPeers (nullPeerIds exs) token))
 
     it "does compatible with existing DHT" $ do
       nid <- genNodeId
@@ -99,10 +137,23 @@ spec = do
 
   describe "announce" $ do
     it "properly bencoded" $ do
-      pending
+      BE.decode "d2:id20:abcdefghij0123456789\
+                 \9:info_hash20:mnopqrstuvwxyz123456\
+                 \4:porti6881e\
+                 \5:token8:aoeusnth\
+                \e" `shouldBe` Right
+        (Query "abcdefghij0123456789"
+                   (Announce "mnopqrstuvwxyz123456" 6881 "aoeusnth"))
 
-    it "properly bencoded (iso)" $ do
-      pending
+
+      BE.decode "d2:id20:mnopqrstuvwxyz123456e"
+        `shouldBe` Right
+        (Response "mnopqrstuvwxyz123456" Announced)
+
+    it "properly bencoded (iso)" $ property $ \ nid topic port token -> do
+      prop_bencode (Query nid    (Announce topic port token))
+      prop_bencode (Response nid (Announced))
+
 
     it "does compatible with existing DHT" $ do
       nid <- genNodeId

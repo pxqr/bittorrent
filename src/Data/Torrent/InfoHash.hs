@@ -120,6 +120,7 @@ instance Convertible BS.ByteString InfoHash where
 -- | Parse infohash from base16\/base32\/base64 encoded string.
 instance Convertible Text InfoHash where
   safeConvert t
+      | 20 == hashLen = pure (InfoHash hashStr)
       | 26 <= hashLen && hashLen <= 28 =
         case Base64.decode hashStr of
           Left  msg   -> convError ("invalid base64 encoding " ++ msg) t

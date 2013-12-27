@@ -31,6 +31,7 @@ import Control.Applicative
 import Data.BEncode as BE
 import Data.BEncode.BDict
 import Data.ByteString as BS
+import Data.List as L
 import Data.Monoid
 import Data.Serialize as S
 import Data.Typeable
@@ -138,7 +139,7 @@ binary k = field (req k) >>= either (fail . format) return .
 
 instance (Typeable ip, Serialize ip) => BEncode (NodeFound ip) where
   toBEncode (NodeFound ns) = toDict $
-       nodes_key .=! S.encode ns
+       nodes_key .=! runPut (mapM_ put ns)
     .: endDict
 
   fromBEncode = fromDict $ NodeFound <$> binary nodes_key
@@ -154,7 +155,7 @@ instance (Serialize ip, Typeable ip)
 
 -- | Get peers associated with a torrent infohash.
 newtype GetPeers = GetPeers InfoHash
-  deriving Typeable
+  deriving (Show, Eq, Typeable)
 
 info_hash_key :: BKey
 info_hash_key = "info_hash"
@@ -172,7 +173,7 @@ data GotPeers ip = GotPeers
     -- | The token value is a required argument for a future
     -- announce_peer query.
   , grantedToken :: Token
-  } deriving Typeable
+  } deriving (Show, Eq, Typeable)
 
 peers_key :: BKey
 peers_key = "values"
@@ -182,17 +183,25 @@ token_key = "token"
 
 instance (Typeable ip, Serialize ip) => BEncode (GotPeers ip) where
   toBEncode GotPeers {..} = toDict $
-       putPeerList peers
-    .: token_key .=! grantedToken
-    .: endDict
-    where
-      putPeerList (Right ps) = peers_key .=! S.encode ps
-      putPeerList (Left  ns) = nodes_key .=! S.encode ns
+    case peers of
+      Left  ns ->
+           nodes_key .=! runPut (mapM_ put ns)
+        .: token_key .=! grantedToken
+        .: endDict
+      Right ps ->
+           token_key .=! grantedToken
+        .: peers_key .=! L.map S.encode ps
+        .: endDict
 
-  fromBEncode = fromDict $ GotPeers <$> getPeerList  <*>! token_key
-    where
-      getPeerList = Right <$> binary peers_key
-                <|> Left  <$> binary nodes_key
+  fromBEncode = fromDict $ do
+     mns <- optional (binary nodes_key)                      -- "nodes"
+     tok <- field    (req    token_key)                      -- "token"
+     mps <- optional (field (req peers_key) >>= decodePeers) -- "values"
+     case (Right <$> mps) <|> (Left <$> mns) of
+       Nothing -> fail "get_peers: neihter peers nor nodes key is valid"
+       Just xs -> pure $ GotPeers xs tok
+     where
+       decodePeers = either fail pure . mapM S.decode
 
 instance (Typeable ip, Serialize ip) =>
          KRPC (Query GetPeers) (Response (GotPeers ip)) where
@@ -213,7 +222,7 @@ data Announce = Announce
 
     -- | received in response to a previous get_peers query.
   , sessionToken :: Token
-  } deriving Typeable
+  } deriving (Show, Eq, Typeable)
 
 port_key :: BKey
 port_key = "port"
@@ -235,6 +244,7 @@ instance BEncode Announce where
 -- port number under the infohash in its store of peer contact
 -- information.
 data Announced = Announced
+  deriving (Show, Eq, Typeable)
 
 instance BEncode Announced where
   toBEncode   _ = toBEncode Ping
