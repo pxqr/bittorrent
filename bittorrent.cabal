@@ -172,6 +172,7 @@ test-suite spec
                        Network.BitTorrent.Core.PeerAddrSpec
                        Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.DHT.MessageSpec
+                       Network.BitTorrent.DHT.RoutingSpec
                        Network.BitTorrent.Tracker.MessageSpec
                        Network.BitTorrent.Tracker.RPCSpec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
