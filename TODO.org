@@ -6,3 +6,6 @@
   recvmsg/sendmsg which will block the whole OS thread.
 
 ** TODO Compare performance of the two
+* TODO Proper handling of transaction ids in UDP tracker
+
+Just like the krpc package does.
