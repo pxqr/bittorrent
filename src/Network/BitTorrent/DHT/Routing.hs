@@ -95,24 +95,30 @@ insert ping (k, v) = go 0
 -}
 
 {-----------------------------------------------------------------------
---  Insertion
+--  Routing monad
 -----------------------------------------------------------------------}
 
 type Timestamp = POSIXTime
 
 data Routing ip result
-  = Full      result
-  | Done     (Timestamp -> result)
-  | GetTime                ( Timestamp                 -> Routing ip result)
-  | Refresh   NodeId       (([NodeInfo ip], Timestamp) -> Routing ip result)
-  | NeedPing (NodeAddr ip) (Maybe Timestamp            -> Routing ip result)
+  = Done      result
+  | GetTime                ( Timestamp    -> Routing ip result)
+  | NeedPing (NodeAddr ip) ( Bool         -> Routing ip result)
+  | Refresh   NodeId       ([NodeInfo ip] -> Routing ip result)
 
 instance Functor (Routing ip) where
-  fmap f (Full          r) = Full          (     f   r)
-  fmap f (Done          r) = Done          (     f . r)
+  fmap f (Done          r) = Done          (     f   r)
   fmap f (GetTime       g) = GetTime       (fmap f . g)
-  fmap f (Refresh  addr g) = Refresh  addr (fmap f . g)
   fmap f (NeedPing addr g) = NeedPing addr (fmap f . g)
+  fmap f (Refresh  nid  g) = Refresh  nid  (fmap f . g)
+
+instance Monad (Routing ip) where
+  return = Done
+
+  Done       r >>= m = m r
+  GetTime    f >>= m = GetTime     $ \ t -> f t >>= m
+  NeedPing a f >>= m = NeedPing a  $ \ p -> f p >>= m
+  Refresh  n f >>= m = Refresh  n  $ \ i -> f i >>= m
 
 runRouting :: (Monad m, Eq ip)
              => (NodeAddr ip -> m Bool)          -- ^ ping_node
@@ -122,24 +128,27 @@ runRouting :: (Monad m, Eq ip)
              -> m f                              -- ^ result
 runRouting ping_node find_nodes timestamper = go
   where
-    go (Full          r) = return r
-    go (Done          f) = liftM f timestamper
+    go (Done          r) = return r
     go (GetTime       f) = do
       t <- timestamper
       go (f t)
 
     go (NeedPing addr f) = do
       pong <- ping_node addr
-      if pong
-        then do
-             time <- timestamper
-             go (f (Just time))
-        else go (f Nothing)
+      go (f pong)
 
     go (Refresh nid f) = do
       infos <- find_nodes nid
-      time  <- timestamper
-      go (f (infos, time))
+      go (f infos)
+
+getTime :: Routing ip Timestamp
+getTime = GetTime return
+
+needPing :: NodeAddr ip -> Routing ip Bool
+needPing addr = NeedPing addr return
+
+refresh :: NodeId -> Routing ip [NodeInfo ip]
+refresh nid = Refresh nid return
 
 {-----------------------------------------------------------------------
     Bucket
@@ -197,34 +206,37 @@ insertBucket :: Eq ip => Timestamp -> NodeInfo ip -> Bucket ip
            -> ip `Routing` Bucket ip
 insertBucket curTime info bucket
   -- just update timestamp if a node is already in bucket
-  | Just _ <- PSQ.lookup info bucket
-  = Done $ \ t -> PSQ.insertWith max info t bucket
+  | Just _ <- PSQ.lookup info bucket = do
+    return $ PSQ.insertWith max info curTime bucket
 
   -- update the all bucket if it is too outdated
   | Just (NodeInfo {..} :-> lastSeen) <- lastChanged bucket
-  , curTime - lastSeen > delta
-  = Refresh nodeId $ \ (infos, t) ->
-      insertNode info $
-      L.foldr (\ x -> PSQ.insertWith max x t) bucket infos
+  , curTime - lastSeen > delta = do
+    infos   <- refresh nodeId
+    refTime <- getTime
+    let newBucket = L.foldr (\ x -> PSQ.insertWith max x refTime) bucket infos
+    insertBucket refTime info newBucket
 
   -- update questionable nodes, if any; then try to insert our new node
   -- this case can remove bad nodes from bucket, so we can insert a new one
   | Just ((old @ NodeInfo {..} :-> leastSeen), rest) <- leastRecently bucket
-  , curTime - leastSeen > delta
-  = NeedPing nodeAddr $ \ mtime ->
-      insertNode info $
-        case mtime of
-          Nothing       -> rest
-          Just pongTime -> PSQ.insert old pongTime bucket
+  , curTime - leastSeen > delta = do
+    pong     <- needPing nodeAddr
+    pongTime <- getTime
+    let newBucket = if pong then PSQ.insert old pongTime bucket else rest
+    insertBucket pongTime info newBucket
 
   -- bucket is good, but not full => we can insert a new node
-  | PSQ.size bucket < defaultAlpha  = Done (\ t -> PSQ.insert info t bucket)
+  | PSQ.size bucket < defaultAlpha = do
+    return $ PSQ.insert info curTime bucket
 
   -- bucket is full of good nodes => ignore new node
-  | otherwise = Full bucket
+  | otherwise = return bucket
 
 insertNode :: Eq ip => NodeInfo ip -> Bucket ip -> ip `Routing` Bucket ip
-insertNode info bucket = GetTime $ \ curTime -> insertBucket curTime info bucket
+insertNode info bucket = do
+  curTime <- getTime
+  insertBucket curTime info bucket
 
 type BitIx = Word
 
@@ -337,7 +349,7 @@ insert info @ NodeInfo {..} = go (0 :: BitIx)
       | testIdBit nodeId i  =   One  bucket   <$> go (succ i) table
       |     otherwise       = (`One` table)   <$> insertNode info bucket
     go i (Tip nid n bucket) = case insertNode info bucket of
-      Full kbucket
-        |   n == 0  -> Tip nid n <$> Full kbucket
+      Done kbucket
+        |   n == 0  -> Tip nid n <$> Done kbucket
         | otherwise -> go (succ i) (splitTip nid n i kbucket)
       result -> Tip nid n <$> result
