@@ -37,13 +37,12 @@ module Network.BitTorrent.DHT.Routing
        , Network.BitTorrent.DHT.Routing.insert
        ) where
 
-import Control.Applicative hiding (empty)
+import Control.Applicative as A
 import Control.Arrow
 import Control.Monad
 import Data.Function
 import Data.List as L hiding (insert)
 import Data.Maybe
-import Data.Monoid
 import Data.PSQueue as PSQ
 import Data.Serialize as S hiding (Result, Done)
 import Data.Time
@@ -101,12 +100,14 @@ insert ping (k, v) = go 0
 type Timestamp = POSIXTime
 
 data Routing ip result
-  = Done      result
+  = Full
+  | Done      result
   | GetTime                ( Timestamp    -> Routing ip result)
   | NeedPing (NodeAddr ip) ( Bool         -> Routing ip result)
   | Refresh   NodeId       ([NodeInfo ip] -> Routing ip result)
 
 instance Functor (Routing ip) where
+  fmap _  Full             = Full
   fmap f (Done          r) = Done          (     f   r)
   fmap f (GetTime       g) = GetTime       (fmap f . g)
   fmap f (NeedPing addr g) = NeedPing addr (fmap f . g)
@@ -115,20 +116,31 @@ instance Functor (Routing ip) where
 instance Monad (Routing ip) where
   return = Done
 
+  Full         >>= _ = Full
   Done       r >>= m = m r
   GetTime    f >>= m = GetTime     $ \ t -> f t >>= m
   NeedPing a f >>= m = NeedPing a  $ \ p -> f p >>= m
   Refresh  n f >>= m = Refresh  n  $ \ i -> f i >>= m
+
+instance Applicative (Routing ip) where
+  pure  = return
+  (<*>) = ap
+
+instance Alternative (Routing ip) where
+  empty = Full
+  Full <|> m = m
+  m    <|> _ = m
 
 runRouting :: (Monad m, Eq ip)
              => (NodeAddr ip -> m Bool)          -- ^ ping_node
              -> (NodeId      -> m [NodeInfo ip]) -- ^ find_nodes
              -> m Timestamp                      -- ^ timestamper
              -> Routing ip f                     -- ^ action
-             -> m f                              -- ^ result
+             -> m (Maybe f)                      -- ^ result
 runRouting ping_node find_nodes timestamper = go
   where
-    go (Done          r) = return r
+    go  Full             = return (Nothing)
+    go (Done          r) = return (Just  r)
     go (GetTime       f) = do
       t <- timestamper
       go (f t)
@@ -231,7 +243,7 @@ insertBucket curTime info bucket
     return $ PSQ.insert info curTime bucket
 
   -- bucket is full of good nodes => ignore new node
-  | otherwise = return bucket
+  | otherwise = A.empty
 
 insertNode :: Eq ip => NodeInfo ip -> Bucket ip -> ip `Routing` Bucket ip
 insertNode info bucket = do
@@ -348,8 +360,7 @@ insert info @ NodeInfo {..} = go (0 :: BitIx)
     go i (One  bucket table )
       | testIdBit nodeId i  =   One  bucket   <$> go (succ i) table
       |     otherwise       = (`One` table)   <$> insertNode info bucket
-    go i (Tip nid n bucket) = case insertNode info bucket of
-      Done kbucket
-        |   n == 0  -> Tip nid n <$> Done kbucket
-        | otherwise -> go (succ i) (splitTip nid n i kbucket)
-      result -> Tip nid n <$> result
+    go i (Tip nid n bucket)
+      |        n == 0       =   Tip nid n     <$> insertNode info bucket
+      |     otherwise       =   Tip nid n     <$> insertNode info bucket
+                           <|>  go (succ i) (splitTip nid n i bucket)

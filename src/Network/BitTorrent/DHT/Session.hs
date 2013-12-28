@@ -33,7 +33,7 @@ module Network.BitTorrent.DHT.Session
 
 import Control.Applicative
 import Control.Concurrent.STM
-import Control.Exception hiding (Handler)
+import Control.Exception.Lifted hiding (Handler)
 import Control.Monad.Base
 import Control.Monad.Logger
 import Control.Monad.Reader
@@ -145,15 +145,16 @@ runDHT naddr handlers action = runResourceT $ do
 -----------------------------------------------------------------------}
 
 --  TODO fork?
-routing :: Address ip => Routing ip a -> DHT ip a
+routing :: Address ip => Routing ip a -> DHT ip (Maybe a)
 routing = runRouting ping refreshNodes getTimestamp
 
 -- TODO add timeout
 ping :: Address ip => NodeAddr ip -> DHT ip Bool
 ping addr = do
   $(logDebugS) "routing.questionable_node" (T.pack (render (pretty addr)))
-  Ping <- Ping <@> addr
-  return True
+  result <- try $ Ping <@> addr
+  let _ = result :: Either SomeException Ping
+  return $ either (const False) (const True) result
 
 -- FIXME do not use getClosest sinse we should /refresh/ them
 refreshNodes :: Address ip => NodeId -> DHT ip [NodeInfo ip]
@@ -167,9 +168,9 @@ refreshNodes nid = do
 
 getTimestamp :: DHT ip Timestamp
 getTimestamp = do
-  timestamp <- liftIO $ getCurrentTime
-  $(logDebugS) "routing.make_timestamp" (T.pack (render (pretty timestamp)))
-  return $ utcTimeToPOSIXSeconds timestamp
+  utcTime <- liftIO $ getCurrentTime
+  $(logDebugS) "routing.make_timestamp" (T.pack (render (pretty utcTime)))
+  return $ utcTimeToPOSIXSeconds utcTime
 
 {-----------------------------------------------------------------------
 -- Tokens
@@ -222,11 +223,13 @@ getClosestHash ih = kclosestHash 8 ih <$> getTable
 insertNode :: Address ip => NodeInfo ip -> DHT ip ()
 insertNode info = do
   t  <- getTable
-  t' <- routing (R.insert info t)
-  putTable t'
-
-  let logMsg = "Routing table updated: " <> pretty t <> " -> " <> pretty t'
-  $(logDebugS) "insertNode" (T.pack (render logMsg))
+  mt <- routing (R.insert info t)
+  case mt of
+    Nothing -> $(logDebugS) "insertNode" "Routing table is full"
+    Just t' -> do
+      putTable t'
+      let logMsg = "Routing table updated: " <> pretty t <> " -> " <> pretty t'
+      $(logDebugS) "insertNode" (T.pack (render logMsg))
 
 {-----------------------------------------------------------------------
 -- Peer storage
