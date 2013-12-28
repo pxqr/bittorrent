@@ -109,7 +109,7 @@ genNodeId = NodeId <$> getEntropy nodeIdSize
 data NodeAddr a = NodeAddr
   { nodeHost ::                !a
   , nodePort :: {-# UNPACK #-} !PortNumber
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable)
 
 $(deriveJSON omitRecordPrefix ''NodeAddr)
 
@@ -165,20 +165,3 @@ instance Eq a => Ord (NodeInfo a) where
 instance Serialize a => Serialize (NodeInfo a) where
   get = NodeInfo <$> get <*> get
   put NodeInfo {..} = put nodeId >> put nodeAddr
-{-
-type CompactInfo = ByteString
-
-data NodeList a = CompactNodeList [NodeInfo a]
-
-decodeCompact :: Serialize a => CompactInfo -> [NodeInfo a]
-decodeCompact = either (const []) id . S.runGet (many get)
-
-encodeCompact :: [NodeId] -> CompactInfo
-encodeCompact = S.runPut . mapM_ put
-
---decodePeerList :: [BEncode] -> [PeerAddr]
---decodePeerList = undefined
-
---encodePeerList :: [PeerAddr] -> [BEncode]
---encodePeerList = undefined
--}
