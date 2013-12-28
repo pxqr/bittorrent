@@ -12,7 +12,6 @@
 module Network.BitTorrent.DHT.Routing
        ( -- * Routing table
          Table
-       , BucketCount
 
          -- * Routing
        , Timestamp
@@ -35,15 +34,18 @@ module Network.BitTorrent.DHT.Routing
 import Control.Applicative hiding (empty)
 import Control.Arrow
 import Control.Monad
+import Data.Function
 import Data.List as L hiding (insert)
 import Data.Maybe
-import Data.Function
+import Data.Monoid
 import Data.PSQueue as PSQ
 import Data.Serialize as S hiding (Result, Done)
 import Data.Time
 import Data.Time.Clock.POSIX
 import Data.Word
 import GHC.Generics
+import Text.PrettyPrint as PP hiding ((<>))
+import Text.PrettyPrint.Class
 
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
@@ -95,12 +97,14 @@ type Timestamp = POSIXTime
 data Routing ip result
   = Full      result
   | Done     (Timestamp -> result)
+  | GetTime                ( Timestamp                 -> Routing ip result)
   | Refresh   NodeId       (([NodeInfo ip], Timestamp) -> Routing ip result)
   | NeedPing (NodeAddr ip) (Maybe Timestamp            -> Routing ip result)
 
 instance Functor (Routing ip) where
   fmap f (Full          r) = Full          (     f   r)
   fmap f (Done          r) = Done          (     f . r)
+  fmap f (GetTime       g) = GetTime       (fmap f . g)
   fmap f (Refresh  addr g) = Refresh  addr (fmap f . g)
   fmap f (NeedPing addr g) = NeedPing addr (fmap f . g)
 
@@ -114,6 +118,10 @@ runRouting ping_node find_nodes timestamper = go
   where
     go (Full          r) = return r
     go (Done          f) = liftM f timestamper
+    go (GetTime       f) = do
+      t <- timestamper
+      go (f t)
+
     go (NeedPing addr f) = do
       pong <- ping_node addr
       if pong
@@ -171,7 +179,7 @@ leastRecently = minView
 
 -- | Update interval, in seconds.
 delta :: NominalDiffTime
-delta = 15
+delta = 15 * 60
 
 -- | Max bucket size, in nodes.
 type Alpha = Int
@@ -179,15 +187,16 @@ type Alpha = Int
 defaultAlpha :: Int
 defaultAlpha = 8
 
-insertNode :: Eq ip => NodeInfo ip -> Bucket ip -> ip `Routing` Bucket ip
-insertNode info bucket
+insertBucket :: Eq ip => Timestamp -> NodeInfo ip -> Bucket ip
+           -> ip `Routing` Bucket ip
+insertBucket curTime info bucket
   -- just update timestamp if a node is already in bucket
   | Just _ <- PSQ.lookup info bucket
   = Done $ \ t -> PSQ.insertWith max info t bucket
 
   -- update the all bucket if it is too outdated
   | Just (NodeInfo {..} :-> lastSeen) <- lastChanged bucket
-  , lastSeen > delta
+  , curTime - lastSeen > delta
   = Refresh nodeId $ \ (infos, t) ->
       insertNode info $
       L.foldr (\ x -> PSQ.insertWith max x t) bucket infos
@@ -195,15 +204,21 @@ insertNode info bucket
   -- update questionable nodes, if any; then try to insert our new node
   -- this case can remove bad nodes from bucket, so we can insert a new one
   | Just ((old @ NodeInfo {..} :-> leastSeen), rest) <- leastRecently bucket
-  , leastSeen > delta
-  = NeedPing nodeAddr $ insertNode info . maybe rest
-        (\ pong_time -> PSQ.insert old pong_time bucket)
+  , curTime - leastSeen > delta
+  = NeedPing nodeAddr $ \ mtime ->
+      insertNode info $
+        case mtime of
+          Nothing       -> bucket
+          Just pongTime -> PSQ.insert old pongTime bucket
 
   -- bucket is good, but not full => we can insert a new node
   | PSQ.size bucket < defaultAlpha  = Done (\ t -> PSQ.insert info t bucket)
 
   -- bucket is full of good nodes => ignore new node
   | otherwise = Full bucket
+
+insertNode :: Eq ip => NodeInfo ip -> Bucket ip -> ip `Routing` Bucket ip
+insertNode info bucket = GetTime $ \ curTime -> insertBucket curTime info bucket
 
 type BitIx = Word
 
@@ -216,13 +231,11 @@ split i = (PSQ.fromList *** PSQ.fromList) . partition spanBit . PSQ.toList
 --  Table
 -----------------------------------------------------------------------}
 
-type BucketCount = Word
-
-defaultBucketCount :: BucketCount
+defaultBucketCount :: Int
 defaultBucketCount = 20
 
 data Table ip
-  = Tip  NodeId BucketCount (Bucket ip)
+  = Tip  NodeId Int (Bucket ip)
   | Zero (Table  ip) (Bucket ip)
   | One  (Bucket ip) (Table  ip)
     deriving Generic
@@ -235,6 +248,12 @@ instance Serialize NominalDiffTime where
 -- the client software. Note that you don't need store /this/ 'NodeId'
 -- since it is included in routing table.
 instance (Eq ip, Serialize ip) => Serialize (Table ip)
+
+instance Pretty (Table ip) where
+  pretty t =
+      "size  = " <> PP.int (Network.BitTorrent.DHT.Routing.size  t) <>
+    ", depth = " <> PP.int (depth t)
+
 
 nullTable :: Eq ip => NodeId -> Table ip
 nullTable nid = Tip nid defaultBucketCount PSQ.empty
@@ -253,7 +272,7 @@ size = go
     go (One bucket t  ) = PSQ.size bucket + go t
 
 -- | Get number of buckets in the table.
-depth :: Table ip -> BucketCount
+depth :: Table ip -> Int
 depth = go
   where
     go (Tip _ _ _) = 1
@@ -291,7 +310,7 @@ kclosestHash k nid t = kclosest k (coerseId nid) t
 --  Routing
 -----------------------------------------------------------------------}
 
-splitTip :: Eq ip => NodeId -> BucketCount -> BitIx -> Bucket ip -> Table ip
+splitTip :: Eq ip => NodeId -> Int -> BitIx -> Bucket ip -> Table ip
 splitTip nid n i bucket
   | testIdBit nid i = (One  zeros (Tip nid (pred n) ones))
   |    otherwise    = (Zero (Tip nid (pred n) zeros) ones)
