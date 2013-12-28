@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Network.BitTorrent.DHT
        ( dht
        , ping
@@ -8,9 +10,13 @@ module Network.BitTorrent.DHT
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Reader
+import Control.Monad.Logger
 import Data.List as L
+import Data.Monoid
+import Data.Text as T
 import Network.Socket (PortNumber)
+import Text.PrettyPrint as PP hiding ((<>))
+import Text.PrettyPrint.Class
 
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
@@ -59,11 +65,16 @@ ping addr = do
 
 -- | One good node may be sufficient. <note about 'Data.Torrent.tNodes'>
 bootstrap :: Address ip => [NodeAddr ip] -> DHT ip ()
-bootstrap = mapM_ insertClosest
+bootstrap startNodes = do
+    $(logInfoS) "bootstrap" "Start node bootstrapping"
+    mapM_ insertClosest startNodes
+    $(logInfoS) "bootstrap" "Node bootstrapping finished"
   where
     insertClosest addr = do
       nid <- getNodeId
       NodeFound closest <- FindNode nid <@> addr
+      $(logDebug) ("Get a list of closest nodes: " <>
+                  T.pack (PP.render (pretty closest)))
       forM_ closest insertNode
 
 -- | Get list of peers which downloading

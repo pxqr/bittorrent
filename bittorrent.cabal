@@ -108,6 +108,10 @@ library
                      , network-conduit  >= 1.0
                      , cereal-conduit   >= 0.5
 
+                       -- * Logging
+                     , fast-logger  >= 2.0
+                     , monad-logger >= 0.3.4
+
                        -- Data & Data structures
                      , bytestring   >= 0.10
                      , containers   >= 0.5
