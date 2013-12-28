@@ -208,7 +208,7 @@ insertBucket curTime info bucket
   = NeedPing nodeAddr $ \ mtime ->
       insertNode info $
         case mtime of
-          Nothing       -> bucket
+          Nothing       -> rest
           Just pongTime -> PSQ.insert old pongTime bucket
 
   -- bucket is good, but not full => we can insert a new node
