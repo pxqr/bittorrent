@@ -17,7 +17,7 @@ module Network.BitTorrent.DHT.Token
        , Network.BitTorrent.DHT.Token.tokens
        , Network.BitTorrent.DHT.Token.lookup
        , Network.BitTorrent.DHT.Token.member
-       , Network.BitTorrent.DHT.Token.updateInterval
+       , Network.BitTorrent.DHT.Token.defaultUpdateInterval
        , Network.BitTorrent.DHT.Token.update
        ) where
 
@@ -43,7 +43,7 @@ type Secret = Int
 newtype Token = Token BS.ByteString
   deriving (Show, Eq, BEncode, IsString)
 
--- | Meaningless token, for testsing purposes only.
+-- | Meaningless token, for testing purposes only.
 instance Default Token where
   def = Token "0xdeadbeef"
 
@@ -78,8 +78,8 @@ member addr token TokenMap {..} = token `L.elem` valid
 
 -- Secret changes every five minutes and tokens up to ten minutes old
 -- are accepted.
-updateInterval :: NominalDiffTime
-updateInterval = 5 * 60
+defaultUpdateInterval :: NominalDiffTime
+defaultUpdateInterval = 5 * 60
 
 update :: TokenMap -> TokenMap
 update TokenMap {..} = TokenMap
