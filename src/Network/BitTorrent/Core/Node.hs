@@ -37,11 +37,14 @@ import Data.Aeson (ToJSON, FromJSON)
 import Data.Aeson.TH
 import Data.Bits
 import Data.ByteString as BS
+import Data.ByteString.Char8 as BC
+import Data.ByteString.Base16 as Base16
 import Data.BEncode as BE
 import Data.Default
 import Data.Hashable
 import Data.IP
 import Data.List as L
+import Data.Monoid
 import Data.Ord
 import Data.Serialize as S
 import Data.String
@@ -49,6 +52,8 @@ import Data.Typeable
 import Data.Word
 import Network
 import System.Entropy
+import Text.PrettyPrint as PP hiding ((<>))
+import Text.PrettyPrint.Class
 
 import Data.Torrent.JSON
 import Network.BitTorrent.Core.PeerAddr (PeerAddr (..))
@@ -85,6 +90,10 @@ instance IsString NodeId where
     | L.length str == nodeIdSize = NodeId (fromString str)
     |           otherwise = error "fromString: invalid NodeId length"
   {-# INLINE fromString #-}
+
+-- | base16 encoded.
+instance Pretty NodeId where
+  pretty (NodeId nid) = PP.text $ BC.unpack $ Base16.encode nid
 
 -- | Test if the nth bit is set.
 testIdBit :: NodeId -> Word -> Bool
@@ -131,6 +140,9 @@ instance Hashable a => Hashable (NodeAddr a) where
   hashWithSalt s NodeAddr {..} = hashWithSalt s (nodeHost, nodePort)
   {-# INLINE hashWithSalt #-}
 
+instance Pretty ip => Pretty (NodeAddr ip) where
+  pretty NodeAddr {..} = pretty nodeHost <> ":" <> pretty nodePort
+
 -- | Example:
 --
 --   @nodePort \"127.0.0.1:6881\" == 6881@
@@ -165,3 +177,9 @@ instance Eq a => Ord (NodeInfo a) where
 instance Serialize a => Serialize (NodeInfo a) where
   get = NodeInfo <$> get <*> get
   put NodeInfo {..} = put nodeId >> put nodeAddr
+
+instance Pretty ip => Pretty (NodeInfo ip) where
+  pretty NodeInfo {..} = pretty nodeId <> "@(" <> pretty nodeAddr <> ")"
+
+instance Pretty ip => Pretty [NodeInfo ip] where
+  pretty = PP.vcat . PP.punctuate "," . L.map pretty

@@ -50,7 +50,7 @@ import Data.String
 import Data.Typeable
 import Data.Word
 import Network.Socket
-import Text.PrettyPrint hiding ((<>))
+import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 import Text.Read (readMaybe)
 import qualified Text.ParserCombinators.ReadP as RP
@@ -85,6 +85,10 @@ instance Serialize PortNumber where
 instance Hashable PortNumber where
   hashWithSalt s = hashWithSalt s . fromEnum
   {-# INLINE hashWithSalt #-}
+
+instance Pretty PortNumber where
+  pretty = PP.int . fromEnum
+  {-# INLINE pretty #-}
 
 {-----------------------------------------------------------------------
 --  IP addr
@@ -159,6 +163,18 @@ instance Serialize IPv4 where
 instance Serialize IPv6 where
     put ip = put $ toHostAddress6 ip
     get = fromHostAddress6 <$> get
+
+instance Pretty IPv4 where
+  pretty = PP.text . show
+  {-# INLINE pretty #-}
+
+instance Pretty IPv6 where
+  pretty = PP.text . show
+  {-# INLINE pretty #-}
+
+instance Pretty IP where
+  pretty = PP.text . show
+  {-# INLINE pretty #-}
 
 {-----------------------------------------------------------------------
 --  Peer addr

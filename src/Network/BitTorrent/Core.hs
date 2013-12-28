@@ -20,8 +20,11 @@ module Network.BitTorrent.Core
 import Control.Applicative
 import Data.IP
 import Data.Serialize
+import Data.Time
 import Data.Typeable
 import Network.Socket (SockAddr (..), PortNumber)
+import Text.PrettyPrint as PP hiding ((<>))
+import Text.PrettyPrint.Class
 
 import Network.BitTorrent.Core.Fingerprint as Core
 import Network.BitTorrent.Core.Node        as Core
@@ -29,7 +32,10 @@ import Network.BitTorrent.Core.PeerId      as Core
 import Network.BitTorrent.Core.PeerAddr    as Core
 
 
-class (Eq a, Serialize a, Typeable a) => Address a where
+instance Pretty UTCTime where
+  pretty = PP.text . show
+
+class (Eq a, Serialize a, Typeable a, Pretty a) => Address a where
   toSockAddr   :: a        -> SockAddr
   fromSockAddr :: SockAddr -> Maybe a
 
