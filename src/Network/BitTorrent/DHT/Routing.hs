@@ -8,12 +8,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators   #-}
 {-# LANGUAGE DeriveGeneric   #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Network.BitTorrent.DHT.Routing
        ( -- * Routing table
          Table
        , BucketCount
 
          -- * Routing
+       , Timestamp
        , Routing
        , runRouting
 
@@ -89,12 +91,11 @@ insert ping (k, v) = go 0
 -----------------------------------------------------------------------}
 
 type Timestamp = POSIXTime
-type PingInterval = POSIXTime
 
 data Routing ip result
   = Full      result
   | Done     (Timestamp -> result)
-  | Refresh  (NodeAddr ip) (([NodeInfo ip], Timestamp) -> Routing ip result)
+  | Refresh   NodeId       (([NodeInfo ip], Timestamp) -> Routing ip result)
   | NeedPing (NodeAddr ip) (Maybe Timestamp            -> Routing ip result)
 
 instance Functor (Routing ip) where
@@ -107,23 +108,24 @@ runRouting :: (Monad m, Eq ip)
              => (NodeAddr ip -> m Bool)          -- ^ ping_node
              -> (NodeId      -> m [NodeInfo ip]) -- ^ find_nodes
              -> m Timestamp                      -- ^ timestamper
-             -> Routing ip f
+             -> Routing ip f                     -- ^ action
              -> m f                              -- ^ result
-runRouting ping_node find_nodes timestamp = go
+runRouting ping_node find_nodes timestamper = go
   where
     go (Full          r) = return r
-    go (Done          f) = liftM f timestamp
+    go (Done          f) = liftM f timestamper
     go (NeedPing addr f) = do
       pong <- ping_node addr
       if pong
         then do
-             time <- timestamp
+             time <- timestamper
              go (f (Just time))
         else go (f Nothing)
 
-    go (Refresh nodes f) = do
-      let nid = undefined
-      go (f undefined)
+    go (Refresh nid f) = do
+      infos <- find_nodes nid
+      time  <- timestamper
+      go (f (infos, time))
 
 {-----------------------------------------------------------------------
     Bucket
@@ -186,7 +188,7 @@ insertNode info bucket
   -- update the all bucket if it is too outdated
   | Just (NodeInfo {..} :-> lastSeen) <- lastChanged bucket
   , lastSeen > delta
-  = Refresh nodeAddr $ \ (infos, t) ->
+  = Refresh nodeId $ \ (infos, t) ->
       insertNode info $
       L.foldr (\ x -> PSQ.insertWith max x t) bucket infos
 

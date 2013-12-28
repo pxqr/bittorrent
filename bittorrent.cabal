@@ -57,10 +57,10 @@ library
                        Network.BitTorrent.Core.Node
                        Network.BitTorrent.Core.PeerId
                        Network.BitTorrent.Core.PeerAddr
---                     Network.BitTorrent.DHT
+                       Network.BitTorrent.DHT
                        Network.BitTorrent.DHT.Message
---                     Network.BitTorrent.DHT.Protocol
                        Network.BitTorrent.DHT.Routing
+                       Network.BitTorrent.DHT.Session
                        Network.BitTorrent.DHT.Token
 --                     Network.BitTorrent.Exchange
                        Network.BitTorrent.Exchange.Assembler
@@ -95,6 +95,8 @@ library
                      , lens         >= 3.0
                      , resourcet    >= 0.4
                      , mtl
+                     , monad-control
+                     , transformers-base
 
                        -- Concurrency
 --                     , SafeSemaphore
