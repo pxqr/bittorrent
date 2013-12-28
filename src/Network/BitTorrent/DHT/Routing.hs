@@ -13,6 +13,11 @@ module Network.BitTorrent.DHT.Routing
        ( -- * Routing table
          Table
 
+         -- * Table attributes
+       , BucketCount
+       , BucketSize
+       , NodeCount
+
          -- * Routing
        , Timestamp
        , Routing
@@ -20,6 +25,7 @@ module Network.BitTorrent.DHT.Routing
 
          -- * Query
        , thisId
+       , shape
        , Network.BitTorrent.DHT.Routing.size
        , Network.BitTorrent.DHT.Routing.depth
        , K
@@ -149,7 +155,7 @@ instance (Serialize k, Serialize v) => Serialize (Binding k v) where
 -- TODO instance Pretty where
 
 -- | Most clients use this value for maximum bucket size.
-defaultBucketSize :: Int
+defaultBucketSize :: BucketSize
 defaultBucketSize = 20
 
 -- | Bucket is also limited in its length — thus it's called k-bucket.
@@ -184,7 +190,7 @@ delta = 15 * 60
 -- | Max bucket size, in nodes.
 type Alpha = Int
 
-defaultAlpha :: Int
+defaultAlpha :: Alpha
 defaultAlpha = 8
 
 insertBucket :: Eq ip => Timestamp -> NodeInfo ip -> Bucket ip
@@ -231,11 +237,11 @@ split i = (PSQ.fromList *** PSQ.fromList) . partition spanBit . PSQ.toList
 --  Table
 -----------------------------------------------------------------------}
 
-defaultBucketCount :: Int
+defaultBucketCount :: BucketCount
 defaultBucketCount = 20
 
 data Table ip
-  = Tip  NodeId Int (Bucket ip)
+  = Tip  NodeId BucketCount (Bucket ip)
   | Zero (Table  ip) (Bucket ip)
   | One  (Bucket ip) (Table  ip)
     deriving Generic
@@ -249,35 +255,38 @@ instance Serialize NominalDiffTime where
 -- since it is included in routing table.
 instance (Eq ip, Serialize ip) => Serialize (Table ip)
 
+-- | Shape of the table.
 instance Pretty (Table ip) where
-  pretty t =
-      "size  = " <> PP.int (Network.BitTorrent.DHT.Routing.size  t) <>
-    ", depth = " <> PP.int (depth t)
+  pretty = hcat . punctuate "," . L.map PP.int . shape
 
-
+-- | Empty table with specified /spine/ node id.
 nullTable :: Eq ip => NodeId -> Table ip
 nullTable nid = Tip nid defaultBucketCount PSQ.empty
 
+-- | Get the /spine/ node id.
 thisId :: Table ip -> NodeId
 thisId (Tip  nid _ _) = nid
 thisId (Zero table _) = thisId table
 thisId (One _  table) = thisId table
 
+type BucketSize  = Int
+type BucketCount = Int
+type NodeCount   = Int
+
+-- | Internally, routing table is similar to list of buckets or a
+-- /matrix/ of nodes. This function returns the shape of the matrix.
+shape :: Table ip -> [BucketSize]
+shape (Tip _ _ bucket) = [PSQ.size bucket]
+shape (Zero t  bucket) = PSQ.size bucket : shape t
+shape (One bucket t  ) = PSQ.size bucket : shape t
+
 -- | Get number of nodes in the table.
-size :: Table ip -> Int
-size = go
-  where
-    go (Tip _ _ bucket) = PSQ.size bucket
-    go (Zero t  bucket) = go t + PSQ.size bucket
-    go (One bucket t  ) = PSQ.size bucket + go t
+size :: Table ip -> NodeCount
+size = L.sum . shape
 
 -- | Get number of buckets in the table.
-depth :: Table ip -> Int
-depth = go
-  where
-    go (Tip _ _ _) = 1
-    go (Zero t  _) = succ (go t)
-    go (One  _  t) = succ (go t)
+depth :: Table ip -> BucketCount
+depth = L.length . shape
 
 lookupBucket :: NodeId -> Table ip -> Maybe (Bucket ip)
 lookupBucket nid = go 0
@@ -310,7 +319,7 @@ kclosestHash k nid t = kclosest k (coerseId nid) t
 --  Routing
 -----------------------------------------------------------------------}
 
-splitTip :: Eq ip => NodeId -> Int -> BitIx -> Bucket ip -> Table ip
+splitTip :: Eq ip => NodeId -> BucketCount -> BitIx -> Bucket ip -> Table ip
 splitTip nid n i bucket
   | testIdBit nid i = (One  zeros (Tip nid (pred n) ones))
   |    otherwise    = (Zero (Tip nid (pred n) zeros) ones)
