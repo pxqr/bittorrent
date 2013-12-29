@@ -9,12 +9,15 @@ module Network.BitTorrent.DHT
        ) where
 
 import Control.Applicative
+import Control.Concurrent.Lifted
+import Control.Exception.Lifted
 import Control.Monad
 import Control.Monad.Logger
 import Data.List as L
 import Data.Monoid
 import Data.Text as T
 import Network.Socket (PortNumber)
+import System.Timeout.Lifted
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
@@ -29,26 +32,32 @@ import Network.BitTorrent.DHT.Session
 -----------------------------------------------------------------------}
 
 pingH :: Address ip => NodeHandler ip
-pingH = nodeHandler $ \ _ Ping -> return Ping
+pingH = nodeHandler $ \ _ Ping -> do
+  $(logDebug) "ping received, sending pong"
+  return Ping
 
-{-
-findNodeH :: (Eq ip, Serialize ip, Typeable ip) => Handler (DHT ip)
-findNodeH = dhtHandler $ \ _ (FindNode nid) ->
+findNodeH :: Address ip => NodeHandler ip
+findNodeH = nodeHandler $ \ _ (FindNode nid) -> do
+  $(logDebug) "find_node received, sending closest nodes back"
   NodeFound <$> getClosest nid
 
-getPeersH :: (Eq ip, Serialize ip, Typeable ip) => Handler (DHT ip)
-getPeersH = dhtHandler $ \ addr (GetPeers ih) ->
-  GotPeers <$> getPeerList ih <*> grantToken addr
+getPeersH :: Address ip => NodeHandler ip
+getPeersH = nodeHandler $ \ naddr (GetPeers ih) -> do
+  $(logDebug) "get_peers received, trying to find peers"
+  GotPeers <$> getPeerList ih <*> grantToken naddr
 
-announceH :: Handler (DHT ip)
-announceH = dhtHandler $ \ addr (Announce {..}) -> do
-  checkToken addr sessionToken
-  insertPeer topic undefined -- PeerAddr (add, port)
-  return Announced
--}
+announceH :: Address ip => NodeHandler ip
+announceH = nodeHandler $ \ naddr (Announce {..}) -> do
+  $(logDebug) "announce received, trying to check token"
+  checkToken naddr sessionToken
+  case fromAddr naddr of
+    Nothing    -> undefined
+    Just paddr -> do
+      insertPeer topic paddr
+      return Announced
 
 handlers :: Address ip => [NodeHandler ip]
-handlers = [pingH]
+handlers = [pingH, findNodeH, getPeersH, announceH]
 
 {-----------------------------------------------------------------------
 --  Query
@@ -63,6 +72,7 @@ ping addr = do
   Ping <- Ping <@> addr
   return ()
 
+-- TODO fork?
 -- | One good node may be sufficient. <note about 'Data.Torrent.tNodes'>
 bootstrap :: Address ip => [NodeAddr ip] -> DHT ip ()
 bootstrap startNodes = do
@@ -72,10 +82,23 @@ bootstrap startNodes = do
   where
     insertClosest addr = do
       nid <- getNodeId
-      NodeFound closest <- FindNode nid <@> addr
-      $(logDebug) ("Get a list of closest nodes: " <>
-                  T.pack (PP.render (pretty closest)))
-      forM_ closest insertNode
+      result <- try $ timeout 1000000 $ FindNode nid <@> addr
+      case result of
+        Left                    e -> do
+          $(logWarnS) "bootstrap" $ T.pack $ show (e :: IOError)
+
+        Right Nothing -> do
+          $(logWarnS) "bootstrap" $ "not responding @ "
+                                 <> T.pack (show (pretty  addr))
+
+        Right (Just (NodeFound closest)) -> do
+          $(logDebug) ("Get a list of closest nodes: " <>
+                       T.pack (PP.render (pretty closest)))
+          forM_ (L.take 2 closest) $ \ info @ NodeInfo {..} -> do
+            insertNode    info
+            let prettyAddr = T.pack (show (pretty nodeAddr))
+            $(logInfoS) "bootstrap" $ "table detalization" <> prettyAddr
+            fork $ insertClosest nodeAddr
 
 -- | Get list of peers which downloading
 lookup :: Address ip => InfoHash -> DHT ip [PeerAddr ip]
