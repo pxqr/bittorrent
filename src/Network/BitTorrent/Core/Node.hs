@@ -66,7 +66,7 @@ import Network.BitTorrent.Core.PeerAddr (PeerAddr (..))
 -- | Each node has a globally unique identifier known as the \"node
 -- ID.\"
 --
---   Normally, /this/ node id should we saved between invocations
+--   Normally, /this/ node id should be saved between invocations
 --   of the client software.
 newtype NodeId = NodeId ByteString
   deriving (Show, Eq, Ord, BEncode, FromJSON, ToJSON, Typeable)
