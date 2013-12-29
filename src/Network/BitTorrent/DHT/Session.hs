@@ -33,6 +33,7 @@ module Network.BitTorrent.DHT.Session
 
 import Control.Applicative
 import Control.Concurrent.STM
+import Control.Concurrent.Lifted
 import Control.Exception.Lifted hiding (Handler)
 import Control.Monad.Base
 import Control.Monad.Logger
@@ -93,7 +94,7 @@ invalidateTokens curTime ts @ SessionTokens {..}
 
 data Node ip = Node
   { manager       :: !(Manager (DHT       ip))
-  , routingTable  :: !(TVar    (Table     ip))
+  , routingTable  :: !(MVar    (Table     ip))
   , contactInfo   :: !(TVar    (PeerStore ip))
   , sessionTokens :: !(TVar     SessionTokens)
   , loggerFun     :: !(Loc -> LogSource -> LogLevel -> LogStr -> IO ())
@@ -134,7 +135,7 @@ runDHT naddr handlers action = runResourceT $ do
     (_, m) <- allocate (newManager (toSockAddr naddr) handlers) closeManager
     myId   <- liftIO genNodeId
     node   <- liftIO $ Node m
-             <$> newTVarIO (nullTable myId)
+             <$> newMVar (nullTable myId)
              <*> newTVarIO def
              <*> (newTVarIO =<< nullSessionTokens)
              <*> pure logger
@@ -204,12 +205,7 @@ checkToken addr questionableToken = do
 getTable :: DHT ip (Table ip)
 getTable = do
   var <- asks routingTable
-  liftIO (readTVarIO var)
-
-putTable :: Table ip -> DHT ip ()
-putTable table = do
-  var <- asks routingTable
-  liftIO (atomically (writeTVar var table))
+  liftIO (readMVar var)
 
 getNodeId :: DHT ip NodeId
 getNodeId = thisId <$> getTable
@@ -220,16 +216,21 @@ getClosest nid = kclosest 8 nid <$> getTable
 getClosestHash :: Eq ip => InfoHash -> DHT ip [NodeInfo ip]
 getClosestHash ih = kclosestHash 8 ih <$> getTable
 
-insertNode :: Address ip => NodeInfo ip -> DHT ip ()
-insertNode info = do
-  t  <- getTable
-  mt <- routing (R.insert info t)
-  case mt of
-    Nothing -> $(logDebugS) "insertNode" "Routing table is full"
-    Just t' -> do
-      putTable t'
-      let logMsg = "Routing table updated: " <> pretty t <> " -> " <> pretty t'
-      $(logDebugS) "insertNode" (T.pack (render logMsg))
+-- FIXME some nodes can be ommited
+insertNode :: Address ip => NodeInfo ip -> DHT ip ThreadId
+insertNode info = fork $ do
+  var <- asks routingTable
+  modifyMVar_ var $ \ t -> do
+    result <- routing (R.insert info t)
+    case result of
+      Nothing -> do
+        $(logDebugS) "insertNode" $ "Routing table is full: "
+                   <> T.pack (show (pretty t))
+        return t
+      Just t' -> do
+        let logMsg = "Routing table updated: " <> pretty t <> " -> " <> pretty t'
+        $(logDebugS) "insertNode" (T.pack (render logMsg))
+        return t'
 
 {-----------------------------------------------------------------------
 -- Peer storage
