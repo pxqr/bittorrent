@@ -43,6 +43,7 @@ import Control.Monad
 import Data.Function
 import Data.List as L hiding (insert)
 import Data.Maybe
+import Data.Monoid
 import Data.PSQueue as PSQ
 import Data.Serialize as S hiding (Result, Done)
 import Data.Time
@@ -128,15 +129,19 @@ instance Applicative (Routing ip) where
 
 instance Alternative (Routing ip) where
   empty = Full
-  Full <|> m = m
-  m    <|> _ = m
+
+  Full         <|> m = m
+  Done     a   <|> _ = Done a
+  GetTime  f   <|> m = GetTime    $ \ t -> f t <|> m
+  NeedPing a f <|> m = NeedPing a $ \ p -> f p <|> m
+  Refresh  n f <|> m = Refresh  n $ \ i -> f i <|> m
 
 runRouting :: (Monad m, Eq ip)
-             => (NodeAddr ip -> m Bool)          -- ^ ping_node
-             -> (NodeId      -> m [NodeInfo ip]) -- ^ find_nodes
-             -> m Timestamp                      -- ^ timestamper
-             -> Routing ip f                     -- ^ action
-             -> m (Maybe f)                      -- ^ result
+           => (NodeAddr ip -> m Bool)          -- ^ ping_node
+           -> (NodeId      -> m [NodeInfo ip]) -- ^ find_nodes
+           -> m Timestamp                      -- ^ timestamper
+           -> Routing ip f                     -- ^ action
+           -> m (Maybe f)                      -- ^ result
 runRouting ping_node find_nodes timestamper = go
   where
     go  Full             = return (Nothing)
@@ -281,7 +286,14 @@ instance (Eq ip, Serialize ip) => Serialize (Table ip)
 
 -- | Shape of the table.
 instance Pretty (Table ip) where
-  pretty = hcat . punctuate "," . L.map PP.int . shape
+  pretty t
+    | bucketCount < 6 = hcat $ punctuate ", " $ L.map PP.int ss
+    |    otherwise    = brackets $
+      PP.int (L.sum    ss) <> " nodes, " <>
+      PP.int bucketCount   <> " buckets"
+    where
+      bucketCount = L.length ss
+      ss = shape t
 
 -- | Empty table with specified /spine/ node id.
 nullTable :: Eq ip => NodeId -> Table ip
