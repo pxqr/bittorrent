@@ -176,6 +176,17 @@ instance Pretty IP where
   pretty = PP.text . show
   {-# INLINE pretty #-}
 
+instance Hashable IPv4 where
+  hashWithSalt = hashUsing toHostAddress
+  {-# INLINE hashWithSalt #-}
+
+instance Hashable IPv6 where
+  hashWithSalt s a = hashWithSalt s (toHostAddress6 a)
+
+instance Hashable IP where
+  hashWithSalt s (IPv4 h) = hashWithSalt s h
+  hashWithSalt s (IPv6 h) = hashWithSalt s h
+
 {-----------------------------------------------------------------------
 --  Peer addr
 -----------------------------------------------------------------------}
@@ -266,6 +277,10 @@ instance Pretty a => Pretty (PeerAddr a) where
     |     otherwise      = paddr
     where
       paddr = pretty peerHost <> ":" <> text (show peerPort)
+
+instance Hashable a => Hashable (PeerAddr a) where
+  hashWithSalt s PeerAddr {..} =
+    s `hashWithSalt` peerId `hashWithSalt` peerHost `hashWithSalt` peerPort
 
 -- | Ports typically reserved for bittorrent P2P listener.
 defaultPorts :: [PortNumber]

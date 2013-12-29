@@ -9,7 +9,10 @@
 --
 module Network.BitTorrent.Core
        ( module Core
+
+         -- * Address class
        , Address (..)
+       , fromAddr
 
          -- * Re-exports from Data.IP
        , IPv4
@@ -19,6 +22,7 @@ module Network.BitTorrent.Core
 
 import Control.Applicative
 import Data.IP
+import Data.Hashable
 import Data.Serialize
 import Data.Time
 import Data.Typeable
@@ -35,9 +39,13 @@ import Network.BitTorrent.Core.PeerAddr    as Core
 instance Pretty UTCTime where
   pretty = PP.text . show
 
-class (Eq a, Serialize a, Typeable a, Pretty a) => Address a where
+class (Eq a, Serialize a, Typeable a, Hashable a, Pretty a)
+    => Address a where
   toSockAddr   :: a        -> SockAddr
   fromSockAddr :: SockAddr -> Maybe a
+
+fromAddr :: (Address a, Address b) => a -> Maybe b
+fromAddr = fromSockAddr . toSockAddr
 
 -- | Note that port is zeroed.
 instance Address IPv4 where
