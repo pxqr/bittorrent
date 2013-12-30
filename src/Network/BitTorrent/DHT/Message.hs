@@ -1,5 +1,59 @@
--- | For more info see:
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   This module provides message datatypes which is used for /Node to
+--   Node/ communication. Bittorrent DHT is based on Kademlia
+--   specification, but have a slightly different set of messages
+--   which have been adopted for /peer/ discovery mechanism. Messages
+--   are sent over "Network.KRPC" protocol, but normally you should
+--   use "Network.BitTorrent.DHT.Session" to send and receive
+--   messages.
+--
+--   DHT queries are not /recursive/, they are /iterative/. This means
+--   that /querying/ node . While original specification (namely BEP5)
+--   do not impose any restrictions for /quered/ node behaviour, a
+--   good DHT implementation should follow some rules to guarantee
+--   that unlimit recursion will never happen. The following set of
+--   restrictions:
+--
+--     * 'Ping' query must not trigger any message.
+--
+--     * 'FindNode' query /may/ trigger 'Ping' query to check if a
+--     list of nodes to return is /good/. See
+--     'Network.BitTorrent.DHT.Routing.Routing' for further explanation.
+--
+--     * 'GetPeers' query may trigger 'Ping' query for the same reason.
+--
+--     * 'Announce' query must trigger 'Ping' query for the same reason.
+--
+--   It is easy to see that the most long RPC chain is:
+--
+--   @
+--     |                                            |                |
+--   Node_A                                         |                |
+--     |   FindNode or GetPeers or Announce         |                |
+--     |  ------------------------------------>   Node_B             |
+--     |                                            |      Ping      |
+--     |                                            |  ----------->  |
+--     |                                            |              Node_C
+--     |                                            |      Pong      |
+--     |     NodeFound or GotPeers or Announced     |  <-----------  |
+--     |  <-------------------------------------  Node_B             |
+--   Node_A                                         |                |
+--     |                                            |                |
+--   @
+--
+--   where in some cases 'Node_C' is 'Node_A'.
+--
+--   For more info see:
 --   <http://www.bittorrent.org/beps/bep_0005.html#dht-queries>
+--
+--   For Kamelia messages see original Kademlia paper:
+--   <http://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf>
 --
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances  #-}
@@ -49,11 +103,11 @@ import Network.KRPC ()
 node_id_key :: BKey
 node_id_key = "id"
 
--- | All queries have an "id" key and value containing the node ID of
--- the querying node.
+-- | All queries have an \"id\" key and value containing the node ID
+-- of the querying node.
 data Query a = Query
-  { thisNodeId  :: NodeId
-  , queryParams :: a
+  { thisNodeId  :: NodeId -- ^ node id of /quering/ node;
+  , queryParams :: a      -- ^ query parameters.
   } deriving (Show, Eq)
 
 instance BEncode a => BEncode (Query a) where
@@ -69,11 +123,11 @@ instance BEncode a => BEncode (Query a) where
     Query <$> fromDict (field (req node_id_key)) v
           <*> fromBEncode v
 
--- | All responses have an "id" key and value containing the node ID
+-- | All responses have an \"id\" key and value containing the node ID
 -- of the responding node.
 data Response a = Response
-  { remoteNodeId :: NodeId
-  , responseVals :: a
+  { remoteNodeId :: NodeId -- ^ node id of /quered/ node;
+  , responseVals :: a      -- ^ query result.
   } deriving (Show, Eq)
 
 instance BEncode a => BEncode (Response a) where
@@ -201,6 +255,7 @@ instance (Typeable ip, Serialize ip) => BEncode (GotPeers ip) where
      where
        decodePeers = either fail pure . mapM S.decode
 
+-- | \"q" = \"get_peers\"
 instance (Typeable ip, Serialize ip) =>
          KRPC (Query GetPeers) (Response (GotPeers ip)) where
   method = "get_peers"
@@ -265,5 +320,6 @@ instance BEncode Announced where
   toBEncode   _ = toBEncode Ping
   fromBEncode _ = pure  Announced
 
+-- | \"q" = \"announce\"
 instance KRPC (Query Announce) (Response Announced) where
   method = "announce_peer"
