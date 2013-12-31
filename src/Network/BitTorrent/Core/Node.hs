@@ -122,6 +122,10 @@ data NodeAddr a = NodeAddr
 
 $(deriveJSON omitRecordPrefix ''NodeAddr)
 
+-- | @127.0.0.1:6882@
+instance Default (NodeAddr IPv4) where
+  def = "127.0.0.1:6882"
+
 -- | KRPC compatible encoding.
 instance Serialize a => Serialize (NodeAddr a) where
   get = NodeAddr <$> get <*> get
