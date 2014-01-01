@@ -39,8 +39,8 @@ instance Arbitrary URI where
 --  Instances
 -----------------------------------------------------------------------}
 
-instance Arbitrary HashArray where
-  arbitrary = HashArray <$> arbitrary
+instance Arbitrary HashList where
+  arbitrary = HashList <$> arbitrary
 
 instance Arbitrary PieceInfo where
   arbitrary = PieceInfo <$> arbitrary <*> arbitrary

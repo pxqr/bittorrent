@@ -25,7 +25,7 @@ module Data.Torrent.Piece
        , pieceSize
 
          -- * Piece control
-       , HashArray (..)
+       , HashList (..)
        , PieceInfo (..)
        , pieceCount
 
@@ -146,24 +146,24 @@ pieceSize Piece {..} = fromIntegral (BL.length pieceData)
 -- Piece control
 -----------------------------------------------------------------------}
 
--- | A flat array of SHA1 sums of each piece.
-newtype HashArray = HashArray { unHashArray :: ByteString }
-                    deriving (Show, Read, Eq, BEncode)
+-- | A flat array of SHA1 hash for each piece.
+newtype HashList = HashList { unHashList :: ByteString }
+  deriving (Show, Read, Eq, BEncode, Typeable)
 
 -- | Represented as base64 encoded JSON string.
-instance ToJSON HashArray where
-  toJSON (HashArray bs) = String $ T.decodeUtf8 $ Base64.encode bs
+instance ToJSON HashList where
+  toJSON (HashList bs) = String $ T.decodeUtf8 $ Base64.encode bs
 
-instance FromJSON HashArray where
+instance FromJSON HashList where
   parseJSON = withText "HashArray" $
-    either fail (return . HashArray) . Base64.decode . T.encodeUtf8
+    either fail (return . HashList) . Base64.decode . T.encodeUtf8
 
 -- | Part of torrent file used for torrent content validation.
 data PieceInfo = PieceInfo
   { piPieceLength  :: {-# UNPACK #-} !PieceSize
     -- ^ Number of bytes in each piece.
 
-  , piPieceHashes  :: !HashArray
+  , piPieceHashes  :: !HashList
     -- ^ Concatenation of all 20-byte SHA1 hash values.
   } deriving (Show, Read, Eq, Typeable)
 
@@ -179,7 +179,7 @@ instance NFData PieceInfo
 
 instance Lint PieceInfo where
   lint pinfo @ PieceInfo {..}
-    | BS.length (unHashArray piPieceHashes) `rem` hashsize == 0
+    | BS.length (unHashList piPieceHashes) `rem` hashsize == 0
     , piPieceLength >= 0 = return pinfo
     |       otherwise    = Left undefined
 
@@ -213,12 +213,12 @@ slice start len = BS.take len . BS.drop start
 
 -- | Extract validation hash by specified piece index.
 pieceHash :: PieceInfo -> PieceIx -> ByteString
-pieceHash PieceInfo {..} i = slice (hashsize * i) hashsize (unHashArray piPieceHashes)
+pieceHash PieceInfo {..} i = slice (hashsize * i) hashsize (unHashList piPieceHashes)
 
 -- | Find count of pieces in the torrent. If torrent size is not a
 -- multiple of piece size then the count is rounded up.
 pieceCount :: PieceInfo -> PieceCount
-pieceCount PieceInfo {..} = BS.length (unHashArray piPieceHashes) `quot` hashsize
+pieceCount PieceInfo {..} = BS.length (unHashList piPieceHashes) `quot` hashsize
 
 -- | Test if this is last piece in torrent content.
 isLastPiece :: PieceInfo -> PieceIx -> Bool
