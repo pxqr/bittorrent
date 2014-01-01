@@ -19,6 +19,7 @@ module Data.Torrent.Piece
        , minPieceSize
        , maxPieceSize
        , defaultPieceSize
+       , PieceHash
 
          -- * Piece data
        , Piece (..)
@@ -146,6 +147,12 @@ pieceSize Piece {..} = fromIntegral (BL.length pieceData)
 -- Piece control
 -----------------------------------------------------------------------}
 
+type PieceHash = ByteString
+
+hashsize :: Int
+hashsize = 20
+{-# INLINE hashsize #-}
+
 -- | A flat array of SHA1 hash for each piece.
 newtype HashList = HashList { unHashList :: ByteString }
   deriving (Show, Read, Eq, BEncode, Typeable)
@@ -203,16 +210,12 @@ instance BEncode PieceInfo where
 instance Pretty PieceInfo where
   pretty  PieceInfo {..} = "Piece size: " <> int piPieceLength
 
-hashsize :: Int
-hashsize = 20
-{-# INLINE hashsize #-}
-
 slice :: Int -> Int -> ByteString -> ByteString
 slice start len = BS.take len . BS.drop start
 {-# INLINE slice #-}
 
 -- | Extract validation hash by specified piece index.
-pieceHash :: PieceInfo -> PieceIx -> ByteString
+pieceHash :: PieceInfo -> PieceIx -> PieceHash
 pieceHash PieceInfo {..} i = slice (hashsize * i) hashsize (unHashList piPieceHashes)
 
 -- | Find count of pieces in the torrent. If torrent size is not a
