@@ -27,7 +27,7 @@ module Network.BitTorrent.DHT
        ) where
 
 import Control.Applicative
-import Control.Concurrent.Lifted
+import Control.Concurrent.Lifted hiding (yield)
 import Control.Exception.Lifted
 import Control.Monad
 import Control.Monad.Logger
@@ -42,6 +42,7 @@ import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Session
+import Network.KRPC
 
 
 {-----------------------------------------------------------------------
@@ -68,7 +69,7 @@ announceH = nodeHandler $ \ naddr (Announce {..}) -> do
   $(logDebug) "announce received, trying to check token"
   checkToken naddr sessionToken
   case fromAddr naddr of
-    Nothing    -> undefined
+    Nothing    -> throw $ KError ProtocolError "bad address" ""
     Just paddr -> do
       insertPeer topic paddr
       return Announced
@@ -111,7 +112,6 @@ bootstrap startNodes = do
           $(logDebug) ("Get a list of closest nodes: " <>
                        T.pack (PP.render (pretty closest)))
           forM_ (L.take 2 closest) $ \ info @ NodeInfo {..} -> do
-            _ <- insertNode    info
             let prettyAddr = T.pack (show (pretty nodeAddr))
             $(logInfoS) "bootstrap" $ "table detalization" <> prettyAddr
             fork $ insertClosest nodeAddr
