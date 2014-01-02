@@ -1,11 +1,29 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   BitTorrent uses a \"distributed sloppy hash table\" (DHT) for
+--   storing peer contact information for \"trackerless\" torrents. In
+--   effect, each peer becomes a tracker.
+--
+--   Normally you don't need to import other DHT modules.
+--
+--   For more info see:
+--   <http://www.bittorrent.org/beps/bep_0005.html>
+--
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Network.BitTorrent.DHT
-       ( dht
-       , ping
+       ( -- * Distributed Hash Table
+         DHT
+       , dht
        , Network.BitTorrent.DHT.bootstrap
        , Network.BitTorrent.DHT.lookup
        , Network.BitTorrent.DHT.insert
+       , Network.BitTorrent.DHT.delete
        ) where
 
 import Control.Applicative
@@ -67,13 +85,11 @@ handlers = [pingH, findNodeH, getPeersH, announceH]
 dht :: Address ip => NodeAddr ip -> DHT ip a -> IO a
 dht addr = runDHT addr handlers
 
-ping :: Address ip => NodeAddr ip -> DHT ip ()
-ping addr = do
-  Ping <- Ping <@> addr
-  return ()
-
--- TODO fork?
--- | One good node may be sufficient. <note about 'Data.Torrent.tNodes'>
+-- | One good node may be sufficient. The list of bootstrapping nodes
+-- usually obtained from 'Data.Torrent.tNodes' field.
+--
+-- (TODO) This operation is asynchronous and do not block.
+--
 bootstrap :: Address ip => [NodeAddr ip] -> DHT ip ()
 bootstrap startNodes = do
     $(logInfoS) "bootstrap" "Start node bootstrapping"
@@ -95,22 +111,29 @@ bootstrap startNodes = do
           $(logDebug) ("Get a list of closest nodes: " <>
                        T.pack (PP.render (pretty closest)))
           forM_ (L.take 2 closest) $ \ info @ NodeInfo {..} -> do
-            insertNode    info
+            _ <- insertNode    info
             let prettyAddr = T.pack (show (pretty nodeAddr))
             $(logInfoS) "bootstrap" $ "table detalization" <> prettyAddr
             fork $ insertClosest nodeAddr
 
--- | Get list of peers which downloading
+-- | Get list of peers which downloading this torrent.
+--
+-- (TODO) This operation is synchronous and do block.
+--
 lookup :: Address ip => InfoHash -> DHT ip [PeerAddr ip]
-lookup ih = getClosestHash ih >>= collect
+lookup topic = getClosestHash topic >>= collect
+     -- TODO retry getClosestHash if bucket is empty
   where
     collect nodes = L.concat <$> forM (nodeAddr <$> nodes) retrieve
     retrieve addr = do
-      GotPeers {..} <- GetPeers ih <@> addr
+      GotPeers {..} <- GetPeers topic <@> addr
       either collect pure peers
 
 -- | Announce that /this/ peer may have some pieces of the specified
 -- torrent.
+--
+-- (TODO) This operation is asynchronous and do not block.
+--
 insert :: Address ip => InfoHash -> PortNumber -> DHT ip ()
 insert ih port = do
   nodes <- getClosestHash ih
@@ -118,3 +141,10 @@ insert ih port = do
 --    GotPeers {..} <- GetPeers ih <@> addr
 --    Announced     <- Announce False ih undefined grantedToken <@> addr
     return ()
+
+-- | Stop announcing /this/ peer for the specified torrent.
+--
+--   This operation is atomic and do not block.
+--
+delete :: Address ip => InfoHash -> DHT ip ()
+delete = error "DHT.delete: not implemented"
