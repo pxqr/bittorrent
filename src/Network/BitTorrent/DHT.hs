@@ -82,8 +82,13 @@ handlers = [pingH, findNodeH, getPeersH, announceH]
 -----------------------------------------------------------------------}
 
 -- | Run DHT on specified port. <add note about resources>
-dht :: Address ip => NodeAddr ip -> DHT ip a -> IO a
-dht addr = runDHT addr handlers
+dht :: Address ip
+    => Options     -- ^ normally you need to use 'Data.Default.def';
+    -> NodeAddr ip -- ^ address to bind this node;
+    -> DHT ip a    -- ^ actions to run: 'bootstrap', 'lookup', etc;
+    -> IO a        -- ^ result.
+dht = runDHT handlers
+{-# INLINE dht #-}
 
 -- | One good node may be sufficient. The list of bootstrapping nodes
 -- usually obtained from 'Data.Torrent.tNodes' field.

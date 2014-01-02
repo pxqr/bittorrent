@@ -7,8 +7,15 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TemplateHaskell            #-}
 module Network.BitTorrent.DHT.Session
-       ( -- * Session
-         DHT
+       ( -- * Options
+         Alpha
+       , defaultAlpha
+       , K
+       , defaultK
+       , Options (..)
+
+         -- * Session
+       , DHT
        , runDHT
 
          -- * Tokens
@@ -62,6 +69,37 @@ import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Routing as R
 import Network.BitTorrent.DHT.Token   as T
 
+{-----------------------------------------------------------------------
+-- Options
+-----------------------------------------------------------------------}
+
+-- | Node lookups can proceed asynchronously.
+type Alpha = Int
+
+-- | The quantity of simultaneous lookups is typically three.
+defaultAlpha :: Alpha
+defaultAlpha = 3
+
+data Options = Options
+  { -- | the degree of parallelism in 'find_node' queries.
+    optAlpha   :: {-# UNPACK #-} !Alpha
+
+    -- | number of nodes to return in 'find_node' responses.
+  , optK       :: {-# UNPACK #-} !K
+
+    -- | RPC timeout.
+  , optTimeout :: {-# UNPACK #-} !NominalDiffTime
+
+--  , optReannounceInterval :: NominalDiffTime
+--  , optDataExpiredTimeout :: NominalDiffTime
+  } deriving (Show, Eq)
+
+instance Default Options where
+  def = Options
+    { optAlpha   = defaultAlpha
+    , optK       = defaultK
+    , optTimeout = 5 -- seconds
+    }
 
 {-----------------------------------------------------------------------
 -- Tokens policy
@@ -93,7 +131,8 @@ invalidateTokens curTime ts @ SessionTokens {..}
 -----------------------------------------------------------------------}
 
 data Node ip = Node
-  { manager       :: !(Manager (DHT       ip))
+  { options       :: !Options
+  , manager       :: !(Manager (DHT       ip))
   , routingTable  :: !(MVar    (Table     ip))
   , contactInfo   :: !(TVar    (PeerStore ip))
   , sessionTokens :: !(TVar     SessionTokens)
@@ -126,15 +165,16 @@ instance MonadLogger (DHT ip) where
     liftIO $ logger loc src lvl (toLogStr msg)
 
 runDHT :: forall ip a. Address ip
-       => NodeAddr ip        -- ^ node address to bind;
-       -> [Handler (DHT ip)] -- ^ handlers to run on accepted queries;
+       => [Handler (DHT ip)] -- ^ handlers to run on accepted queries;
+       -> Options            -- ^ various dht options;
+       -> NodeAddr ip        -- ^ node address to bind;
        -> DHT ip a           -- ^ DHT action to run;
        -> IO a               -- ^ result.
-runDHT naddr handlers action = runResourceT $ do
+runDHT handlers opts naddr action = runResourceT $ do
   runStderrLoggingT $ LoggingT $  \ logger -> do
     (_, m) <- allocate (newManager (toSockAddr naddr) handlers) closeManager
     myId   <- liftIO genNodeId
-    node   <- liftIO $ Node m
+    node   <- liftIO $ Node opts m
              <$> newMVar (nullTable myId)
              <*> newTVarIO def
              <*> (newTVarIO =<< nullSessionTokens)
@@ -156,6 +196,9 @@ ping addr = do
   result <- try $ Ping <@> addr
   let _ = result :: Either SomeException Ping
   return $ either (const False) (const True) result
+
+-- /pick a random ID/ in the range of the bucket and perform a
+-- find_nodes search on it.
 
 -- FIXME do not use getClosest sinse we should /refresh/ them
 refreshNodes :: Address ip => NodeId -> DHT ip [NodeInfo ip]
