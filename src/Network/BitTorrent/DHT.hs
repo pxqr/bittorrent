@@ -16,6 +16,7 @@
 --
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeOperators     #-}
 module Network.BitTorrent.DHT
        ( -- * Distributed Hash Table
          DHT
@@ -29,13 +30,16 @@ module Network.BitTorrent.DHT
 import Control.Applicative
 import Control.Concurrent.Lifted hiding (yield)
 import Control.Exception.Lifted
-import Control.Monad
+import Control.Monad as M
 import Control.Monad.Logger
+import Control.Monad.Trans
+import Data.Conduit as C
+import Data.Conduit.List as C
 import Data.List as L
 import Data.Monoid
 import Data.Text as T
 import Network.Socket (PortNumber)
-import Text.PrettyPrint as PP hiding ((<>))
+import Text.PrettyPrint as PP hiding ((<>), ($$))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.InfoHash
@@ -82,6 +86,20 @@ handlers = [pingH, findNodeH, getPeersH, announceH]
 --  Query
 -----------------------------------------------------------------------}
 
+findNodeQ :: Address ip => NodeId -> Iteration ip NodeAddr NodeInfo
+findNodeQ nid addr = do
+  NodeFound closest <- FindNode nid <@> addr
+  return $ Right closest
+
+getPeersQ :: Address ip => InfoHash -> Iteration ip NodeInfo PeerAddr
+getPeersQ topic NodeInfo {..} = do
+  GotPeers {..} <- GetPeers topic <@> nodeAddr
+  return peers
+
+{-----------------------------------------------------------------------
+--  DHT operations
+-----------------------------------------------------------------------}
+
 -- | Run DHT on specified port. <add note about resources>
 dht :: Address ip
     => Options     -- ^ normally you need to use 'Data.Default.def';
@@ -100,7 +118,7 @@ dht = runDHT handlers
 bootstrap :: Address ip => [NodeAddr ip] -> DHT ip ()
 bootstrap startNodes = do
     $(logInfoS) "bootstrap" "Start node bootstrapping"
-    mapM_ insertClosest startNodes
+    M.mapM_ insertClosest startNodes
     $(logInfoS) "bootstrap" "Node bootstrapping finished"
   where
     insertClosest addr = do
@@ -124,14 +142,10 @@ bootstrap startNodes = do
 --
 -- (TODO) This operation is synchronous and do block.
 --
-lookup :: Address ip => InfoHash -> DHT ip [PeerAddr ip]
-lookup topic = getClosestHash topic >>= collect
-     -- TODO retry getClosestHash if bucket is empty
-  where
-    collect nodes = L.concat <$> forM (nodeAddr <$> nodes) retrieve
-    retrieve addr = do
-      GotPeers {..} <- GetPeers topic <@> addr
-      either collect pure peers
+lookup :: Address ip => InfoHash -> DHT ip `Source` [PeerAddr ip]
+lookup topic = do      -- TODO retry getClosestHash if bucket is empty
+  closest <- lift $ getClosestHash topic
+  sourceList [closest] $= search (getPeersQ topic)
 
 -- | Announce that /this/ peer may have some pieces of the specified
 -- torrent.

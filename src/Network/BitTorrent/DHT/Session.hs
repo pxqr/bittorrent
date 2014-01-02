@@ -383,5 +383,7 @@ search action = do
   alpha <- lift $ asks (optAlpha . options)
   awaitForever $ \ inputs -> do
     forM_ (L.take alpha inputs) $ \ input -> do
-      result <- lift $ action input
-      either leftover yield result
+      result <- lift $ try $ action input
+      case result of
+        Left  e -> let _ = e :: IOError in return ()
+        Right r -> either leftover yield r
