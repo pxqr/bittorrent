@@ -254,12 +254,15 @@ getNodeId :: DHT ip NodeId
 getNodeId = thisId <$> getTable
 
 getClosest :: Eq ip => NodeId -> DHT ip [NodeInfo ip]
-getClosest nid = kclosest 8 nid <$> getTable
+getClosest nid = do
+  k <- asks (optK . options)
+  kclosest k nid <$> getTable
 
 getClosestHash :: Eq ip => InfoHash -> DHT ip [NodeInfo ip]
-getClosestHash ih = kclosestHash 8 ih <$> getTable
+getClosestHash ih = do
+  k <- asks (optK . options)
+  kclosestHash k ih <$> getTable
 
--- FIXME some nodes can be ommited
 insertNode :: Address ip => NodeInfo ip -> DHT ip ThreadId
 insertNode info = fork $ do
   var <- asks routingTable
