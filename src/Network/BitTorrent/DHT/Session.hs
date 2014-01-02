@@ -23,6 +23,7 @@ module Network.BitTorrent.DHT.Session
        , checkToken
 
          -- * Routing table
+       , getTable
        , getNodeId
        , getClosest
        , getClosestHash

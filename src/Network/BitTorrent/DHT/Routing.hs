@@ -29,6 +29,8 @@ module Network.BitTorrent.DHT.Routing
        , NodeCount
 
          -- * Query
+       , Network.BitTorrent.DHT.Routing.null
+       , Network.BitTorrent.DHT.Routing.full
        , thisId
        , shape
        , Network.BitTorrent.DHT.Routing.size
@@ -328,7 +330,16 @@ instance Pretty (Table ip) where
 nullTable :: Eq ip => NodeId -> BucketCount -> Table ip
 nullTable nid n = Tip nid (bucketCount (pred n)) PSQ.empty
   where
-    bucketCount x = max 0 (min 160 x)
+    bucketCount x = max 0 (min 159 x)
+
+null :: Table ip -> Bool
+null (Tip _ _ b) = PSQ.null b
+null  _          = False
+
+full :: Table ip -> Bool
+full (Tip  _ n _) = n == 0
+full (Zero   t b) = PSQ.size b == defaultBucketSize && full t
+full (One    b t) = PSQ.size b == defaultBucketSize && full t
 
 -- | Get the /spine/ node id.
 thisId :: Table ip -> NodeId

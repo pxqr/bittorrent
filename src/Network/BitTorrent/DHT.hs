@@ -41,6 +41,7 @@ import Text.PrettyPrint.Class
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Message
+import Network.BitTorrent.DHT.Routing
 import Network.BitTorrent.DHT.Session
 import Network.KRPC
 
@@ -103,6 +104,8 @@ bootstrap startNodes = do
     $(logInfoS) "bootstrap" "Node bootstrapping finished"
   where
     insertClosest addr = do
+     t <- getTable
+     unless (full t) $ do
       nid <- getNodeId
       result <- try $ FindNode nid <@> addr
       case result of
