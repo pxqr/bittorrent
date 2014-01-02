@@ -96,13 +96,16 @@ defaultAlpha = 3
 
 data Options = Options
   { -- | the degree of parallelism in 'find_node' queries.
-    optAlpha   :: {-# UNPACK #-} !Alpha
+    optAlpha       :: {-# UNPACK #-} !Alpha
 
     -- | number of nodes to return in 'find_node' responses.
-  , optK       :: {-# UNPACK #-} !K
+  , optK           :: {-# UNPACK #-} !K
+
+    -- | Number of buckets to maintain.
+  , optBucketCount :: {-# UNPACK #-} !BucketCount
 
     -- | RPC timeout.
-  , optTimeout ::                !NominalDiffTime
+  , optTimeout     ::                !NominalDiffTime
 
 --  , optReannounceInterval :: NominalDiffTime
 --  , optDataExpiredTimeout :: NominalDiffTime
@@ -110,9 +113,10 @@ data Options = Options
 
 instance Default Options where
   def = Options
-    { optAlpha   = defaultAlpha
-    , optK       = defaultK
-    , optTimeout = 5 -- seconds
+    { optAlpha       = defaultAlpha
+    , optK           = defaultK
+    , optBucketCount = defaultBucketCount
+    , optTimeout     = 5 -- seconds
     }
 
 microseconds :: NominalDiffTime -> Int
@@ -194,7 +198,7 @@ runDHT handlers opts naddr action = runResourceT $ do
     (_, m) <- allocate (newManager (toSockAddr naddr) handlers) closeManager
     myId   <- liftIO genNodeId
     node   <- liftIO $ Node opts m
-             <$> newMVar (nullTable myId)
+             <$> newMVar (nullTable myId (optBucketCount opts))
              <*> newTVarIO def
              <*> (newTVarIO =<< nullSessionTokens)
              <*> pure logger

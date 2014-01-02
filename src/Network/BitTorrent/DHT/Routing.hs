@@ -325,8 +325,10 @@ instance Pretty (Table ip) where
       ss = shape t
 
 -- | Empty table with specified /spine/ node id.
-nullTable :: Eq ip => NodeId -> Table ip
-nullTable nid = Tip nid defaultBucketCount PSQ.empty
+nullTable :: Eq ip => NodeId -> BucketCount -> Table ip
+nullTable nid n = Tip nid (bucketCount (pred n)) PSQ.empty
+  where
+    bucketCount x = max 0 (min 160 x)
 
 -- | Get the /spine/ node id.
 thisId :: Table ip -> NodeId
