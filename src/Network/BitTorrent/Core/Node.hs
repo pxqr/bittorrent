@@ -122,6 +122,9 @@ data NodeAddr a = NodeAddr
 
 $(deriveJSON omitRecordPrefix ''NodeAddr)
 
+instance Read (NodeAddr IPv4) where
+  readsPrec i x = [ (fromPeerAddr a, s) | (a, s) <- readsPrec i x ]
+
 -- | @127.0.0.1:6882@
 instance Default (NodeAddr IPv4) where
   def = "127.0.0.1:6882"

@@ -251,6 +251,13 @@ instance IsString (PeerAddr IPv4) where
                 = PeerAddr Nothing hostAddr portNum
     | otherwise = error $ "fromString: unable to parse (PeerAddr IPv4): " ++ str
 
+instance Read (PeerAddr IPv4) where
+  readsPrec i = RP.readP_to_S $ do
+    ipv4 <- RP.readS_to_P (readsPrec i)
+    _    <- RP.char ':'
+    port <- toEnum <$> RP.readS_to_P (readsPrec i)
+    return $ PeerAddr Nothing ipv4 port
+
 readsIPv6_port :: String -> [((IPv6, PortNumber), String)]
 readsIPv6_port = RP.readP_to_S $ do
   ip <- RP.char '[' *> (RP.readS_to_P reads) <* RP.char ']'
