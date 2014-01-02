@@ -5,36 +5,49 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
+--   Every node maintains a routing table of known good nodes. The
+--   nodes in the routing table are used as starting points for
+--   queries in the DHT. Nodes from the routing table are returned in
+--   response to queries from other nodes.
+--
+--   For more info see:
+--   <http://www.bittorrent.org/beps/bep_0005.html#routing-table>
+--
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators   #-}
 {-# LANGUAGE DeriveGeneric   #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Network.BitTorrent.DHT.Routing
-       ( -- * Routing table
+       ( -- * Table
          Table
 
-         -- * Table attributes
+         -- * Attributes
        , BucketCount
+       , defaultBucketCount
        , BucketSize
+       , defaultBucketSize
        , NodeCount
-
-         -- * Routing
-       , Timestamp
-       , Routing
-       , runRouting
 
          -- * Query
        , thisId
        , shape
        , Network.BitTorrent.DHT.Routing.size
        , Network.BitTorrent.DHT.Routing.depth
+
+         -- * Lookup
        , K
+       , defaultK
        , Network.BitTorrent.DHT.Routing.kclosest
        , Network.BitTorrent.DHT.Routing.kclosestHash
 
          -- * Construction
        , Network.BitTorrent.DHT.Routing.nullTable
        , Network.BitTorrent.DHT.Routing.insert
+
+         -- * Routing
+       , Timestamp
+       , Routing
+       , runRouting
        ) where
 
 import Control.Applicative as A
@@ -56,50 +69,28 @@ import Text.PrettyPrint.Class
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 
-{-
--- | Routing tree should contain key -> value pairs in this way:
---
---     * More keys that near to our node key, and less keys that far
---     from our node key.
---
---     * Tree might be saturated. If this happen we can only update
---     buckets, but we can't add new buckets.
---
---   Instead of using ordinary binary tree and keep track is it
---   following restrictions above (that's somewhat non-trivial) we
---   store distance -> value keys. This lead to simple data structure
---   that actually isomorphic to non-empty list. So we first map our
---   keys to distances using our node ID and store them in tree. When
---   we need to extract a pair we map distances to keys back, again
---   using our node ID. This normalization happen in routing table.
---
-data Tree k v
-  = Tip (Bucket k v)
-  | Bin (Tree k v)   (Bucket k v)
-
-empty :: Int -> Tree k v
-empty = Tip . Bucket.empty
-
-insert :: Applicative f => Bits k
-       => (v -> f Bool) -> (k, v) -> Tree k v -> f (Tree k v)
-insert ping (k, v) = go 0
-  where
-    go n (Tip bucket)
-      | isFull bucket, (near, far) <- split n bucket
-                          = pure (Tip near `Bin` far)
-      |     otherwise     = Tip <$> Bucket.insert ping (k, v) bucket
-
-    go n (Bin near far)
-      | k `testBit` n = Bin <$> pure near <*> Bucket.insert ping (k, v) far
-      | otherwise     = Bin <$> go (succ n) near <*> pure far
--}
-
 {-----------------------------------------------------------------------
 --  Routing monad
 -----------------------------------------------------------------------}
 
+-- | Last time the node was responding to our queries.
+--
+--   Not all nodes that we learn about are equal. Some are \"good\" and
+--   some are not. Many nodes using the DHT are able to send queries
+--   and receive responses, but are not able to respond to queries
+--   from other nodes. It is important that each node's routing table
+--   must contain only known good nodes. A good node is a node has
+--   responded to one of our queries within the last 15 minutes. A
+--   node is also good if it has ever responded to one of our queries
+--   and has sent us a query within the last 15 minutes. After 15
+--   minutes of inactivity, a node becomes questionable. Nodes become
+--   bad when they fail to respond to multiple queries in a row. Nodes
+--   that we know are good are given priority over nodes with unknown
+--   status.
+--
 type Timestamp = POSIXTime
 
+-- | Some routing operations might need to perform additional IO.
 data Routing ip result
   = Full
   | Done      result
@@ -136,12 +127,13 @@ instance Alternative (Routing ip) where
   NeedPing a f <|> m = NeedPing a $ \ p -> f p <|> m
   Refresh  n f <|> m = Refresh  n $ \ i -> f i <|> m
 
+-- | Run routing table operation.
 runRouting :: (Monad m, Eq ip)
-           => (NodeAddr ip -> m Bool)          -- ^ ping_node
-           -> (NodeId      -> m [NodeInfo ip]) -- ^ find_nodes
-           -> m Timestamp                      -- ^ timestamper
-           -> Routing ip f                     -- ^ action
-           -> m (Maybe f)                      -- ^ result
+           => (NodeAddr ip -> m Bool)          -- ^ ping the specific node;
+           -> (NodeId      -> m [NodeInfo ip]) -- ^ get closest nodes;
+           -> m Timestamp                      -- ^ get current time;
+           -> Routing ip f                     -- ^ operation to run;
+           -> m (Maybe f)                      -- ^ operation result;
 runRouting ping_node find_nodes timestamper = go
   where
     go  Full             = return (Nothing)
@@ -160,16 +152,27 @@ runRouting ping_node find_nodes timestamper = go
 
 getTime :: Routing ip Timestamp
 getTime = GetTime return
+{-# INLINE getTime #-}
 
 needPing :: NodeAddr ip -> Routing ip Bool
 needPing addr = NeedPing addr return
+{-# INLINE needPing #-}
 
 refresh :: NodeId -> Routing ip [NodeInfo ip]
 refresh nid = Refresh nid return
+{-# INLINE refresh #-}
 
 {-----------------------------------------------------------------------
     Bucket
 -----------------------------------------------------------------------}
+-- TODO: add replacement cache to the bucket
+--
+-- When a k-bucket is full and a new node is discovered for that
+-- k-bucket, the least recently seen node in the k-bucket is
+-- PINGed. If the node is found to be still alive, the new node is
+-- place in a secondary list, a replacement cache. The replacement
+-- cache is used only if a node in the k-bucket stops responding. In
+-- other words: new nodes are used only when older nodes disappear.
 
 -- | Timestamp - last time this node is pinged.
 type NodeEntry ip = Binding (NodeInfo ip) Timestamp
@@ -180,9 +183,13 @@ instance (Serialize k, Serialize v) => Serialize (Binding k v) where
 
 -- TODO instance Pretty where
 
--- | Most clients use this value for maximum bucket size.
+-- | Number of nodes in a bucket.
+type BucketSize  = Int
+
+-- | Maximum number of 'NodeInfo's stored in a bucket. Most clients
+-- use this value.
 defaultBucketSize :: BucketSize
-defaultBucketSize = 20
+defaultBucketSize = 8
 
 -- | Bucket is also limited in its length — thus it's called k-bucket.
 --   When bucket becomes full we should split it in two lists by
@@ -213,12 +220,7 @@ leastRecently = minView
 delta :: NominalDiffTime
 delta = 15 * 60
 
--- | Max bucket size, in nodes.
-type Alpha = Int
-
-defaultAlpha :: Alpha
-defaultAlpha = 8
-
+-- | Should maintain a set of stable long running nodes.
 insertBucket :: Eq ip => Timestamp -> NodeInfo ip -> Bucket ip
            -> ip `Routing` Bucket ip
 insertBucket curTime info bucket
@@ -226,7 +228,7 @@ insertBucket curTime info bucket
   | Just _ <- PSQ.lookup info bucket = do
     return $ PSQ.insertWith max info curTime bucket
 
-  -- update the all bucket if it is too outdated
+  --  Buckets that have not been changed in 15 minutes should be "refreshed."
   | Just (NodeInfo {..} :-> lastSeen) <- lastChanged bucket
   , curTime - lastSeen > delta = do
     infos   <- refresh nodeId
@@ -234,8 +236,11 @@ insertBucket curTime info bucket
     let newBucket = L.foldr (\ x -> PSQ.insertWith max x refTime) bucket infos
     insertBucket refTime info newBucket
 
-  -- update questionable nodes, if any; then try to insert our new node
-  -- this case can remove bad nodes from bucket, so we can insert a new one
+  -- If there are any questionable nodes in the bucket have not been
+  -- seen in the last 15 minutes, the least recently seen node is
+  -- pinged. If any nodes in the bucket are known to have become bad,
+  -- then one is replaced by the new node in the next insertBucket
+  -- iteration.
   | Just ((old @ NodeInfo {..} :-> leastSeen), rest) <- leastRecently bucket
   , curTime - leastSeen > delta = do
     pong     <- needPing nodeAddr
@@ -244,10 +249,10 @@ insertBucket curTime info bucket
     insertBucket pongTime info newBucket
 
   -- bucket is good, but not full => we can insert a new node
-  | PSQ.size bucket < defaultAlpha = do
+  | PSQ.size bucket < defaultBucketSize = do
     return $ PSQ.insert info curTime bucket
 
-  -- bucket is full of good nodes => ignore new node
+  -- When the bucket is full of good nodes, the new node is simply discarded.
   | otherwise = A.empty
 
 insertNode :: Eq ip => NodeInfo ip -> Bucket ip -> ip `Routing` Bucket ip
@@ -266,12 +271,36 @@ split i = (PSQ.fromList *** PSQ.fromList) . partition spanBit . PSQ.toList
 --  Table
 -----------------------------------------------------------------------}
 
+-- | Number of buckets in a routing table.
+type BucketCount = Int
+
 defaultBucketCount :: BucketCount
 defaultBucketCount = 20
 
+-- | The routing table covers the entire 'NodeId' space from 0 to 2 ^
+-- 160. The routing table is subdivided into 'Bucket's that each cover
+-- a portion of the space. An empty table has one bucket with an ID
+-- space range of @min = 0, max = 2 ^ 160@. When a node with ID \"N\"
+-- is inserted into the table, it is placed within the bucket that has
+-- @min <= N < max@. An empty table has only one bucket so any node
+-- must fit within it. Each bucket can only hold 'K' nodes, currently
+-- eight, before becoming 'Full'. When a bucket is full of known good
+-- nodes, no more nodes may be added unless our own 'NodeId' falls
+-- within the range of the 'Bucket'. In that case, the bucket is
+-- replaced by two new buckets each with half the range of the old
+-- bucket and the nodes from the old bucket are distributed among the
+-- two new ones. For a new table with only one bucket, the full bucket
+-- is always split into two new buckets covering the ranges @0..2 ^
+-- 159@ and @2 ^ 159..2 ^ 160@.
+--
 data Table ip
+  -- most nearest bucket
   = Tip  NodeId BucketCount (Bucket ip)
+
+  -- left biased tree branch
   | Zero (Table  ip) (Bucket ip)
+
+  -- right biased tree branch
   | One  (Bucket ip) (Table  ip)
     deriving Generic
 
@@ -305,8 +334,7 @@ thisId (Tip  nid _ _) = nid
 thisId (Zero table _) = thisId table
 thisId (One _  table) = thisId table
 
-type BucketSize  = Int
-type BucketCount = Int
+-- | Number of nodes in a bucket or a table.
 type NodeCount   = Int
 
 -- | Internally, routing table is similar to list of buckets or a
@@ -335,21 +363,28 @@ lookupBucket nid = go 0
       |     otherwise     = pure bucket
     go _ (Tip _ _ bucket) = pure bucket
 
+-- | Count of closest nodes in find_node request.
 type K = Int
 
--- | Used in 'find_node' queries.
+-- | Default 'K' is equal to 'defaultBucketSize'.
+defaultK :: K
+defaultK = 8
+
+-- | Get a list of /K/ closest nodes using XOR metric. Used in
+-- 'find_node' queries.
 kclosest :: Eq ip => K -> NodeId -> Table ip -> [NodeInfo ip]
 kclosest k nid = L.map key . PSQ.toList . fromMaybe PSQ.empty
                . lookupBucket nid
 
-coerseId :: (Serialize a, Serialize b) => a -> b
-coerseId = either (error msg) id . S.decode . S.encode
+coerceId :: (Serialize a, Serialize b) => a -> b
+coerceId = either (error msg) id . S.decode . S.encode
   where
-    msg = "coerseId: impossible"
+    msg = "coerceId: impossible"
 
--- | Used in 'get_peers' queries.
-kclosestHash :: Eq a => Alpha -> InfoHash -> Table a -> [NodeInfo a]
-kclosestHash k nid t = kclosest k (coerseId nid) t
+-- | Get a list of /K/ nodes with node id closest to the specific
+-- infohash. Used in 'get_peers' queries.
+kclosestHash :: Eq a => K -> InfoHash -> Table a -> [NodeInfo a]
+kclosestHash k nid t = kclosest k (coerceId nid) t
 
 {-----------------------------------------------------------------------
 --  Routing
