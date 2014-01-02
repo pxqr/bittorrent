@@ -33,7 +33,11 @@ module Network.BitTorrent.DHT.Session
        , getPeerList
 
          -- * Messaging
+         -- ** Initiate
+       , queryNode
        , (<@>)
+
+         -- ** Accept
        , NodeHandler
        , nodeHandler
        ) where
@@ -90,7 +94,7 @@ data Options = Options
   , optK       :: {-# UNPACK #-} !K
 
     -- | RPC timeout.
-  , optTimeout :: {-# UNPACK #-} !NominalDiffTime
+  , optTimeout ::                !NominalDiffTime
 
 --  , optReannounceInterval :: NominalDiffTime
 --  , optDataExpiredTimeout :: NominalDiffTime
@@ -312,9 +316,9 @@ getPeerList ih = do
 -----------------------------------------------------------------------}
 
 -- | Throws exception if node is not responding.
-(<@>) :: forall a b ip. Address ip => KRPC (Query a) (Response b)
-      => a -> NodeAddr ip -> DHT ip b
-q <@> addr = do
+queryNode :: forall a b ip. Address ip => KRPC (Query a) (Response b)
+          => NodeAddr ip -> a -> DHT ip b
+queryNode addr q = do
   nid <- getNodeId
 
   let Method name = method :: Method (Query a) (Response b)
@@ -333,6 +337,12 @@ q <@> addr = do
       $(logDebugS) "queryNode" $ "Query recv | " <> signature
       insertNode (NodeInfo remoteId addr)
       return r
+
+-- | Infix version of 'queryNode' function.
+(<@>) :: Address ip => KRPC (Query a) (Response b)
+      => a -> NodeAddr ip -> DHT ip b
+(<@>) = flip queryNode
+{-# INLINE (<@>) #-}
 
 type NodeHandler ip = Handler (DHT ip)
 
