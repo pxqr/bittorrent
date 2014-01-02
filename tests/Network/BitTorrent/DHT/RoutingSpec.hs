@@ -9,4 +9,4 @@ spec :: Spec
 spec = do
   describe "size" $ do
     it "null table is empty" $ do
-      T.size (nullTable def :: Table IPv4) `shouldBe` 0
+      T.size (nullTable def 2 :: Table IPv4) `shouldBe` 0
