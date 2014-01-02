@@ -35,7 +35,6 @@ import Data.List as L
 import Data.Monoid
 import Data.Text as T
 import Network.Socket (PortNumber)
-import System.Timeout.Lifted
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
@@ -103,16 +102,12 @@ bootstrap startNodes = do
   where
     insertClosest addr = do
       nid <- getNodeId
-      result <- try $ timeout 1000000 $ FindNode nid <@> addr
+      result <- try $ FindNode nid <@> addr
       case result of
         Left                    e -> do
           $(logWarnS) "bootstrap" $ T.pack $ show (e :: IOError)
 
-        Right Nothing -> do
-          $(logWarnS) "bootstrap" $ "not responding @ "
-                                 <> T.pack (show (pretty  addr))
-
-        Right (Just (NodeFound closest)) -> do
+        Right (NodeFound closest) -> do
           $(logDebug) ("Get a list of closest nodes: " <>
                        T.pack (PP.render (pretty closest)))
           forM_ (L.take 2 closest) $ \ info @ NodeInfo {..} -> do
