@@ -91,7 +91,8 @@ dht = runDHT handlers
 {-# INLINE dht #-}
 
 -- | One good node may be sufficient. The list of bootstrapping nodes
--- usually obtained from 'Data.Torrent.tNodes' field.
+-- usually obtained from 'Data.Torrent.tNodes' field. Bootstrapping
+-- process can take up to 5 minutes.
 --
 -- (TODO) This operation is asynchronous and do not block.
 --
@@ -109,12 +110,12 @@ bootstrap startNodes = do
           $(logWarnS) "bootstrap" $ T.pack $ show (e :: IOError)
 
         Right (NodeFound closest) -> do
-          $(logDebug) ("Get a list of closest nodes: " <>
-                       T.pack (PP.render (pretty closest)))
-          forM_ (L.take 2 closest) $ \ info @ NodeInfo {..} -> do
+          $(logDebug) $ "Get a list of closest nodes: " <>
+                         T.pack (PP.render (pretty closest))
+          forM_ closest $ \ info @ NodeInfo {..} -> do
             let prettyAddr = T.pack (show (pretty nodeAddr))
             $(logInfoS) "bootstrap" $ "table detalization" <> prettyAddr
-            fork $ insertClosest nodeAddr
+            insertClosest nodeAddr
 
 -- | Get list of peers which downloading this torrent.
 --

@@ -40,17 +40,25 @@ module Network.BitTorrent.DHT.Session
          -- ** Accept
        , NodeHandler
        , nodeHandler
+
+         -- ** Iterate
+       , Iteration
+       , Search
+       , search
        ) where
+
+import Prelude hiding (ioError)
 
 import Control.Applicative
 import Control.Concurrent.STM
-import Control.Concurrent.Lifted
+import Control.Concurrent.Lifted hiding (yield)
 import Control.Exception.Lifted hiding (Handler)
 import Control.Monad.Base
 import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Control.Monad.Trans.Resource
+import Data.Conduit
 import Data.Default
 import Data.Fixed
 import Data.Hashable
@@ -107,10 +115,10 @@ instance Default Options where
     , optTimeout = 5 -- seconds
     }
 
-milliseconds :: NominalDiffTime -> Int
-milliseconds dt = fromEnum millis
+microseconds :: NominalDiffTime -> Int
+microseconds dt = fromEnum millis
   where
-    millis = realToFrac dt :: Milli
+    millis = realToFrac dt :: Micro
 
 {-----------------------------------------------------------------------
 -- Tokens policy
@@ -325,13 +333,15 @@ queryNode addr q = do
   let signature = T.decodeUtf8 name <> " @ " <> T.pack (render (pretty addr))
   $(logDebugS) "queryNode" $ "Query sent | " <> signature
 
-  interval <- asks (milliseconds . optTimeout . options)
-  result   <- timeout interval  $ query (toSockAddr addr) (Query nid q)
+  interval <- asks (optTimeout . options)
+  result   <- timeout (microseconds interval) $ do
+                query (toSockAddr addr) (Query nid q)
   case result of
     Nothing -> do
       $(logWarnS) "queryNode" $ "not responding @ "
-                   <> T.pack (show (pretty  addr))
-      throwIO $ KError GenericError "timeout expired" ""
+                   <> T.pack (show (pretty  addr)) <> " for "
+                   <> T.pack (show interval)
+      ioError $ userError "timeout expired"
 
     Just (Response remoteId r) -> do
       $(logDebugS) "queryNode" $ "Query recv | " <> signature
@@ -354,3 +364,19 @@ nodeHandler action = handler $ \ sockAddr (Query remoteId q) -> do
     Just naddr -> do
       insertNode (NodeInfo remoteId naddr)
       Response <$> getNodeId <*> action naddr q
+
+{-----------------------------------------------------------------------
+--  Search
+-----------------------------------------------------------------------}
+
+type Iteration ip i o = i ip -> DHT ip (Either [i ip] [o ip])
+type Search    ip i o = Conduit [i ip] (DHT ip) [o ip]
+
+-- TODO: use all inputs
+search :: Address ip => Iteration ip i o -> Search ip i o
+search action = do
+  alpha <- lift $ asks (optAlpha . options)
+  awaitForever $ \ inputs -> do
+    forM_ (L.take alpha inputs) $ \ input -> do
+      result <- lift $ action input
+      either leftover yield result
