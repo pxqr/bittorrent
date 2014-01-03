@@ -4,6 +4,7 @@ cabal-dev
 cabal.sandbox.config
 tmp
 upload-docs
+*.torrent
 *.aux
 *.eventlog
 *.hp
