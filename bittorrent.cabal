@@ -244,6 +244,10 @@ executable gettorrent
   build-depends:       base        == 4.*
                      , optparse-applicative
                      , data-default
+                     , conduit
+                     , mtl
+                     , network
+                     , filepath
                      , bittorrent
 
 executable client-example
