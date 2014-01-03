@@ -83,6 +83,8 @@ module Network.BitTorrent.Exchange.Message
        , metadataPieceSize
        , defaultMetadataFactor
        , defaultMaxInfoDictSize
+       , isLastPiece
+       , isValidPiece
        ) where
 
 import Control.Applicative
@@ -859,13 +861,18 @@ instance PeerMessage ExtendedMetadata where
 metadataPieceSize :: Int
 metadataPieceSize = 16 * 1024
 
+isLastPiece :: P.Piece a -> Int -> Bool
+isLastPiece P.Piece {..} total = succ pieceIndex == pcnt
+  where
+    pcnt = q + if r > 0 then 1 else 0
+    (q, r) = quotRem total metadataPieceSize
+
 -- TODO we can check if the piece payload bytestring have appropriate
 -- length; otherwise serialization MUST fail.
-isLastMetadata :: ExtendedMetadata -> Bool
-isLastMetadata = undefined -- FIXME
-
-checkPiece :: ExtendedMetadata -> Bool
-checkPiece = undefined -- FIXME
+isValidPiece :: P.Piece BL.ByteString -> Int -> Bool
+isValidPiece p @ P.Piece {..} total
+  | isLastPiece p total = P.pieceSize p <= metadataPieceSize
+  |       otherwise     = P.pieceSize p == metadataPieceSize
 
 setMetadataPayload :: BS.ByteString -> ExtendedMetadata -> ExtendedMetadata
 setMetadataPayload bs (MetadataData (P.Piece pix _) t) =

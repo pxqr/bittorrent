@@ -55,6 +55,7 @@ module Network.BitTorrent.Exchange.Wire
        , getConnection
        , getExtCaps
        , getStats
+       , getMetadata
        ) where
 
 import Control.Applicative
@@ -689,3 +690,43 @@ acceptWire :: Socket -> PeerAddr IP -> Wire () -> IO ()
 acceptWire sock peerAddr wire = do
   bracket (return sock) close $ \ _ -> do
     error "acceptWire: not implemented"
+
+{-----------------------------------------------------------------------
+--  Metadata exchange
+-----------------------------------------------------------------------}
+-- TODO introduce new metadata exchange specific exceptions
+
+fetchMetadata :: Wire [BS.ByteString]
+fetchMetadata = loop 0
+  where
+    recvData = recvMessage >>= inspect
+      where
+        inspect (Extended (EMetadata _ meta)) =
+          case meta of
+            MetadataRequest pix -> do
+              sendMessage (MetadataReject pix)
+              recvData
+            MetadataData   {..} -> return (piece, totalSize)
+            MetadataReject   _  -> disconnectPeer
+            MetadataUnknown   _ -> recvData
+        inspect _ = recvData
+
+    loop i = do
+      sendMessage (MetadataRequest i)
+      (piece, totalSize) <- recvData
+      unless (pieceIndex piece == i) $ do
+        disconnectPeer
+
+      if piece `isLastPiece` totalSize
+        then pure [pieceData piece]
+        else (pieceData piece :) <$> loop (succ i)
+
+getMetadata :: Wire InfoDict
+getMetadata = do
+  chunks <- fetchMetadata
+  Connection {..} <- getConnection
+  case BE.decode (BS.concat chunks) of
+     Right (infodict @ InfoDict {..})
+       | connTopic == idInfoHash -> return infodict
+       |         otherwise       -> error "broken infodict"
+     Left err -> error $ "unable to parse infodict" ++ err
