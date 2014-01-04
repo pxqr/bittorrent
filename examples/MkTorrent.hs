@@ -27,8 +27,6 @@ import Data.Torrent
 import Data.Torrent.Magnet hiding (Magnet (Magnet))
 import Data.Torrent.Magnet (Magnet)
 
---import MkTorrent.Check
---import MkTorrent.Create
 
 {-----------------------------------------------------------------------
 --  Dialogs
@@ -109,19 +107,17 @@ torrentFile = argument Just
     )
 
 {-----------------------------------------------------------------------
---  Amend command
+--  Amend command - edit a field of torrent file
 -----------------------------------------------------------------------}
 
 data AmendOpts = AmendOpts FilePath
   deriving Show
 
-amendOpts :: Parser AmendOpts
-amendOpts = AmendOpts <$> torrentFile
-
 amendInfo :: ParserInfo AmendOpts
-amendInfo = info (helper <*> amendOpts) modifier
+amendInfo = info (helper <*> parser) modifier
   where
     modifier = progDesc "Edit info fields of existing torrent"
+    parser   = AmendOpts <$> torrentFile
 
 type Amend = Torrent -> Torrent
 
@@ -203,73 +199,58 @@ createInfo = info (helper <*> createOpts) modifier
 -}
 
 {-----------------------------------------------------------------------
---  Magnet command
+--  Magnet command -- print magnet link for given torrent file
 -----------------------------------------------------------------------}
 
-data MagnetFlags = MagnetFlags
-  { detailed :: Bool
+data MagnetOpts = MagnetOpts
+  { magnetFile :: FilePath -- ^ path to torrent file
+  , detailed   :: Bool     -- ^ whether to append additional uri params
   } deriving Show
-
-data MagnetOpts = MagnetOpts FilePath MagnetFlags
-  deriving Show
-
-magnetFlags :: Parser MagnetFlags
-magnetFlags = MagnetFlags
-    <$> switch
-       ( long "detailed"
-       )
-
-magnetOpts :: Parser MagnetOpts
-magnetOpts = MagnetOpts <$> torrentFile <*> magnetFlags
 
 magnetInfo :: ParserInfo MagnetOpts
-magnetInfo = info (helper <*> magnetOpts) modifier
+magnetInfo = info (helper <*> parser) modifier
   where
     modifier = progDesc "Print magnet link"
-
-mkMagnet :: MagnetFlags -> Torrent -> Magnet
-mkMagnet MagnetFlags {..} = if detailed then detailedMagnet else simpleMagnet
+    parser   = MagnetOpts
+      <$> torrentFile
+      <*> switch ( long "detailed" )
 
 magnet :: MagnetOpts -> IO Bool
-magnet (MagnetOpts tpath flags) = do
-  print . mkMagnet flags =<< fromFile tpath
-  return True
+magnet MagnetOpts {..} = do
+    print . magnetLink =<< fromFile magnetFile;
+    return True
+  where
+    magnetLink = if detailed then detailedMagnet else simpleMagnet
 
 {-----------------------------------------------------------------------
---  Show command
+--  Show command - print torrent file information
 -----------------------------------------------------------------------}
 
-data ShowFlags = ShowFlags
-  { infoHashOnly :: Bool
+data ShowOpts = ShowOpts
+  { showPath     :: FilePath -- ^ torrent file to inspect;
+  , infoHashOnly :: Bool     -- ^ omit everything except infohash.
   } deriving Show
 
-data ShowOpts = ShowOpts FilePath ShowFlags
-  deriving Show
-
-showFlags :: Parser ShowFlags
-showFlags = ShowFlags
-  <$> switch
-      ( long "infohash"
-     <> help "Show only hash of the torrent info part"
-      )
-
-showOpts :: Parser ShowOpts
-showOpts = ShowOpts <$> torrentFile <*> showFlags
-
 showInfo :: ParserInfo ShowOpts
-showInfo = info (helper <*> showOpts) modifier
+showInfo = info (helper <*> parser) modifier
   where
     modifier = progDesc "Print .torrent file metadata"
+    parser   = ShowOpts
+      <$> torrentFile
+      <*> switch
+          ( long "infohash"
+         <> help "Show only hash of the torrent info part"
+          )
 
-showTorrent :: ShowFlags -> Torrent -> ShowS
-showTorrent ShowFlags {..} torrent
+showTorrent :: ShowOpts -> Torrent -> ShowS
+showTorrent ShowOpts {..} torrent
   | infoHashOnly = shows $ idInfoHash (tInfoDict torrent)
   |   otherwise  = shows $ pretty torrent
 
 putTorrent :: ShowOpts -> IO Bool
-putTorrent (ShowOpts torrentPath flags) = do
-    torrent <- fromFile torrentPath `onException` putStrLn help
-    putStrLn $ showTorrent flags torrent []
+putTorrent opts @ ShowOpts {..} = do
+    torrent <- fromFile showPath `onException` putStrLn help
+    putStrLn $ showTorrent opts torrent []
     return True
   where
     help = "Most likely this is not a valid .torrent file"
