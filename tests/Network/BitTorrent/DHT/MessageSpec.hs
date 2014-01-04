@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.DHT.MessageSpec (spec) where
 import Control.Monad.Reader
+import Control.Concurrent
 import Data.BEncode as BE
 import Data.ByteString.Lazy as BL
 import Data.Default
@@ -11,6 +12,7 @@ import Network.KRPC
 import Network.Socket (PortNumber)
 import Test.Hspec
 import Test.QuickCheck
+import System.Timeout
 
 import Network.BitTorrent.CoreSpec      ()
 import Network.BitTorrent.DHT.TokenSpec ()
@@ -37,9 +39,24 @@ isProtocolError KError {..} = errorCode == ProtocolError
 prop_bencode :: Eq a => Show a => BEncode a => a -> Expectation
 prop_bencode x = BE.decode (BL.toStrict (BE.encode x)) `shouldBe` Right x
 
+retry :: Int -> IO (Maybe a) -> IO (Maybe a)
+retry 0 _ = return Nothing
+retry n a = do
+  res <- a
+  case res of
+    Just _ -> return res
+    Nothing -> threadDelay (100 * 1000) >> retry (n-1) a
+
 spec :: Spec
 spec = do
  context ("you need running DHT node at " ++ show remoteAddr) $ do
+  it "is running" $ do
+         _ <- retry 5 $ timeout (100 * 1000) $ do
+                      nid <- genNodeId
+                      Response _remoteAddr Ping <-
+                          rpc (query remoteAddr (Query nid Ping))
+                      return ()
+         return ()
   describe "ping" $ do
     it "properly bencoded" $ do
       BE.decode "d2:id20:abcdefghij0123456789e"

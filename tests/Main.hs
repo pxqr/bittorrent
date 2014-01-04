@@ -12,7 +12,7 @@ import Data.Functor
 
 clients :: [(String, String)]
 clients = [
- ("rtorrent","rtorrent -p 51234-51234 testfile.torrent") ]
+ ("rtorrent","rtorrent -p 51234-51234 -O dht=on -O dht_port=6881 -O session=rtorrent-sessiondir testfile.torrent") ]
 
 main :: IO ()
 main = do

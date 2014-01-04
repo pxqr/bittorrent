@@ -11,3 +11,4 @@ upload-docs
 *.pdf
 *.ps
 *.prof
+res/rtorrent-sessiondir
