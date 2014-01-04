@@ -131,12 +131,11 @@ fields = [ ("announce",      set announce            <$> askURI)
 askAmend :: IO Amend
 askAmend = join $ T.putStrLn "Choose a field:" >> askChoice fields
 
-amend :: AmendOpts -> IO Bool
+amend :: AmendOpts -> IO ()
 amend (AmendOpts tpath) = do
   t <- fromFile tpath
   a <- askAmend
   toFile tpath $ a t
-  return True
 
 {-----------------------------------------------------------------------
 --  Check command
@@ -215,10 +214,8 @@ magnetInfo = info (helper <*> parser) modifier
       <$> torrentFile
       <*> switch ( long "detailed" )
 
-magnet :: MagnetOpts -> IO Bool
-magnet MagnetOpts {..} = do
-    print . magnetLink =<< fromFile magnetFile;
-    return True
+magnet :: MagnetOpts -> IO ()
+magnet MagnetOpts {..} = print . magnetLink =<< fromFile magnetFile
   where
     magnetLink = if detailed then detailedMagnet else simpleMagnet
 
@@ -247,11 +244,10 @@ showTorrent ShowOpts {..} torrent
   | infoHashOnly = shows $ idInfoHash (tInfoDict torrent)
   |   otherwise  = shows $ pretty torrent
 
-putTorrent :: ShowOpts -> IO Bool
+putTorrent :: ShowOpts -> IO ()
 putTorrent opts @ ShowOpts {..} = do
     torrent <- fromFile showPath `onException` putStrLn help
     putStrLn $ showTorrent opts torrent []
-    return True
   where
     help = "Most likely this is not a valid .torrent file"
 
@@ -351,7 +347,7 @@ parserInfo = info parser modifier
 --  Dispatch
 -----------------------------------------------------------------------}
 
-run :: Command -> IO Bool
+run :: Command -> IO ()
 run (Amend  opts) = amend opts
 --run (Check  opts) = checkTorrent opts
 --run (Create opts) = createTorrent opts
@@ -366,5 +362,4 @@ main :: IO ()
 main = do
   Options {..} <- execParser parserInfo
   prepare globOpts
-  success <- run cmdOpts
-  if success then exitSuccess else exitFailure
+  run cmdOpts
