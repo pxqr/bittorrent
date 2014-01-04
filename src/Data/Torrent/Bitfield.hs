@@ -37,6 +37,7 @@ module Data.Torrent.Bitfield
 
          -- * Query
        , Data.Torrent.Bitfield.null
+       , Data.Torrent.Bitfield.full
        , haveCount, totalCount, completeness
 
        , member, notMember
@@ -134,6 +135,10 @@ interval pc a b = Bitfield pc (S.interval a b)
 -- | Test if bitifield have no one index: peer do not have anything.
 null :: Bitfield -> Bool
 null Bitfield {..} = S.null bfSet
+
+-- | Test if bitfield have all pieces.
+full :: Bitfield -> Bool
+full Bitfield {..} = S.size bfSet == bfSize
 
 -- | Count of peer have pieces.
 haveCount :: Bitfield -> PieceCount
