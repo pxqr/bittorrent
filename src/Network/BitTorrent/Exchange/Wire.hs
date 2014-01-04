@@ -426,6 +426,28 @@ instance Default Options where
 --  Connection
 -----------------------------------------------------------------------}
 
+data Cached a = Cached { unCache :: a, cached :: BS.ByteString }
+
+cache :: (BEncode a) => a -> Cached a
+cache s = Cached s (BSL.toStrict $ BE.encode s)
+
+data ConnectionState = ConnectionState {
+    -- | If @not (allowed ExtExtended connCaps)@ then this set is always
+    -- empty. Otherwise it has the BEP10 extension protocol mandated mapping of
+    -- 'MessageId' to the message type for the remote peer.
+    _connExtCaps      :: !ExtendedCaps
+
+    -- | Current extended handshake information from the remote peer
+  , _connRemoteEhs    :: !ExtendedHandshake
+
+    -- | Various stats about messages sent and received. Stats can be
+    -- used to protect /this/ peer against flood attacks.
+  , _connStats        :: !ConnectionStats
+
+    -- | Infodict associated with this Connection's connTopic.
+  , _connMetadata     :: Maybe (Cached InfoDict)
+  }
+
 -- | Connection keep various info about both peers.
 data Connection = Connection
   { -- | /Both/ peers handshaked with this protocol string. The only
