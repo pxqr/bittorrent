@@ -18,7 +18,7 @@
 --     * Rarest first selection - performed to avoid situation when
 --     rarest piece is unaccessible.
 --
---     * _End game_ seletion - performed after a peer has requested all
+--     * /End game/ seletion - performed after a peer has requested all
 --     the subpieces of the content.
 --
 --   Note that BitTorrent applies the strict priority policy for
@@ -28,24 +28,38 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 module Data.Torrent.Bitfield
-       ( PieceIx, PieceCount, Bitfield
+       ( -- * Bitfield
+         PieceIx
+       , PieceCount
+       , Bitfield
 
          -- * Construction
-       , haveAll, haveNone, have, singleton
+       , haveAll
+       , haveNone
+       , have
+       , singleton
        , interval
        , adjustSize
 
          -- * Query
+         -- ** Cardinality
        , Data.Torrent.Bitfield.null
        , Data.Torrent.Bitfield.full
-       , haveCount, totalCount, completeness
+       , haveCount
+       , totalCount
+       , completeness
 
-       , member, notMember
-       , findMin, findMax
-
+         -- ** Membership
+       , member
+       , notMember
+       , findMin
+       , findMax
        , isSubsetOf
 
-       , Frequency, frequencies, rarest
+         -- ** Availability
+       , Frequency
+       , frequencies
+       , rarest
 
          -- * Combine
        , union
