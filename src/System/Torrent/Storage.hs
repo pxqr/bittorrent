@@ -36,11 +36,17 @@ module System.Torrent.Storage
        , readPiece
        , hintRead
        , unsafeReadPiece
+
+         -- * Streaming
+       , sourceStorage
+       , sinkStorage
        ) where
 
 import Control.Applicative
 import Control.Exception
+import Control.Monad.Trans
 import Data.ByteString.Lazy as BL
+import Data.Conduit
 import Data.Typeable
 
 import Data.Torrent.Bitfield as BF
@@ -119,6 +125,24 @@ unsafeReadPiece pix s @ Storage {..}
   where
     offset = fromIntegral pix * fromIntegral pieceLen
     sz     = fromIntegral pieceLen
+
+-- | Stream storage pieces from first to the last.
+sourceStorage :: Storage -> Source IO (Piece BL.ByteString)
+sourceStorage s = go 0
+  where
+    go pix
+        | pix < totalPieces s = do
+          piece <- liftIO $ readPiece pix s
+          liftIO $ hintRead (succ pix) s
+          yield piece
+          go (succ pix)
+        |       otherwise     = return ()
+
+-- | Write stream of pieces to the storage. Fail if storage is 'ReadOnly'.
+sinkStorage :: Storage -> Sink (Piece BL.ByteString) IO ()
+sinkStorage s = do
+  awaitForever $ \ piece ->
+    liftIO $ writePiece piece s
 
 -- | TODO examples of use
 genPieceInfo :: Storage -> IO PieceInfo

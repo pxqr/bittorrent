@@ -1,6 +1,8 @@
 module System.Torrent.StorageSpec (spec) where
 import Control.Exception
 import Data.ByteString.Lazy as BL
+import Data.Conduit as C
+import Data.Conduit.List as C
 import System.FilePath
 import System.Directory
 import System.IO.Unsafe
@@ -24,6 +26,12 @@ layout =
 createLayout :: IO ()
 createLayout =
   bracket (open ReadWriteEx 0 layout) close (const (return ()))
+
+psize :: PieceSize
+psize = 16
+
+pcount :: PieceCount
+pcount = 11
 
 spec :: Spec
 spec = before createLayout $ do
@@ -56,3 +64,21 @@ spec = before createLayout $ do
       withStorage ReadOnly 100 layout $ \ s -> do
         _ <- readPiece 1 s
         readPiece 2 s `shouldThrow` (== InvalidIndex 2)
+
+  describe "sourceStorage" $ do
+    it "should source all chunks" $ do
+      withStorage ReadOnly psize layout $ \ s -> do
+        n <- sourceStorage s $$ C.fold (\ n _ -> succ n) 0
+        n `shouldBe` pcount
+
+  -- this test should fail if 'sourceStorage' test fail
+  describe "sinkStorage" $ do
+    it "should write all chunks" $ do
+      let byteVal       = 0
+      let bzeroPiece  p = p { pieceData = BL.replicate (BL.length (pieceData p)) byteVal }
+      let isZeroPiece p = (== byteVal) `BL.all` pieceData p
+
+      withStorage ReadWrite psize layout $ \ s -> do
+        sourceStorage s $= C.map bzeroPiece $$ sinkStorage s
+        b <- sourceStorage s $$ C.fold (\ b p -> b && isZeroPiece p) True
+        b `shouldBe` True

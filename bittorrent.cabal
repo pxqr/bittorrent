@@ -212,6 +212,7 @@ test-suite spec
 
                      , mtl
                      , resourcet
+                     , conduit
 
                      , hspec >= 1.8.1.1
                      , QuickCheck
