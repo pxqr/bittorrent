@@ -29,8 +29,7 @@ import Data.Torrent
 import Data.Torrent.Bitfield as BF
 import Data.Torrent.Piece
 import Data.Torrent.Layout
-import Data.Torrent.Magnet hiding (Magnet (Magnet))
-import Data.Torrent.Magnet (Magnet)
+import Data.Torrent.Magnet hiding (Magnet)
 import System.Torrent.Storage
 
 
@@ -45,9 +44,9 @@ instance Read URI where
       f (Just u) = [(u, "")]
 
 question :: Show a => Text -> Maybe a -> IO ()
-question q def = do
+question q defVal = do
   T.putStrLn q
-  case def of
+  case defVal of
     Nothing -> return ()
     Just v  -> T.putStrLn $ "[default: " <> T.pack (show v) <> "]"
 
@@ -69,22 +68,22 @@ askMaybe q = question q (Just False) >> getReply
 
 askURI :: IO URI
 askURI = do
-  str <- P.getLine
-  case parseURI str of
+  s <- P.getLine
+  case parseURI s of
     Nothing -> T.putStrLn "incorrect URI" >> askURI
     Just u  -> return u
 
 askFreeform :: IO Text
 askFreeform = do
-  str <- T.getLine
-  if T.null str
+  s <- T.getLine
+  if T.null s
     then askFreeform
-    else return str
+    else return s
 
 askInRange :: Int -> Int -> IO Int
 askInRange a b = do
-  str <- T.getLine
-  case T.decimal str of
+  s <- T.getLine
+  case T.decimal s of
     Left msg -> do
       P.putStrLn msg
       askInRange a b
@@ -99,8 +98,8 @@ askChoice kvs = do
   forM_ (L.zip [1 :: Int ..] $ L.map fst kvs) $ \(i, lbl) -> do
     T.putStrLn $ "  " <> T.pack (show i) <> ") " <> lbl
   T.putStrLn "Your choice?"
-  ix <- askInRange 1 (succ (L.length kvs))
-  return $ snd (kvs !! pred ix)
+  n <- askInRange 1 (succ (L.length kvs))
+  return $ snd (kvs !! pred n)
 
 {-----------------------------------------------------------------------
 --  Helpers
@@ -108,7 +107,7 @@ askChoice kvs = do
 
 torrentFile :: Parser FilePath
 torrentFile = argument Just
-    ( metavar "FILE"
+    ( metavar "TORRENT_FILE_PATH"
    <> help    "A .torrent file"
     )
 
@@ -156,10 +155,11 @@ checkInfo :: ParserInfo CheckOpts
 checkInfo = info (helper <*> parser) modifier
   where
     modifier = progDesc "Validate integrity of torrent data"
+        <> header   "append +RTS -N$NUMBER_OF_CORES -RTS for parallel execution"
     parser   = CheckOpts
       <$> torrentFile
       <*> argument Just
-          ( metavar "PATH"
+          ( metavar "CONTENT_DIR_PATH"
          <> value   "."
          <> help    "Content directory or a single file"
           )
@@ -291,10 +291,10 @@ showTorrent ShowOpts {..} torrent
 
 putTorrent :: ShowOpts -> IO ()
 putTorrent opts @ ShowOpts {..} = do
-    torrent <- fromFile showPath `onException` putStrLn help
+    torrent <- fromFile showPath `onException` putStrLn msg
     putStrLn $ showTorrent opts torrent []
   where
-    help = "Most likely this is not a valid .torrent file"
+    msg = "Torrent file is either invalid or do not exist"
 
 {-----------------------------------------------------------------------
 --  Command
