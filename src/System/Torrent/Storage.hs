@@ -44,9 +44,12 @@ module System.Torrent.Storage
 
 import Control.Applicative
 import Control.Exception
+import Control.Monad as M
 import Control.Monad.Trans
 import Data.ByteString.Lazy as BL
-import Data.Conduit
+import Data.Conduit as C
+import Data.Conduit.Binary as C
+import Data.Conduit.List as C
 import Data.Typeable
 
 import Data.Torrent.Bitfield as BF
@@ -156,10 +159,26 @@ sinkStorage s = do
   awaitForever $ \ piece ->
     liftIO $ writePiece piece s
 
--- | TODO examples of use
+-- | This function can be used to generate 'InfoDict' from a set of
+-- opened files.
 genPieceInfo :: Storage -> IO PieceInfo
-genPieceInfo = undefined
+genPieceInfo s = do
+  hashes <- sourceStorage s $= C.map hashPiece $$ C.sinkLbs
+  return $ PieceInfo (pieceLen s) (HashList (BL.toStrict hashes))
 
--- | TODO examples of use
+-- | Verify storage.
+--
+--   Throws 'InvalidSize' if piece info size do not match with storage
+--   piece size.
+--
 getBitfield :: Storage -> PieceInfo -> IO Bitfield
-getBitfield = undefined
+getBitfield s @ Storage {..} pinfo @ PieceInfo {..}
+  | pieceLen /= piPieceLength = throwIO (InvalidSize piPieceLength)
+  | otherwise = M.foldM verifyPiece (BF.haveNone total) [0..total - 1]
+  where
+    total = totalPieces s
+
+    verifyPiece :: Bitfield -> PieceIx -> IO Bitfield
+    verifyPiece bf pix = do
+      valid <- checkPieceLazy pinfo <$> readPiece pix s
+      return $ if valid then BF.insert pix bf else bf

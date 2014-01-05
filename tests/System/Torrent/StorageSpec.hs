@@ -8,6 +8,7 @@ import System.Directory
 import System.IO.Unsafe
 import Test.Hspec
 
+import Data.Torrent.Bitfield as BF
 import Data.Torrent.Layout
 import Data.Torrent.Piece
 import System.Torrent.Storage
@@ -86,3 +87,9 @@ spec = before createLayout $ do
         sourceStorage s $= C.map bzeroPiece $$ sinkStorage s
         b <- sourceStorage s $$ C.fold (\ b p -> b && isZeroPiece p) True
         b `shouldBe` True
+
+  describe "genPieceInfo" $ do
+    it "" $ do
+      withStorage ReadWrite psize layout $ \ s -> do
+        bf <- genPieceInfo s >>= getBitfield s
+        bf `shouldSatisfy` BF.full

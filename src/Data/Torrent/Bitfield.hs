@@ -62,6 +62,7 @@ module Data.Torrent.Bitfield
        , rarest
 
          -- * Combine
+       , insert
        , union
        , intersection
        , difference
@@ -196,6 +197,10 @@ findMax = S.findMax . bfSet
 isSubsetOf :: Bitfield -> Bitfield -> Bool
 isSubsetOf a b = bfSet a `S.isSubsetOf` bfSet b
 
+{-----------------------------------------------------------------------
+-- Availability
+-----------------------------------------------------------------------}
+
 -- | Frequencies are needed in piece selection startegies which use
 -- availability quantity to find out the optimal next piece index to
 -- download.
@@ -239,6 +244,14 @@ rarest xs
 {-----------------------------------------------------------------------
     Combine
 -----------------------------------------------------------------------}
+
+insert :: PieceIx -> Bitfield -> Bitfield
+insert pix bf @ Bitfield {..}
+  | 0 <= pix && pix < bfSize = Bitfield
+    { bfSet  = S.insert pix bfSet
+    , bfSize = bfSize
+    }
+  | otherwise = bf
 
 -- | Find indices at least one peer have.
 union :: Bitfield -> Bitfield -> Bitfield
