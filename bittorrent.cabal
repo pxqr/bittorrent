@@ -256,24 +256,16 @@ executable mktorrent
 --                     , MkTorrent.Magnet
 --                     , MkTorrent.Show
   build-depends:       base == 4.6.*
-                     , lens
-                     , time
-
                      , bytestring
-
-                     , stm
-                     , async
-                     , parallel
-
                      , text
-                     , pretty
                      , pretty-class
+
+                     , lens
+
                      , network
                      , bittorrent
 
                      , optparse-applicative
-                     , directory
-                     , filepath
                      , hslogger
   ghc-options:         -Wall -threaded
 
