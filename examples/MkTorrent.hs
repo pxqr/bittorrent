@@ -5,10 +5,12 @@
 module Main (main) where
 
 import Prelude as P
+import Control.Concurrent.ParallelIO
 import Control.Exception
 import Control.Lens hiding (argument)
 import Control.Monad
 import Data.List as L
+import Data.Maybe
 import Data.Monoid
 import Data.Text as T
 import qualified Data.Text.IO as T
@@ -24,8 +26,12 @@ import Text.PrettyPrint.Class
 
 import Paths_bittorrent (version)
 import Data.Torrent
+import Data.Torrent.Bitfield as BF
+import Data.Torrent.Piece
+import Data.Torrent.Layout
 import Data.Torrent.Magnet hiding (Magnet (Magnet))
 import Data.Torrent.Magnet (Magnet)
+import System.Torrent.Storage
 
 
 {-----------------------------------------------------------------------
@@ -138,27 +144,66 @@ amend (AmendOpts tpath) = do
   toFile tpath $ a t
 
 {-----------------------------------------------------------------------
---  Check command
+--  Check command -- validate content files using torrent file
 -----------------------------------------------------------------------}
 
-{-
-checkOpts :: Parser CheckOpts
-checkOpts = CheckOpts
-    <$> torrentFile
-    <*> argument Just
-        ( metavar "PATH"
-       <> value   "."
-       <> help    "Content directory or a single file" )
+data CheckOpts = CheckOpts
+  { checkTorrentPath :: FilePath -- ^ validation torrent file
+  , checkContentPath :: FilePath -- ^ root dir for content files
+  } deriving Show
 
 checkInfo :: ParserInfo CheckOpts
-checkInfo = info (helper <*> checkOpts) modifier
+checkInfo = info (helper <*> parser) modifier
   where
     modifier = progDesc "Validate integrity of torrent data"
+    parser   = CheckOpts
+      <$> torrentFile
+      <*> argument Just
+          ( metavar "PATH"
+         <> value   "."
+         <> help    "Content directory or a single file"
+          )
+
+validatePiece :: Storage -> PieceInfo -> PieceIx -> IO (Maybe PieceIx)
+validatePiece s pinfo pix = do
+  valid <- verifyPiece s pinfo pix
+  if valid
+    then do infoM "check" $ "valid piece "   ++ show pix
+            return (Just pix)
+    else do infoM "check" $ "invalid piece " ++ show pix
+            return Nothing
+
+validateStorage :: Storage -> PieceInfo -> IO Bitfield
+validateStorage s pinfo = do
+  infoM "check" "start storage validation"
+  let total = totalPieces s
+  pixs <- parallel $ L.map (validatePiece s pinfo) [0 .. total - 1]
+  infoM "check" "storage validation finished"
+  return $ fromList total $ catMaybes pixs
+
+-- TODO use local thread pool
+checkContent :: Storage -> PieceInfo -> IO ()
+checkContent s pinfo = do
+  invalids <- BF.complement <$> validateStorage s pinfo
+  if BF.null invalids
+    then noticeM "check" "all files are complete and valid"
+    else do
+      emergencyM "check" $ "there are some invalid pieces" ++ show invalids
+      exitFailure
+
+checkTorrent :: CheckOpts -> IO ()
+checkTorrent CheckOpts {..} = do
+  InfoDict {..} <- tInfoDict <$> fromFile checkTorrentPath
+  let layout = flatLayout checkContentPath idLayoutInfo
+  withStorage ReadOnly (piPieceLength idPieceInfo) layout $ \ s -> do
+    infoM "check" "files mapped"
+    checkContent s idPieceInfo
+    infoM "check" "unmapping files"
 
 {-----------------------------------------------------------------------
 --  Create command
 -----------------------------------------------------------------------}
-
+{-
 createFlags :: Parser CreateFlags
 createFlags = CreateFlags
     <$> optional (option
@@ -257,7 +302,7 @@ putTorrent opts @ ShowOpts {..} = do
 
 data Command
   = Amend  AmendOpts
---  | Check  CheckOpts
+  | Check  CheckOpts
 --  | Create CreateOpts
   | Magnet MagnetOpts
   | Show   ShowOpts
@@ -266,7 +311,7 @@ data Command
 commandOpts :: Parser Command
 commandOpts = subparser $ mconcat
     [ command "amend"  (Amend  <$> amendInfo)
---    , command "check"  (Check  <$> checkInfo)
+    , command "check"  (Check  <$> checkInfo)
 --    , command "create" (Create <$> createInfo)
     , command "magnet" (Magnet <$> magnetInfo)
     , command "show"   (Show   <$> showInfo)
@@ -349,7 +394,7 @@ parserInfo = info parser modifier
 
 run :: Command -> IO ()
 run (Amend  opts) = amend opts
---run (Check  opts) = checkTorrent opts
+run (Check  opts) = checkTorrent opts
 --run (Create opts) = createTorrent opts
 run (Magnet opts) = magnet opts
 run (Show   opts) = putTorrent opts

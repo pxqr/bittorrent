@@ -57,6 +57,7 @@ module Data.Torrent.Bitfield
        , isSubsetOf
 
          -- ** Availability
+       , complement
        , Frequency
        , frequencies
        , rarest
@@ -194,8 +195,20 @@ findMax :: Bitfield -> PieceIx
 findMax = S.findMax . bfSet
 {-# INLINE findMax #-}
 
+-- | Check if all pieces from first bitfield present if the second bitfield
 isSubsetOf :: Bitfield -> Bitfield -> Bool
 isSubsetOf a b = bfSet a `S.isSubsetOf` bfSet b
+{-# INLINE isSubsetOf #-}
+
+-- | Resulting bitfield includes only missing pieces.
+complement :: Bitfield -> Bitfield
+complement Bitfield {..} = Bitfield
+  { bfSet  = uni `S.difference` bfSet
+  , bfSize = bfSize
+  }
+  where
+    Bitfield _ uni = haveAll bfSize
+{-# INLINE complement #-}
 
 {-----------------------------------------------------------------------
 -- Availability

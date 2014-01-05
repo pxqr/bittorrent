@@ -261,13 +261,13 @@ executable mktorrent
                      , pretty-class
 
                      , lens
-
+                     , parallel-io
                      , network
                      , bittorrent
 
                      , optparse-applicative
                      , hslogger
-  ghc-options:         -Wall -threaded
+  ghc-options:         -Wall -O2 -threaded
 
 -- Utility to fetch
 executable gettorrent

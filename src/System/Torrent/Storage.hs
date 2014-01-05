@@ -28,6 +28,8 @@ module System.Torrent.Storage
        , withStorage
 
          -- * Query
+       , totalPieces
+       , verifyPiece
        , genPieceInfo
        , getBitfield
 
@@ -166,6 +168,10 @@ genPieceInfo s = do
   hashes <- sourceStorage s $= C.map hashPiece $$ C.sinkLbs
   return $ PieceInfo (pieceLen s) (HashList (BL.toStrict hashes))
 
+-- | Verify specific piece using infodict hash list.
+verifyPiece :: Storage -> PieceInfo -> PieceIx -> IO Bool
+verifyPiece s pinfo pix = checkPieceLazy pinfo <$> readPiece pix s
+
 -- | Verify storage.
 --
 --   Throws 'InvalidSize' if piece info size do not match with storage
@@ -174,11 +180,11 @@ genPieceInfo s = do
 getBitfield :: Storage -> PieceInfo -> IO Bitfield
 getBitfield s @ Storage {..} pinfo @ PieceInfo {..}
   | pieceLen /= piPieceLength = throwIO (InvalidSize piPieceLength)
-  | otherwise = M.foldM verifyPiece (BF.haveNone total) [0..total - 1]
+  | otherwise = M.foldM checkPiece (BF.haveNone total) [0..total - 1]
   where
     total = totalPieces s
 
-    verifyPiece :: Bitfield -> PieceIx -> IO Bitfield
-    verifyPiece bf pix = do
-      valid <- checkPieceLazy pinfo <$> readPiece pix s
+    checkPiece :: Bitfield -> PieceIx -> IO Bitfield
+    checkPiece bf pix = do
+      valid <- verifyPiece s pinfo pix
       return $ if valid then BF.insert pix bf else bf
