@@ -135,6 +135,8 @@ readPiece pix s @ Storage {..}
 hintRead :: PieceIx -> Storage -> IO ()
 hintRead _pix Storage {..} = return ()
 
+-- | Zero-copy version of readPiece. Can be used only with 'ReadOnly'
+-- storages.
 unsafeReadPiece :: PieceIx -> Storage -> IO (Piece BL.ByteString)
 unsafeReadPiece pix s @ Storage {..}
   | not (isValidIx pix s) = throwIO (InvalidIndex pix)
@@ -170,7 +172,9 @@ genPieceInfo s = do
 
 -- | Verify specific piece using infodict hash list.
 verifyPiece :: Storage -> PieceInfo -> PieceIx -> IO Bool
-verifyPiece s pinfo pix = checkPieceLazy pinfo <$> readPiece pix s
+verifyPiece s pinfo pix = do
+  piece <- unsafeReadPiece pix s
+  return $! checkPieceLazy pinfo piece
 
 -- | Verify storage.
 --
