@@ -24,6 +24,7 @@ module Data.Torrent.Piece
          -- * Piece data
        , Piece (..)
        , pieceSize
+       , hashPiece
 
          -- * Piece control
        , HashList (..)
@@ -121,6 +122,12 @@ defaultPieceSize x = max minPieceSize $ min maxPieceSize $ toPow2 pc
 -- Piece data
 -----------------------------------------------------------------------}
 
+type PieceHash = ByteString
+
+hashsize :: Int
+hashsize = 20
+{-# INLINE hashsize #-}
+
 -- TODO check if pieceLength is power of 2
 -- | Piece payload should be strict or lazy bytestring.
 data Piece a = Piece
@@ -143,15 +150,13 @@ instance Pretty (Piece a) where
 pieceSize :: Piece BL.ByteString -> PieceSize
 pieceSize Piece {..} = fromIntegral (BL.length pieceData)
 
+-- | Get piece hash.
+hashPiece :: Piece BL.ByteString -> PieceHash
+hashPiece Piece {..} = SHA1.hashlazy pieceData
+
 {-----------------------------------------------------------------------
 -- Piece control
 -----------------------------------------------------------------------}
-
-type PieceHash = ByteString
-
-hashsize :: Int
-hashsize = 20
-{-# INLINE hashsize #-}
 
 -- | A flat array of SHA1 hash for each piece.
 newtype HashList = HashList { unHashList :: ByteString }
