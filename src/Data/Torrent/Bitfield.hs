@@ -66,12 +66,13 @@ module Data.Torrent.Bitfield
        , intersection
        , difference
 
-         -- * Serialization
-       , fromBitmap, toBitmap
+         -- * Conversion
        , toList
+       , fromList
 
-         -- * Debug
-       , mkBitfield
+         -- * Serialization
+       , fromBitmap
+       , toBitmap
        ) where
 
 import Control.Monad
@@ -268,9 +269,16 @@ unions = {-# SCC unions #-} foldl' union (haveNone 0)
     Serialization
 -----------------------------------------------------------------------}
 
--- | List all have indexes.
+-- | List all /have/ indexes.
 toList :: Bitfield -> [PieceIx]
 toList Bitfield {..} = S.toList bfSet
+
+-- | Make bitfield from list of /have/ indexes.
+fromList :: PieceCount -> [PieceIx] -> Bitfield
+fromList s ixs = Bitfield {
+    bfSize = s
+  , bfSet  = S.splitGT (-1) $ S.splitLT s $ S.fromList ixs
+  }
 
 -- | Unpack 'Bitfield' from tightly packed bit array. Note resulting
 -- size might be more than real bitfield size, use 'adjustSize'.
@@ -288,14 +296,3 @@ toBitmap Bitfield {..} = {-# SCC toBitmap #-} Lazy.fromChunks [intsetBM, alignme
     byteSize  = bfSize `div` 8 + if bfSize `mod` 8 == 0 then 0 else 1
     alignment = B.replicate (byteSize - B.length intsetBM) 0
     intsetBM  = S.toByteString bfSet
-
-{-----------------------------------------------------------------------
-    Debug
------------------------------------------------------------------------}
-
--- | For internal use only.
-mkBitfield :: PieceCount -> [PieceIx] -> Bitfield
-mkBitfield s ixs = Bitfield {
-    bfSize = s
-  , bfSet  = S.splitGT (-1) $ S.splitLT s $ S.fromList ixs
-  }
