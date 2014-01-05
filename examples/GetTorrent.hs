@@ -52,9 +52,6 @@ programInfo = info (helper <*> paramsParser)
   <> header   "gettorrent - get torrent file by infohash"
    )
 
-fakeTracker :: URI
-fakeTracker = fromJust $ parseURI "http://foo.org"
-
 exchangeTorrent :: PeerAddr IP -> InfoHash -> IO InfoDict
 exchangeTorrent addr ih = do
   pid <- genPeerId
@@ -72,7 +69,7 @@ getTorrent Params {..} = do
     DHT.lookup topic $$ C.mapM_ $ \ peers -> do
       liftIO $ forM_ peers $ \ peer -> do
         infodict <- exchangeTorrent (IPv4 <$> peer) topic
-        let torrent = nullTorrent fakeTracker infodict
+        let torrent = nullTorrent infodict -- TODO add tNodes, tCreated, etc?
         toFile (show topic <.> torrentExt) torrent
         exitSuccess
 

@@ -191,7 +191,7 @@ instance Pretty InfoDict where
 
 -- | Metainfo about particular torrent.
 data Torrent = Torrent
-  { tAnnounce     :: !URI
+  { tAnnounce     :: !(Maybe URI)
     -- ^ The URL of the tracker.
 
   , tAnnounceList :: !(Maybe [[URI]])
@@ -215,7 +215,7 @@ data Torrent = Torrent
   , tInfoDict     :: !InfoDict
     -- ^ Info about each content file.
 
-  , tNodes        :: Maybe [NodeAddr ByteString]
+  , tNodes        :: !(Maybe [NodeAddr ByteString])
     -- ^ This key should be set to the /K closest/ nodes in the
     -- torrent generating client's routing table. Alternatively, the
     -- key could be set to a known good 'Network.BitTorrent.Core.Node'
@@ -284,7 +284,7 @@ instance BEncode POSIXTime where
 
 instance BEncode Torrent where
   toBEncode Torrent {..} = toDict $
-       "announce"      .=! tAnnounce
+       "announce"      .=? tAnnounce
     .: "announce-list" .=? tAnnounceList
     .: "comment"       .=? tComment
     .: "created by"    .=? tCreatedBy
@@ -298,7 +298,7 @@ instance BEncode Torrent where
     .: endDict
 
   fromBEncode = fromDict $ do
-    Torrent <$>! "announce"
+    Torrent <$>? "announce"
             <*>? "announce-list"
             <*>? "comment"
             <*>? "created by"
@@ -341,10 +341,10 @@ instance Pretty Torrent where
         "Signature"     <:>? ((text . show) <$> tSignature)
 
 -- | A simple torrent contains only required fields.
-nullTorrent :: URI -> InfoDict -> Torrent
-nullTorrent ann info = Torrent
-    ann  Nothing Nothing Nothing Nothing Nothing
-    info Nothing Nothing Nothing Nothing
+nullTorrent :: InfoDict -> Torrent
+nullTorrent info = Torrent
+    Nothing Nothing Nothing Nothing Nothing Nothing
+    info    Nothing Nothing Nothing Nothing
 
 -- | Mime type of torrent files.
 typeTorrent :: BS.ByteString

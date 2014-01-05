@@ -326,7 +326,7 @@ detailedMagnet :: Torrent -> Magnet
 detailedMagnet t @ Torrent {tInfoDict = InfoDict {..}, tAnnounce}
   = (simpleMagnet t)
     { exactLength = Just $ fromIntegral $ contentLength idLayoutInfo
-    , tracker     = Just tAnnounce
+    , tracker     = tAnnounce
     }
 
 {-----------------------------------------------------------------------

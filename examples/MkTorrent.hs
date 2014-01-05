@@ -122,7 +122,7 @@ amendInfo = info (helper <*> parser) modifier
 type Amend = Torrent -> Torrent
 
 fields :: [(Text, IO Amend)]
-fields = [ ("announce",      set announce            <$> askURI)
+fields = [ ("announce",      set announce     . Just <$> askURI)
          , ("comment",       set comment      . Just <$> askFreeform)
          , ("created by",    set createdBy    . Just <$> askFreeform)
          , ("publisher url", set publisherURL . Just <$> askURI)

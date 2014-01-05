@@ -24,7 +24,7 @@ data Swarm = Swarm
 
 newLeecher :: PeerId -> PortNumber -> Torrent -> IO Swarm
 newLeecher pid port Torrent {..} = do
-  tracker <- connect tAnnounce
+  tracker <- connect undefined
   return Swarm
     { swarmTopic   = idInfoHash tInfoDict
     , thisPeerId   = pid
