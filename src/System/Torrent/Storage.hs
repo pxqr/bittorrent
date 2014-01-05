@@ -43,7 +43,7 @@ import Control.Exception
 import Data.ByteString.Lazy as BL
 import Data.Typeable
 
-import Data.Torrent.Bitfield
+import Data.Torrent.Bitfield as BF
 import Data.Torrent.Layout
 import Data.Torrent.Piece
 import System.Torrent.FileMap as FM
@@ -82,10 +82,11 @@ withStorage :: Mode -> PieceSize -> FileLayout FileSize
             -> (Storage -> IO ()) -> IO ()
 withStorage m s l = bracket (open m s l) close
 
+totalPieces :: Storage -> PieceCount
+totalPieces Storage {..} = FM.size fileMap `sizeInBase` pieceLen
+
 isValidIx :: PieceIx -> Storage -> Bool
-isValidIx i Storage {..} = 0 <= i && i < pcount
-  where
-    pcount = FM.size fileMap `sizeInBase` pieceLen
+isValidIx i s = 0 <= i && i < totalPieces s
 
 writePiece :: Piece BL.ByteString -> Storage -> IO ()
 writePiece p @ Piece {..} s @ Storage {..}
@@ -104,7 +105,10 @@ readPiece pix s @ Storage {..}
     offset = fromIntegral pix * fromIntegral pieceLen
     sz     = fromIntegral pieceLen
 
--- | Hint about the coming 'readPiece'.
+-- | Hint about the coming 'readPiece'. Ignores invalid indexes, for e.g.:
+--
+--   @forall s. hindRead (-1) s == return ()@
+--
 hintRead :: PieceIx -> Storage -> IO ()
 hintRead _pix Storage {..} = return ()
 
