@@ -96,11 +96,23 @@ isValidIx i s = 0 <= i && i < totalPieces s
 
 writePiece :: Piece BL.ByteString -> Storage -> IO ()
 writePiece p @ Piece {..} s @ Storage {..}
-  | mode        == ReadOnly      = throwIO  StorageIsRO
-  | pieceSize p /= pieceLen      = throwIO (InvalidSize (pieceSize p))
-  | not (isValidIx pieceIndex s) = throwIO (InvalidIndex pieceIndex)
-  | otherwise = writeBytes offset pieceData fileMap
+  |       mode == ReadOnly    = throwIO  StorageIsRO
+  | isNotValidIx   pieceIndex = throwIO (InvalidIndex pieceIndex)
+  | isNotValidSize pieceIndex (pieceSize p)
+                              = throwIO (InvalidSize  (pieceSize p))
+  |          otherwise        = writeBytes offset pieceData fileMap
   where
+    isNotValidSize pix psize
+      | succ pix == pcount = psize /= lastPieceLen -- last piece may be shorter
+      |      otherwise     = psize /= pieceLen
+      where
+        lastPieceLen = fromIntegral (FM.size fileMap `rem` fromIntegral pieceLen)
+    {-# INLINE isNotValidSize #-}
+
+    isNotValidIx i = i < 0 || i >= pcount
+    {-# INLINE isNotValidIx #-}
+
+    pcount = totalPieces s
     offset = fromIntegral pieceIndex * fromIntegral pieceLen
 
 readPiece :: PieceIx -> Storage -> IO (Piece BL.ByteString)

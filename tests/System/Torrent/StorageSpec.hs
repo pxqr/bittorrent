@@ -52,8 +52,12 @@ spec = before createLayout $ do
     it "should fail on out of upper bound index" $ do
       withStorage ReadWrite 100 layout $ \ s -> do
         let bs = BL.replicate 100 0
-        writePiece (Piece 1 bs) s
-        writePiece (Piece 2 bs) s `shouldThrow` (== InvalidIndex 2)
+        writePiece (Piece 0 bs) s
+
+        let bs' = BL.replicate 75 0
+        writePiece (Piece 1 bs') s
+
+        writePiece (Piece 2 bs') s `shouldThrow` (== InvalidIndex 2)
 
   describe "readPiece" $ do
     it "should fail on negative index" $
