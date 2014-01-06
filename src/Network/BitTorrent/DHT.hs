@@ -56,22 +56,18 @@ import Network.KRPC
 
 pingH :: Address ip => NodeHandler ip
 pingH = nodeHandler $ \ _ Ping -> do
-  $(logDebug) "ping received, sending pong"
   return Ping
 
 findNodeH :: Address ip => NodeHandler ip
 findNodeH = nodeHandler $ \ _ (FindNode nid) -> do
-  $(logDebug) "find_node received, sending closest nodes back"
   NodeFound <$> getClosest nid
 
 getPeersH :: Address ip => NodeHandler ip
 getPeersH = nodeHandler $ \ naddr (GetPeers ih) -> do
-  $(logDebug) "get_peers received, trying to find peers"
   GotPeers <$> getPeerList ih <*> grantToken naddr
 
 announceH :: Address ip => NodeHandler ip
 announceH = nodeHandler $ \ naddr (Announce {..}) -> do
-  $(logDebug) "announce received, trying to check token"
   checkToken naddr sessionToken
   case fromAddr naddr of
     Nothing    -> throw $ KError ProtocolError "bad address" ""
