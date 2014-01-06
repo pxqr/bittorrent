@@ -60,6 +60,7 @@ import Data.Torrent.Piece
 import System.Torrent.FileMap as FM
 
 
+-- | Some storage operations may throw an exception if misused.
 data StorageFailure
     -- | Occurs on a write operation if the storage has been opened
     --   using 'ReadOnly' mode.
@@ -75,30 +76,45 @@ data StorageFailure
 
 instance Exception StorageFailure
 
--- TODO validation
+-- | Pieces store.
 data Storage = Storage
   { mode     ::                !Mode
   , pieceLen :: {-# UNPACK #-} !PieceSize
   , fileMap  :: {-# UNPACK #-} !FileMap
   }
 
--- ResourceT ?
+-- | Map torrent files:
+--
+--   * when torrent first created use 'ReadWriteEx' mode;
+--
+--   * when seeding, validation 'ReadOnly' mode.
+--
 open :: Mode -> PieceSize -> FileLayout FileSize -> IO Storage
 open mode s l = Storage mode s <$> mmapFiles mode l
 
+-- | Unmaps all files forcefully. It is recommended but not required.
 close :: Storage -> IO ()
 close Storage {..} = unmapFiles fileMap
 
+-- | Normally you need to use 'Control.Monad.Trans.Resource.allocate'.
 withStorage :: Mode -> PieceSize -> FileLayout FileSize
             -> (Storage -> IO ()) -> IO ()
 withStorage m s l = bracket (open m s l) close
 
+-- TODO allocateStorage?
+
+-- | Count of pieces in the storage.
 totalPieces :: Storage -> PieceCount
 totalPieces Storage {..} = FM.size fileMap `sizeInBase` pieceLen
 
 isValidIx :: PieceIx -> Storage -> Bool
 isValidIx i s = 0 <= i && i < totalPieces s
 
+-- | Put piece data at the piece index by overwriting existing
+-- data.
+--
+--   This operation may throw 'StorageFailure'.
+--
 writePiece :: Piece BL.ByteString -> Storage -> IO ()
 writePiece p @ Piece {..} s @ Storage {..}
   |       mode == ReadOnly    = throwIO  StorageIsRO
@@ -120,6 +136,10 @@ writePiece p @ Piece {..} s @ Storage {..}
     pcount = totalPieces s
     offset = fromIntegral pieceIndex * fromIntegral pieceLen
 
+-- | Read specific piece from storage.
+--
+--   This operation may throw 'StorageFailure'.
+--
 readPiece :: PieceIx -> Storage -> IO (Piece BL.ByteString)
 readPiece pix s @ Storage {..}
   | not (isValidIx pix s) = throwIO (InvalidIndex pix)
