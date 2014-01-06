@@ -1,5 +1,4 @@
 module System.Torrent.StorageSpec (spec) where
-import Control.Exception
 import Data.ByteString.Lazy as BL
 import Data.Conduit as C
 import Data.Conduit.List as C
@@ -25,8 +24,7 @@ layout =
     dir = unsafePerformIO $ getTemporaryDirectory
 
 createLayout :: IO ()
-createLayout =
-  bracket (open ReadWriteEx 0 layout) close (const (return ()))
+createLayout = withStorage ReadWriteEx 1 layout (const (return ()))
 
 psize :: PieceSize
 psize = 16
@@ -38,16 +36,15 @@ spec :: Spec
 spec = before createLayout $ do
   describe "writePiece" $ do
     it "should fail gracefully on write operation in RO mode" $ do
-      s <- open ReadOnly 0 layout
-      writePiece (Piece 0 "") s `shouldThrow` (== StorageIsRO)
-      close s
+      withStorage ReadOnly 1 layout $ \ s ->
+        writePiece (Piece 0 "a") s `shouldThrow` (== StorageIsRO)
 
     it "should fail if piece size do not match" $ do
       withStorage ReadWrite 1 layout $ \ s ->
         writePiece (Piece 0 "") s `shouldThrow` (== InvalidSize 0)
 
     it "should fail on negative index" $ do
-      withStorage ReadWrite 0 layout $ \ s ->
+      withStorage ReadWrite 1 layout $ \ s ->
         writePiece (Piece (-1) "") s `shouldThrow` (== InvalidIndex (-1))
 
     it "should fail on out of upper bound index" $ do
@@ -62,7 +59,7 @@ spec = before createLayout $ do
 
   describe "readPiece" $ do
     it "should fail on negative index" $
-      withStorage ReadOnly 0 layout $ \ s ->
+      withStorage ReadOnly 1 layout $ \ s ->
         readPiece (-1) s `shouldThrow` (== InvalidIndex (-1))
 
     it "should fail on out of upper bound index" $ do

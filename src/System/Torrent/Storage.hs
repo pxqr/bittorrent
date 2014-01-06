@@ -90,7 +90,9 @@ data Storage = Storage
 --   * when seeding, validation 'ReadOnly' mode.
 --
 open :: Mode -> PieceSize -> FileLayout FileSize -> IO Storage
-open mode s l = Storage mode s <$> mmapFiles mode l
+open mode s l
+  |   s <= 0  = throwIO (InvalidSize s)
+  | otherwise = Storage mode s <$> mmapFiles mode l
 
 -- | Unmaps all files forcefully. It is recommended but not required.
 close :: Storage -> IO ()
