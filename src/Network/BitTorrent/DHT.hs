@@ -28,14 +28,12 @@ module Network.BitTorrent.DHT
        ) where
 
 import Control.Applicative
-import Control.Concurrent.Lifted hiding (yield)
 import Control.Exception.Lifted
 import Control.Monad as M
 import Control.Monad.Logger
 import Control.Monad.Trans
 import Data.Conduit as C
 import Data.Conduit.List as C
-import Data.List as L
 import Data.Monoid
 import Data.Text as T
 import Network.Socket (PortNumber)
@@ -47,7 +45,6 @@ import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Routing
 import Network.BitTorrent.DHT.Session
-import Network.KRPC
 
 
 {-----------------------------------------------------------------------
@@ -67,13 +64,12 @@ getPeersH = nodeHandler $ \ naddr (GetPeers ih) -> do
   GotPeers <$> getPeerList ih <*> grantToken naddr
 
 announceH :: Address ip => NodeHandler ip
-announceH = nodeHandler $ \ naddr (Announce {..}) -> do
+announceH = nodeHandler $ \ naddr @ NodeAddr {..} (Announce {..}) -> do
   checkToken naddr sessionToken
-  case fromAddr naddr of
-    Nothing    -> throw $ KError ProtocolError "bad address" ""
-    Just paddr -> do
-      insertPeer topic paddr
-      return Announced
+  let annPort  = if impliedPort then nodePort else port
+  let peerAddr = PeerAddr Nothing nodeHost annPort
+  insertPeer topic peerAddr
+  return Announced
 
 handlers :: Address ip => [NodeHandler ip]
 handlers = [pingH, findNodeH, getPeersH, announceH]
