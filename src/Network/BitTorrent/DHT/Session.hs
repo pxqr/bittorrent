@@ -333,23 +333,13 @@ queryNode :: forall a b ip. Address ip => KRPC (Query a) (Response b)
           => NodeAddr ip -> a -> DHT ip b
 queryNode addr q = do
   nid <- getNodeId
-
-  let Method name = method :: Method (Query a) (Response b)
-  let signature = T.decodeUtf8 name <> " @ " <> T.pack (render (pretty addr))
-  $(logDebugS) "queryNode" $ "Query sent | " <> signature
-
+  -- TODO remove timeout: KRPC already keep track timeouts
   interval <- asks (optTimeout . options)
   result   <- timeout (microseconds interval) $ do
                 query (toSockAddr addr) (Query nid q)
   case result of
-    Nothing -> do
-      $(logWarnS) "queryNode" $ "not responding @ "
-                   <> T.pack (show (pretty  addr)) <> " for "
-                   <> T.pack (show interval)
-      ioError $ userError "timeout expired"
-
+    Nothing -> ioError $ userError "timeout expired"
     Just (Response remoteId r) -> do
-      $(logDebugS) "queryNode" $ "Query recv | " <> signature
       insertNode (NodeInfo remoteId addr)
       return r
 
