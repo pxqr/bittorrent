@@ -120,10 +120,8 @@ instance Default Options where
     , optTimeout     = 5 -- seconds
     }
 
-microseconds :: NominalDiffTime -> Int
-microseconds dt = fromEnum millis
-  where
-    millis = realToFrac dt :: Micro
+seconds :: NominalDiffTime -> Int
+seconds dt = fromEnum (realToFrac dt :: Uni)
 
 {-----------------------------------------------------------------------
 -- Tokens policy
@@ -196,8 +194,9 @@ runDHT :: forall ip a. Address ip
        -> IO a               -- ^ result.
 runDHT handlers opts naddr action = runResourceT $ do
   runStderrLoggingT $ LoggingT $  \ logger -> do
-    let kopts = KRPC.def
-    (_, m) <- allocate (newManager kopts (toSockAddr naddr) handlers) closeManager
+    let rpcOpts  = KRPC.def { optQueryTimeout = seconds (optTimeout opts) }
+    let nodeAddr = toSockAddr naddr
+    (_, m) <- allocate (newManager rpcOpts nodeAddr handlers) closeManager
     myId   <- liftIO genNodeId
     node   <- liftIO $ Node opts m
              <$> newMVar (nullTable myId (optBucketCount opts))
@@ -262,7 +261,7 @@ checkToken addr questionableToken = do
   tryUpdateSecret
   toks <- asks sessionTokens >>= liftIO . readTVarIO
   unless (member addr questionableToken (tokenMap toks)) $
-    throw $ InvalidParameter "token"
+    throwIO $ InvalidParameter "token"
 
 {-----------------------------------------------------------------------
 -- Routing table
@@ -334,15 +333,9 @@ queryNode :: forall a b ip. Address ip => KRPC (Query a) (Response b)
           => NodeAddr ip -> a -> DHT ip b
 queryNode addr q = do
   nid <- getNodeId
-  -- TODO remove timeout: KRPC already keep track timeouts
-  interval <- asks (optTimeout . options)
-  result   <- timeout (microseconds interval) $ do
-                query (toSockAddr addr) (Query nid q)
-  case result of
-    Nothing -> ioError $ userError "timeout expired"
-    Just (Response remoteId r) -> do
-      insertNode (NodeInfo remoteId addr)
-      return r
+  Response remoteId r <- query (toSockAddr addr) (Query nid q)
+  insertNode (NodeInfo remoteId addr)
+  return r
 
 -- | Infix version of 'queryNode' function.
 (<@>) :: Address ip => KRPC (Query a) (Response b)
