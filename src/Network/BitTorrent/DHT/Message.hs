@@ -108,7 +108,7 @@ node_id_key = "id"
 data Query a = Query
   { thisNodeId  :: NodeId -- ^ node id of /quering/ node;
   , queryParams :: a      -- ^ query parameters.
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable)
 
 instance BEncode a => BEncode (Query a) where
   toBEncode Query {..} = toDict $
@@ -128,7 +128,7 @@ instance BEncode a => BEncode (Query a) where
 data Response a = Response
   { remoteNodeId :: NodeId -- ^ node id of /quered/ node;
   , responseVals :: a      -- ^ query result.
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable)
 
 instance BEncode a => BEncode (Response a) where
   toBEncode = toBEncode . toQuery

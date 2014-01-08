@@ -76,8 +76,8 @@ import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.InfoHash
-import Network.KRPC
-import Network.KRPC.Method
+import Network.KRPC hiding (Options, def)
+import qualified Network.KRPC as KRPC (Options, def)
 import Network.BitTorrent.Core
 import Network.BitTorrent.Core.PeerAddr as P
 import Network.BitTorrent.DHT.Message
@@ -196,7 +196,8 @@ runDHT :: forall ip a. Address ip
        -> IO a               -- ^ result.
 runDHT handlers opts naddr action = runResourceT $ do
   runStderrLoggingT $ LoggingT $  \ logger -> do
-    (_, m) <- allocate (newManager (toSockAddr naddr) handlers) closeManager
+    let kopts = KRPC.def
+    (_, m) <- allocate (newManager kopts (toSockAddr naddr) handlers) closeManager
     myId   <- liftIO genNodeId
     node   <- liftIO $ Node opts m
              <$> newMVar (nullTable myId (optBucketCount opts))
@@ -254,14 +255,14 @@ grantToken addr = do
   toks <- asks sessionTokens >>= liftIO . readTVarIO
   return $ T.lookup addr $ tokenMap toks
 
--- | Throws 'ProtocolError' if token is invalid or already expired.
+-- | Throws 'HandlerError' if the token is invalid or already
+-- expired. See 'TokenMap' for details.
 checkToken :: Hashable a => NodeAddr a -> Token -> DHT ip ()
 checkToken addr questionableToken = do
   tryUpdateSecret
   toks <- asks sessionTokens >>= liftIO . readTVarIO
   unless (member addr questionableToken (tokenMap toks)) $
-    liftIO $ throwIO $ KError ProtocolError "bad token" ""
-     -- todo reset transaction id in krpc
+    throw $ InvalidParameter "token"
 
 {-----------------------------------------------------------------------
 -- Routing table
@@ -355,7 +356,7 @@ nodeHandler :: Address ip => KRPC (Query a) (Response b)
            => (NodeAddr ip -> a -> DHT ip b) -> NodeHandler ip
 nodeHandler action = handler $ \ sockAddr (Query remoteId q) -> do
   case fromSockAddr sockAddr of
-    Nothing    -> liftIO $ throwIO $ KError GenericError "bad address" ""
+    Nothing    -> throwIO BadAddress
     Just naddr -> do
       insertNode (NodeInfo remoteId naddr)
       Response <$> getNodeId <*> action naddr q

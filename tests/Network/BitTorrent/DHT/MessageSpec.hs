@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.DHT.MessageSpec (spec) where
 import Control.Monad.Reader
+import Control.Monad.Logger
 import Control.Concurrent
 import Data.BEncode as BE
 import Data.ByteString.Lazy as BL
@@ -8,7 +9,8 @@ import Data.Default
 import Data.List as L
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Message
-import Network.KRPC
+import qualified Network.KRPC as KRPC (def)
+import Network.KRPC hiding (def)
 import Network.Socket (PortNumber)
 import Test.Hspec
 import Test.QuickCheck
@@ -17,6 +19,10 @@ import System.Timeout
 import Network.BitTorrent.CoreSpec      ()
 import Network.BitTorrent.DHT.TokenSpec ()
 import Data.Torrent.InfoHashSpec        ()
+
+
+instance MonadLogger IO where
+  monadLoggerLog _ _ _ _ = return ()
 
 remoteAddr :: SockAddr
 remoteAddr = SockAddrInet 6881 (256 * 256 * 256 + 127)
@@ -29,12 +35,12 @@ thisPort = 60001
 
 rpc :: ReaderT (Manager IO) IO a -> IO a
 rpc action = do
-  withManager thisAddr [] $ runReaderT $ do
+  withManager KRPC.def thisAddr [] $ runReaderT $ do
     listen
     action
 
-isProtocolError :: KError -> Bool
-isProtocolError KError {..} = errorCode == ProtocolError
+isQueryError :: QueryFailure -> Bool
+isQueryError _ = True
 
 prop_bencode :: Eq a => Show a => BEncode a => a -> Expectation
 prop_bencode x = BE.decode (BL.toStrict (BE.encode x)) `shouldBe` Right x
@@ -196,5 +202,5 @@ spec = do
         let _ = peers :: Either [NodeInfo IPv4] [PeerAddr IPv4]
         let invalidToken = ""
         query remoteAddr (Query nid (Announce False def thisPort invalidToken)))
-          `shouldThrow` isProtocolError
+          `shouldThrow` isQueryError
       return ()
