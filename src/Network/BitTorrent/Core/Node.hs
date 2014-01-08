@@ -118,9 +118,13 @@ genNodeId = NodeId <$> getEntropy nodeIdSize
 data NodeAddr a = NodeAddr
   { nodeHost ::                !a
   , nodePort :: {-# UNPACK #-} !PortNumber
-  } deriving (Show, Eq, Typeable)
+  } deriving (Eq, Typeable)
 
 $(deriveJSON omitRecordPrefix ''NodeAddr)
+
+instance Show a => Show (NodeAddr a) where
+  showsPrec i NodeAddr {..}
+    = showsPrec i nodeHost <> showString ":" <> showsPrec i nodePort
 
 instance Read (NodeAddr IPv4) where
   readsPrec i x = [ (fromPeerAddr a, s) | (a, s) <- readsPrec i x ]
