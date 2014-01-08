@@ -7,8 +7,6 @@ import Control.Monad.Trans
 import Data.Conduit as C
 import Data.Conduit.List as C
 import Data.Default
-import Data.Maybe
-import Network.URI
 import Options.Applicative
 import System.Exit
 import System.FilePath

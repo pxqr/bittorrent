@@ -66,18 +66,16 @@ import Data.Hashable
 import Data.List as L
 import Data.Monoid
 import Data.Text as T
-import Data.Text.Encoding as T
 import Data.Time
 import Data.Time.Clock.POSIX
 import System.Log.FastLogger
 import System.Random (randomIO)
-import System.Timeout.Lifted
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.InfoHash
 import Network.KRPC hiding (Options, def)
-import qualified Network.KRPC as KRPC (Options, def)
+import qualified Network.KRPC as KRPC (def)
 import Network.BitTorrent.Core
 import Network.BitTorrent.Core.PeerAddr as P
 import Network.BitTorrent.DHT.Message
@@ -305,6 +303,7 @@ insertNode info = fork $ do
 -- Peer storage
 -----------------------------------------------------------------------}
 
+-- TODO limit dht peer store in size (probably by removing oldest peers)
 insertPeer :: Eq ip => InfoHash -> PeerAddr ip -> DHT ip ()
 insertPeer ih addr = do
   var <- asks contactInfo
