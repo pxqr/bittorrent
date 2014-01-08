@@ -106,13 +106,13 @@ node_id_key = "id"
 -- | All queries have an \"id\" key and value containing the node ID
 -- of the querying node.
 data Query a = Query
-  { thisNodeId  :: NodeId -- ^ node id of /quering/ node;
-  , queryParams :: a      -- ^ query parameters.
+  { queringNodeId :: NodeId -- ^ node id of /quering/ node;
+  , queryParams   :: a      -- ^ query parameters.
   } deriving (Show, Eq, Typeable)
 
 instance BEncode a => BEncode (Query a) where
   toBEncode Query {..} = toDict $
-      node_id_key .=! thisNodeId .: endDict
+      node_id_key .=! queringNodeId .: endDict
       <>
       dict (toBEncode queryParams)
     where
@@ -126,7 +126,7 @@ instance BEncode a => BEncode (Query a) where
 -- | All responses have an \"id\" key and value containing the node ID
 -- of the responding node.
 data Response a = Response
-  { remoteNodeId :: NodeId -- ^ node id of /quered/ node;
+  { queredNodeId :: NodeId -- ^ node id of /quered/ node;
   , responseVals :: a      -- ^ query result.
   } deriving (Show, Eq, Typeable)
 

@@ -152,6 +152,7 @@ invalidateTokens curTime ts @ SessionTokens {..}
 
 data Node ip = Node
   { options       :: !Options
+  , thisNodeId    :: !NodeId
   , manager       :: !(Manager (DHT       ip))
   , routingTable  :: !(MVar    (Table     ip))
   , contactInfo   :: !(TVar    (PeerStore ip))
@@ -196,7 +197,7 @@ runDHT handlers opts naddr action = runResourceT $ do
     let nodeAddr = toSockAddr naddr
     (_, m) <- allocate (newManager rpcOpts nodeAddr handlers) closeManager
     myId   <- liftIO genNodeId
-    node   <- liftIO $ Node opts m
+    node   <- liftIO $ Node opts myId m
              <$> newMVar (nullTable myId (optBucketCount opts))
              <*> newTVarIO def
              <*> (newTVarIO =<< nullSessionTokens)
@@ -270,9 +271,9 @@ getTable = do
   var <- asks routingTable
   liftIO (readMVar var)
 
--- FIXME no blocking
+-- | Get id of /this/ node. This value is constant during DHT session.
 getNodeId :: DHT ip NodeId
-getNodeId = thisId <$> getTable
+getNodeId = asks thisNodeId
 
 getClosest :: Eq ip => NodeId -> DHT ip [NodeInfo ip]
 getClosest nid = do
