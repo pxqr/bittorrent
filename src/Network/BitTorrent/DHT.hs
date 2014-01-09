@@ -34,6 +34,7 @@ import Control.Monad.Logger
 import Control.Monad.Trans
 import Data.Conduit as C
 import Data.Conduit.List as C
+import Data.List as L
 import Data.Monoid
 import Data.Text as T
 import Network.Socket (PortNumber)
@@ -41,6 +42,7 @@ import Text.PrettyPrint as PP hiding ((<>), ($$))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.InfoHash
+import Network.KRPC (QueryFailure)
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Routing
@@ -120,7 +122,7 @@ bootstrap startNodes = do
       result <- try $ FindNode nid <@> addr
       case result of
         Left                    e -> do
-          $(logWarnS) "bootstrap" $ T.pack $ show (e :: IOError)
+          $(logWarnS) "bootstrap" $ T.pack $ show (e :: QueryFailure)
 
         Right (NodeFound closest) -> do
           $(logDebug) $ "Get a list of closest nodes: " <>
