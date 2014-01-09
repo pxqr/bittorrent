@@ -156,6 +156,7 @@ amend (AmendOpts tpath) = do
 {-----------------------------------------------------------------------
 --  Check command -- validate content files using torrent file
 -----------------------------------------------------------------------}
+-- TODO progress bar
 
 data CheckOpts = CheckOpts
   { checkTorrentPath :: FilePath -- ^ validation torrent file
@@ -214,6 +215,14 @@ checkTorrent CheckOpts {..} = do
 {-----------------------------------------------------------------------
 --  Create command
 -----------------------------------------------------------------------}
+-- TODO progress bar
+-- TODO multifile torrents
+-- TODO interactive mode
+-- TODO non interactive mode
+-- TODO --ignore-dot-files
+-- TODO --md5
+-- TODO --piece-size
+
 {-
 createFlags :: Parser CreateFlags
 createFlags = CreateFlags
