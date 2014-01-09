@@ -5,12 +5,16 @@
 module Main (main) where
 
 import Prelude as P
+import Control.Concurrent
 import Control.Concurrent.ParallelIO
 import Control.Exception
-import Control.Lens hiding (argument)
+import Control.Lens hiding (argument, (<.>))
 import Control.Monad
+import Control.Monad.Trans
+import Data.Conduit as C
+import Data.Conduit.List as C
 import Data.List as L
-import Data.Maybe
+import Data.Maybe as L
 import Data.Monoid
 import Data.Text as T
 import qualified Data.Text.IO as T
@@ -18,18 +22,25 @@ import Data.Text.Read as T
 import Data.Version
 import Network.URI
 import Options.Applicative
+import System.Exit
+import System.FilePath
 import System.Log
 import System.Log.Logger
-import System.Exit
 import Text.Read
 import Text.PrettyPrint.Class
 
 import Paths_bittorrent (version)
 import Data.Torrent
 import Data.Torrent.Bitfield as BF
+import Data.Torrent.InfoHash
 import Data.Torrent.Piece
 import Data.Torrent.Layout
 import Data.Torrent.Magnet hiding (Magnet)
+import Network.BitTorrent.Core
+import Network.BitTorrent.DHT.Session hiding (Options)
+import Network.BitTorrent.DHT as DHT
+import Network.BitTorrent.Exchange.Message
+import Network.BitTorrent.Exchange.Wire hiding (Options)
 import System.Torrent.Storage
 
 
@@ -179,7 +190,7 @@ validateStorage s pinfo = do
   let total = totalPieces s
   pixs <- parallel $ L.map (validatePiece s pinfo) [0 .. total - 1]
   infoM "check" "storage validation finished"
-  return $ fromList total $ catMaybes pixs
+  return $ fromList total $ L.catMaybes pixs
 
 -- TODO use local thread pool
 checkContent :: Storage -> PieceInfo -> IO ()
@@ -297,6 +308,62 @@ putTorrent opts @ ShowOpts {..} = do
     msg = "Torrent file is either invalid or do not exist"
 
 {-----------------------------------------------------------------------
+--  Get command - fetch torrent by infohash
+-----------------------------------------------------------------------}
+
+data GetOpts = GetOpts
+  { topic    :: InfoHash
+  , thisNode :: NodeAddr IPv4
+  , bootNode :: NodeAddr IPv4
+  , buckets  :: Int
+  } deriving Show
+
+paramsParser :: Parser GetOpts
+paramsParser = GetOpts
+  <$> option (long    "infohash" <> short 'i'
+           <> metavar "SHA1"     <> help "infohash of torrent file")
+  <*> option (long    "port"     <> short 'p'
+           <> value def          <> showDefault
+           <> metavar "NUM"      <> help "port number to bind"
+             )
+  <*> option (long    "boot"     <> short 'b'
+           <> metavar "NODE"     <> help "bootstrap node address"
+             )
+  <*> option (long    "bucket"   <> short 'n'
+           <> value 2            <> showDefault
+           <> metavar "NUM"      <> help "number of buckets to maintain"
+             )
+
+getInfo :: ParserInfo GetOpts
+getInfo = info (helper <*> paramsParser)
+   ( fullDesc
+  <> progDesc "Get torrent file by infohash"
+  <> header   "get torrent file by infohash"
+   )
+
+exchangeTorrent :: PeerAddr IP -> InfoHash -> IO InfoDict
+exchangeTorrent addr ih = do
+  pid <- genPeerId
+  var <- newEmptyMVar
+  let hs = Handshake def (toCaps [ExtExtended]) ih pid
+  connectWire hs addr (toCaps [ExtMetadata]) $ do
+    infodict <- getMetadata
+    liftIO $ putMVar var infodict
+  takeMVar var
+
+getTorrent :: GetOpts -> IO ()
+getTorrent GetOpts {..} = do
+  dht (def { optBucketCount = buckets }) thisNode $ do
+    bootstrap [bootNode]
+    DHT.lookup topic $$ C.mapM_ $ \ peers -> do
+      liftIO $ forM_ peers $ \ peer -> do
+        infodict <- exchangeTorrent (IPv4 <$> peer) topic
+        -- TODO add tNodes, tCreated, etc?
+        let torrent = nullTorrent infodict
+        toFile (show topic <.> torrentExt) torrent
+        exitSuccess
+
+{-----------------------------------------------------------------------
 --  Command
 -----------------------------------------------------------------------}
 
@@ -304,6 +371,7 @@ data Command
   = Amend  AmendOpts
   | Check  CheckOpts
 --  | Create CreateOpts
+  | Get    GetOpts
   | Magnet MagnetOpts
   | Show   ShowOpts
     deriving Show
@@ -313,6 +381,7 @@ commandOpts = subparser $ mconcat
     [ command "amend"  (Amend  <$> amendInfo)
     , command "check"  (Check  <$> checkInfo)
 --    , command "create" (Create <$> createInfo)
+    , command "get"    (Get    <$> getInfo)
     , command "magnet" (Magnet <$> magnetInfo)
     , command "show"   (Show   <$> showInfo)
     ]
@@ -396,6 +465,7 @@ run :: Command -> IO ()
 run (Amend  opts) = amend opts
 run (Check  opts) = checkTorrent opts
 --run (Create opts) = createTorrent opts
+run (Get    opts) = getTorrent opts
 run (Magnet opts) = magnet opts
 run (Show   opts) = putTorrent opts
 
