@@ -17,7 +17,7 @@ import Data.Torrent.Piece
 import Data.Torrent.Layout
 import Data.Torrent
 import Data.Torrent.LayoutSpec ()
-import Network.BitTorrent.Core.NodeSpec ()
+import Network.BitTorrent.Core.NodeInfoSpec ()
 
 {-----------------------------------------------------------------------
 --  Common

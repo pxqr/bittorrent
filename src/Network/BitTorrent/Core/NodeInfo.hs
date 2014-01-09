@@ -19,7 +19,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
-module Network.BitTorrent.Core.Node
+module Network.BitTorrent.Core.NodeInfo
        (  -- * Node ID
          NodeId
        , testIdBit

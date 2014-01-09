@@ -31,7 +31,7 @@ import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
 import Network.BitTorrent.Core.Fingerprint as Core
-import Network.BitTorrent.Core.Node        as Core
+import Network.BitTorrent.Core.NodeInfo    as Core
 import Network.BitTorrent.Core.PeerId      as Core
 import Network.BitTorrent.Core.PeerAddr    as Core
 

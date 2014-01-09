@@ -58,7 +58,7 @@ library
                        Network.BitTorrent.Client.Swarm
                        Network.BitTorrent.Core
                        Network.BitTorrent.Core.Fingerprint
-                       Network.BitTorrent.Core.Node
+                       Network.BitTorrent.Core.NodeInfo
                        Network.BitTorrent.Core.PeerId
                        Network.BitTorrent.Core.PeerAddr
                        Network.BitTorrent.DHT
@@ -181,7 +181,7 @@ test-suite spec
                        Data.Torrent.ProgressSpec
                        Network.BitTorrent.CoreSpec
                        Network.BitTorrent.Core.FingerprintSpec
-                       Network.BitTorrent.Core.NodeSpec
+                       Network.BitTorrent.Core.NodeInfoSpec
                        Network.BitTorrent.Core.PeerAddrSpec
                        Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.DHT.MessageSpec

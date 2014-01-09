@@ -1,5 +1,5 @@
 {-# OPTIONS -fno-warn-orphans #-}
-module Network.BitTorrent.Core.NodeSpec (spec) where
+module Network.BitTorrent.Core.NodeInfoSpec (spec) where
 import Control.Applicative
 import Data.Serialize as S
 import Data.String

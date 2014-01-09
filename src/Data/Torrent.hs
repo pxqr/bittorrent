@@ -94,7 +94,7 @@ import Data.Torrent.InfoHash as IH
 import Data.Torrent.JSON
 import Data.Torrent.Layout
 import Data.Torrent.Piece
-import Network.BitTorrent.Core.Node
+import Network.BitTorrent.Core.NodeInfo
 
 {-----------------------------------------------------------------------
 --  Info dictionary
