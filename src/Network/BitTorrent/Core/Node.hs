@@ -25,11 +25,16 @@ module Network.BitTorrent.Core.Node
        , testIdBit
        , genNodeId
 
+         -- ** Node distance
+       , NodeDistance
+       , distance
+
          -- * Node address
        , NodeAddr (..)
 
          -- * Node info
        , NodeInfo (..)
+       , rank
        ) where
 
 import Control.Applicative
@@ -110,6 +115,19 @@ testIdBit (NodeId bs) i
 --
 genNodeId :: IO NodeId
 genNodeId = NodeId <$> getEntropy nodeIdSize
+
+{-----------------------------------------------------------------------
+--  Node distance
+-----------------------------------------------------------------------}
+
+-- | In Kademlia, the distance metric is XOR and the result is
+-- interpreted as an unsigned integer.
+newtype NodeDistance = NodeDistance BS.ByteString
+  deriving (Eq, Ord)
+
+-- | distance(A,B) = |A xor B| Smaller values are closer.
+distance :: NodeId -> NodeId -> NodeDistance
+distance (NodeId a) (NodeId b) = NodeDistance (BS.pack (BS.zipWith xor a b))
 
 {-----------------------------------------------------------------------
 --  Node address
@@ -194,3 +212,7 @@ instance Pretty ip => Pretty (NodeInfo ip) where
 
 instance Pretty ip => Pretty [NodeInfo ip] where
   pretty = PP.vcat . PP.punctuate "," . L.map pretty
+
+-- | Order by closeness: nearest nodes first.
+rank :: Eq ip => NodeId -> [NodeInfo ip] -> [NodeInfo ip]
+rank nid = L.sortBy (comparing (distance nid . nodeId))
