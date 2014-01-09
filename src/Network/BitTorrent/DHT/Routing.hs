@@ -386,7 +386,8 @@ defaultK = 8
 -- | Get a list of /K/ closest nodes using XOR metric. Used in
 -- 'find_node' queries.
 kclosest :: Eq ip => K -> NodeId -> Table ip -> [NodeInfo ip]
-kclosest k nid = L.map key . PSQ.toList . fromMaybe PSQ.empty
+kclosest k nid = L.take k . rank nid
+               . L.map key . PSQ.toList . fromMaybe PSQ.empty
                . lookupBucket nid
 
 coerceId :: (Serialize a, Serialize b) => a -> b
