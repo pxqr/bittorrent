@@ -96,9 +96,10 @@ defaultAlpha = 3
 
 -- TODO add replication loop
 
--- | Original Kamelia DHT uses term /publish/ . BitTorrent DHT uses
--- term /announce/ since the purpose . Later in documentation, we use
--- terms /publish/ and /announce/ interchangible.
+-- | Original Kamelia DHT uses term /publish/ for data replication
+-- process. BitTorrent DHT uses term /announce/ since the purpose of
+-- the DHT is peer discovery. Later in documentation, we use terms
+-- /publish/ and /announce/ interchangible.
 data Options = Options
   { -- | The degree of parallelism in 'find_node' queries. More
     -- parallism lead to faster bootstrapping and lookup operations,
@@ -310,6 +311,8 @@ checkToken addr questionableToken = do
 -- Routing table
 -----------------------------------------------------------------------}
 
+-- | Get current routing table. Normally you don't need to use this
+-- function, but it can be usefull for debugging and profiling purposes.
 getTable :: DHT ip (Table ip)
 getTable = do
   var <- asks routingTable
@@ -319,16 +322,29 @@ getTable = do
 getNodeId :: DHT ip NodeId
 getNodeId = asks thisNodeId
 
+-- | Find a set of closest nodes from routing table of this node. (in
+-- no particular order)
+--
+--   This operation used for 'find_nodes' query.
+--
 getClosest :: Eq ip => NodeId -> DHT ip [NodeInfo ip]
 getClosest nid = do
   k <- asks (optK . options)
   kclosest k nid <$> getTable
 
+-- | Find a set of closest nodes from routing table of this node. (in
+-- no particular order)
+--
+--   This operation used as failback in 'get_peers' query, see
+--   'getPeerList'.
+--
 getClosestHash :: Eq ip => InfoHash -> DHT ip [NodeInfo ip]
 getClosestHash ih = do
   k <- asks (optK . options)
   kclosestHash k ih <$> getTable
 
+-- | This operation do not block but acquire exclusive access to
+--   routing table.
 insertNode :: Address ip => NodeInfo ip -> DHT ip ThreadId
 insertNode info = fork $ do
   var <- asks routingTable
@@ -340,7 +356,8 @@ insertNode info = fork $ do
                    <> T.pack (show (pretty t))
         return t
       Just t' -> do
-        let logMsg = "Routing table updated: " <> pretty t <> " -> " <> pretty t'
+        let logMsg = "Routing table updated: "
+                  <> pretty t <> " -> " <> pretty t'
         $(logDebugS) "insertNode" (T.pack (render logMsg))
         return t'
 
