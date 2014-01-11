@@ -89,33 +89,77 @@ import Network.BitTorrent.DHT.Token   as T
 -- | Node lookups can proceed asynchronously.
 type Alpha = Int
 
+-- NOTE: libtorrent uses 5, azureus uses 10
 -- | The quantity of simultaneous lookups is typically three.
 defaultAlpha :: Alpha
 defaultAlpha = 3
 
+-- TODO add replication loop
+
+-- | Original Kamelia DHT uses term /publish/ . BitTorrent DHT uses
+-- term /announce/ since the purpose . Later in documentation, we use
+-- terms /publish/ and /announce/ interchangible.
 data Options = Options
-  { -- | the degree of parallelism in 'find_node' queries.
+  { -- | The degree of parallelism in 'find_node' queries. More
+    -- parallism lead to faster bootstrapping and lookup operations,
+    -- but also increase resource usage.
+    --
+    --   Normally this parameter should not exceed 'optK'.
     optAlpha       :: {-# UNPACK #-} !Alpha
 
-    -- | number of nodes to return in 'find_node' responses.
+    -- | /K/ parameter - number of nodes to return in 'find_node'
+    -- responses.
   , optK           :: {-# UNPACK #-} !K
 
-    -- | Number of buckets to maintain.
+    -- | Number of buckets to maintain. This parameter depends on
+    -- amount of nodes in the DHT network.
   , optBucketCount :: {-# UNPACK #-} !BucketCount
 
     -- | RPC timeout.
-  , optTimeout     ::                !NominalDiffTime
+  , optTimeout     :: !NominalDiffTime
 
---  , optReannounceInterval :: NominalDiffTime
---  , optDataExpiredTimeout :: NominalDiffTime
+    -- | /R/ parameter - how many target nodes the 'announce' query
+    -- should affect.
+    --
+    --   A large replica set compensates for inconsistent routing and
+    --   reduces the need to frequently republish data for
+    --   persistence. This comes at an increased cost for
+    --   'Network.BitTorrent.DHT.insert' in terms of time, nodes
+    --   contacted, and storage.
+  , optReplication :: {-# UNPACK #-} !NodeCount
+
+    -- | How often this node should republish (or reannounce) its
+    -- data.
+    --
+    -- Large replica set ('optReplication') should require
+    -- smaller reannounce intervals ('optReannounce').
+  , optReannounce  :: !NominalDiffTime
+
+    -- | The time it takes for data to expire in the
+    --   network. Publisher of the data should republish (or
+    --   reannounce) data to keep it in the network.
+    --
+    --   The /data expired timeout/ should be more than 'optReannounce'
+    --   interval.
+  , optDataExpired :: !NominalDiffTime
   } deriving (Show, Eq)
 
+-- | Optimal options for bittorrent client. For short-lifetime
+-- utilities you most likely need to tune 'optAlpha' and
+-- 'optBucketCount'.
 instance Default Options where
   def = Options
     { optAlpha       = defaultAlpha
     , optK           = defaultK
+
+      -- see Fig.2 from "BitTorrent Mainline DHT Measurement" paper.
     , optBucketCount = defaultBucketCount
-    , optTimeout     = 5 -- seconds
+
+      -- see Fig.4 from "Profiling a Million User DHT" paper.
+    , optTimeout     = 5  -- seconds
+    , optReplication = 20 -- nodes
+    , optReannounce  = 15 * 60
+    , optDataExpired = 60 * 60
     }
 
 seconds :: NominalDiffTime -> Int
