@@ -73,6 +73,7 @@ module Network.BitTorrent.DHT.Message
        , NodeFound (..)
 
          -- ** get_peers
+       , PeerList
        , GetPeers (..)
        , GotPeers (..)
 
@@ -216,11 +217,13 @@ instance BEncode GetPeers where
   toBEncode (GetPeers ih) = toDict   $ info_hash_key .=! ih .: endDict
   fromBEncode             = fromDict $ GetPeers <$>! info_hash_key
 
+type PeerList ip = Either [NodeInfo ip] [PeerAddr ip]
+
 data GotPeers ip = GotPeers
   { -- | If the queried node has no peers for the infohash, returned
     -- the K nodes in the queried nodes routing table closest to the
     -- infohash supplied in the query.
-    peers        :: Either [NodeInfo ip] [PeerAddr ip]
+    peers        :: PeerList ip
 
     -- | The token value is a required argument for a future
     -- announce_peer query.
