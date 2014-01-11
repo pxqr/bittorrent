@@ -14,6 +14,7 @@
 --   <http://www.bittorrent.org/beps/bep_0005.html#routing-table>
 --
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns    #-}
 {-# LANGUAGE TypeOperators   #-}
 {-# LANGUAGE DeriveGeneric   #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -39,8 +40,8 @@ module Network.BitTorrent.DHT.Routing
          -- * Lookup
        , K
        , defaultK
-       , Network.BitTorrent.DHT.Routing.kclosest
-       , Network.BitTorrent.DHT.Routing.kclosestHash
+       , TableKey (..)
+       , kclosest
 
          -- * Construction
        , Network.BitTorrent.DHT.Routing.nullTable
@@ -383,22 +384,24 @@ type K = Int
 defaultK :: K
 defaultK = 8
 
+class TableKey k where
+  toNodeId :: k -> NodeId
+
+instance TableKey NodeId where
+  toNodeId = id
+
+instance TableKey InfoHash where
+  toNodeId = either (error msg) id . S.decode . S.encode
+    where -- TODO unsafe coerse?
+      msg = "tableKey: impossible"
+
 -- | Get a list of /K/ closest nodes using XOR metric. Used in
--- 'find_node' queries.
-kclosest :: Eq ip => K -> NodeId -> Table ip -> [NodeInfo ip]
-kclosest k nid = L.take k . rank nid
-               . L.map key . PSQ.toList . fromMaybe PSQ.empty
-               . lookupBucket nid
-
-coerceId :: (Serialize a, Serialize b) => a -> b
-coerceId = either (error msg) id . S.decode . S.encode
-  where
-    msg = "coerceId: impossible"
-
--- | Get a list of /K/ nodes with node id closest to the specific
--- infohash. Used in 'get_peers' queries.
-kclosestHash :: Eq a => K -> InfoHash -> Table a -> [NodeInfo a]
-kclosestHash k nid t = kclosest k (coerceId nid) t
+-- 'find_node' and 'get_peers' queries.
+kclosest :: Eq ip => TableKey a => K -> a -> Table ip -> [NodeInfo ip]
+kclosest k (toNodeId -> nid)
+  = L.take k . rank nid
+  . L.map PSQ.key . PSQ.toList . fromMaybe PSQ.empty
+  . lookupBucket nid
 
 {-----------------------------------------------------------------------
 --  Routing

@@ -26,7 +26,6 @@ module Network.BitTorrent.DHT.Session
        , getTable
        , getNodeId
        , getClosest
-       , getClosestHash
        , insertNode
 
          -- * Peer storage
@@ -327,21 +326,10 @@ getNodeId = asks thisNodeId
 --
 --   This operation used for 'find_nodes' query.
 --
-getClosest :: Eq ip => NodeId -> DHT ip [NodeInfo ip]
-getClosest nid = do
+getClosest :: Eq ip => TableKey k => k -> DHT ip [NodeInfo ip]
+getClosest node = do
   k <- asks (optK . options)
-  kclosest k nid <$> getTable
-
--- | Find a set of closest nodes from routing table of this node. (in
--- no particular order)
---
---   This operation used as failback in 'get_peers' query, see
---   'getPeerList'.
---
-getClosestHash :: Eq ip => InfoHash -> DHT ip [NodeInfo ip]
-getClosestHash ih = do
-  k <- asks (optK . options)
-  kclosestHash k ih <$> getTable
+  kclosest k node <$> getTable
 
 -- | This operation do not block but acquire exclusive access to
 --   routing table.
@@ -378,11 +366,15 @@ lookupPeers ih = do
 
 type PeerList ip = Either [NodeInfo ip] [PeerAddr ip]
 
+-- |
+--
+--   This operation used 'getClosest' as failback.
+--
 getPeerList :: Eq ip => InfoHash -> DHT ip (PeerList ip)
 getPeerList ih = do
   ps <- lookupPeers ih
   if L.null ps
-    then Left <$> getClosestHash ih
+    then Left <$> getClosest ih
     else return (Right ps)
 
 {-----------------------------------------------------------------------
