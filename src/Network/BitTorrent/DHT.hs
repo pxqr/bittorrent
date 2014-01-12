@@ -77,20 +77,6 @@ handlers :: Address ip => [NodeHandler ip]
 handlers = [pingH, findNodeH, getPeersH, announceH]
 
 {-----------------------------------------------------------------------
---  Query
------------------------------------------------------------------------}
-
-findNodeQ :: Address ip => NodeId -> Iteration ip NodeAddr NodeInfo
-findNodeQ nid addr = do
-  NodeFound closest <- FindNode nid <@> addr
-  return $ Right closest
-
-getPeersQ :: Address ip => InfoHash -> Iteration ip NodeInfo PeerAddr
-getPeersQ topic NodeInfo {..} = do
-  GotPeers {..} <- GetPeers topic <@> nodeAddr
-  return peers
-
-{-----------------------------------------------------------------------
 --  DHT operations
 -----------------------------------------------------------------------}
 
@@ -107,48 +93,36 @@ dht = runDHT handlers
 -- usually obtained from 'Data.Torrent.tNodes' field. Bootstrapping
 -- process can take up to 5 minutes.
 --
--- (TODO) This operation is asynchronous and do not block.
+--   This operation is synchronous and do block, use 'async' if needed.
 --
 bootstrap :: Address ip => [NodeAddr ip] -> DHT ip ()
 bootstrap startNodes = do
-    $(logInfoS) "bootstrap" "Start node bootstrapping"
-    M.mapM_ insertClosest startNodes
-    $(logInfoS) "bootstrap" "Node bootstrapping finished"
-  where
-    insertClosest addr = do
-     t <- getTable
-     unless (full t) $ do
-      nid <- getNodeId
-      result <- try $ FindNode nid <@> addr
-      case result of
-        Left                    e -> do
-          $(logWarnS) "bootstrap" $ T.pack $ show (e :: QueryFailure)
-
-        Right (NodeFound closest) -> do
-          $(logDebug) $ "Get a list of closest nodes: " <>
-                         T.pack (PP.render (pretty closest))
-          forM_ closest $ \ info @ NodeInfo {..} -> do
-            let prettyAddr = T.pack (show (pretty nodeAddr))
-            $(logInfoS) "bootstrap" $ "table detalization" <> prettyAddr
-            insertClosest nodeAddr
+  $(logInfoS) "bootstrap" "Start node bootstrapping"
+  nid <- getNodeId
+  aliveNodes <- queryParallel (ping <$> startNodes)
+  _ <- sourceList [aliveNodes] $= search nid (findNodeQ nid) $$ C.consume
+  $(logInfoS) "bootstrap" "Node bootstrapping finished"
+--     t <- getTable
+--     unless (full t) $ do
+--      nid <- getNodeId
 
 -- | Get list of peers which downloading this torrent.
 --
--- (TODO) This operation is synchronous and do block.
+--   This operation is incremental and do block.
 --
 lookup :: Address ip => InfoHash -> DHT ip `Source` [PeerAddr ip]
-lookup topic = do      -- TODO retry getClosestHash if bucket is empty
-  closest <- lift $ getClosestHash topic
-  sourceList [closest] $= search (getPeersQ topic)
+lookup topic = do      -- TODO retry getClosest if bucket is empty
+  closest <- lift $ getClosest topic
+  sourceList [closest] $= search topic (getPeersQ topic)
 
 -- | Announce that /this/ peer may have some pieces of the specified
 -- torrent.
 --
--- (TODO) This operation is asynchronous and do not block.
+--   This operation is synchronous and do block, use 'async' if needed.
 --
 insert :: Address ip => InfoHash -> PortNumber -> DHT ip ()
 insert ih port = do
-  nodes <- getClosestHash ih
+  nodes <- getClosest ih
   forM_ (nodeAddr <$> nodes) $ \ addr -> do
 --    GotPeers {..} <- GetPeers ih <@> addr
 --    Announced     <- Announce False ih undefined grantedToken <@> addr
@@ -156,7 +130,7 @@ insert ih port = do
 
 -- | Stop announcing /this/ peer for the specified torrent.
 --
---   This operation is atomic and do not block.
+--   This operation is atomic and may block for a while.
 --
 delete :: Address ip => InfoHash -> DHT ip ()
 delete = error "DHT.delete: not implemented"

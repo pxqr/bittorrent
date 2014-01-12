@@ -47,6 +47,7 @@ import Data.ByteString.Base16 as Base16
 import Data.BEncode as BE
 import Data.Default
 import Data.Hashable
+import Data.Foldable
 import Data.IP
 import Data.List as L
 import Data.Monoid
@@ -124,6 +125,12 @@ genNodeId = NodeId <$> getEntropy nodeIdSize
 -- interpreted as an unsigned integer.
 newtype NodeDistance = NodeDistance BS.ByteString
   deriving (Eq, Ord)
+
+instance Pretty NodeDistance where
+  pretty (NodeDistance bs) = foldMap bitseq $ BS.unpack bs
+    where
+      listBits w = L.map (testBit w) (L.reverse [0..bitSize w - 1])
+      bitseq = foldMap (int . fromEnum) . listBits
 
 -- | distance(A,B) = |A xor B| Smaller values are closer.
 distance :: NodeId -> NodeId -> NodeDistance
