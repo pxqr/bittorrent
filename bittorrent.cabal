@@ -105,6 +105,7 @@ library
 
                        -- Concurrency
                      , SafeSemaphore
+                     , lifted-async
 --                     , BoundedChan >= 1.0.1.0
                      , stm         >= 2.4
 
@@ -259,6 +260,7 @@ executable mktorrent
                      , mtl
                      , conduit
                      , lens
+                     , async
                      , parallel-io
 
                      , network

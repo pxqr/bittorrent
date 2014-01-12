@@ -6,6 +6,7 @@ module Main (main) where
 
 import Prelude as P
 import Control.Concurrent
+import Control.Concurrent.Async
 import Control.Concurrent.ParallelIO
 import Control.Exception
 import Control.Lens hiding (argument, (<.>))
@@ -20,6 +21,7 @@ import Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Text.Read as T
 import Data.Version
+import Network
 import Network.URI
 import Options.Applicative
 import System.Exit
@@ -205,8 +207,10 @@ checkContent s pinfo = do
 
 checkTorrent :: CheckOpts -> IO ()
 checkTorrent CheckOpts {..} = do
+  infoM "check" "openning torrent file..."
   InfoDict {..} <- tInfoDict <$> fromFile checkTorrentPath
   let layout = flatLayout checkContentPath idLayoutInfo
+  infoM "check" "mapping content files..."
   withStorage ReadOnly (piPieceLength idPieceInfo) layout $ \ s -> do
     infoM "check" "files mapped"
     checkContent s idPieceInfo
@@ -322,17 +326,20 @@ putTorrent opts @ ShowOpts {..} = do
 
 data GetOpts = GetOpts
   { topic    :: InfoHash
-  , thisNode :: NodeAddr IPv4
+  , servPort :: PortNumber
   , bootNode :: NodeAddr IPv4
   , buckets  :: Int
   } deriving Show
 
+instance Read PortNumber where
+  readsPrec i s = [ (toEnum a, t) | (a, t) <- readsPrec i s]
+
 paramsParser :: Parser GetOpts
 paramsParser = GetOpts
-  <$> option (long    "infohash" <> short 'i'
-           <> metavar "SHA1"     <> help "infohash of torrent file")
+  <$> argument readMaybe
+             (metavar "SHA1"     <> help "infohash of torrent file")
   <*> option (long    "port"     <> short 'p'
-           <> value def          <> showDefault
+           <> value   7000       <> showDefault
            <> metavar "NUM"      <> help "port number to bind"
              )
   <*> option (long    "boot"     <> short 'b'
@@ -350,8 +357,8 @@ getInfo = info (helper <*> paramsParser)
   <> header   "get torrent file by infohash"
    )
 
-exchangeTorrent :: PeerAddr IP -> InfoHash -> IO InfoDict
-exchangeTorrent addr ih = do
+exchangeTorrent :: InfoHash -> PeerAddr IP -> IO InfoDict
+exchangeTorrent ih addr = do
   pid <- genPeerId
   var <- newEmptyMVar
   let hs = Handshake def (toCaps [ExtExtended]) ih pid
@@ -360,17 +367,32 @@ exchangeTorrent addr ih = do
     liftIO $ putMVar var infodict
   takeMVar var
 
+exchangeConc :: InfoHash -> [PeerAddr IP] -> IO (Maybe InfoDict)
+exchangeConc ih peers = do
+  workers <- forM peers $ async . exchangeTorrent ih
+  (_, result) <- waitAnyCatchCancel workers
+  return $ either (const Nothing) Just result
+
+sinkInfoDict :: InfoHash -> Sink [PeerAddr IPv4] (DHT ip) InfoDict
+sinkInfoDict ih = do
+  m <- await
+  case m of
+    Nothing -> liftIO $ throwIO $ userError "impossible: end of peer stream"
+    Just peers -> do
+      minfodict <- liftIO $ exchangeConc ih (fmap IPv4 <$> peers)
+      maybe (sinkInfoDict ih) return minfodict
+
+ -- TODO add tNodes, tCreated, etc?
 getTorrent :: GetOpts -> IO ()
 getTorrent GetOpts {..} = do
-  dht (def { optBucketCount = buckets }) thisNode $ do
+  infoM "get" "starting..."
+  dht (def { optBucketCount = buckets }) (NodeAddr "0.0.0.0" servPort) $ do
     bootstrap [bootNode]
-    DHT.lookup topic $$ C.mapM_ $ \ peers -> do
-      liftIO $ forM_ peers $ \ peer -> do
-        infodict <- exchangeTorrent (IPv4 <$> peer) topic
-        -- TODO add tNodes, tCreated, etc?
-        let torrent = nullTorrent infodict
-        toFile (show topic <.> torrentExt) torrent
-        exitSuccess
+    liftIO $ infoM "get" "searching for peers..."
+    infodict <- DHT.lookup topic $$ sinkInfoDict topic
+    liftIO $ infoM "get" "saving torrent file..."
+    liftIO $ toFile (show topic <.> torrentExt) $ nullTorrent infodict
+  infoM "get" "done"
 
 {-----------------------------------------------------------------------
 --  Command
