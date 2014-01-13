@@ -31,26 +31,36 @@ module Network.BitTorrent.DHT.Session
          -- * Peer storage
        , insertPeer
        , getPeerList
+       , insertTopic
+       , deleteTopic
 
          -- * Messaging
          -- ** Initiate
        , queryNode
        , queryParallel
        , (<@>)
+       , ping
 
          -- ** Accept
        , NodeHandler
        , nodeHandler
+       , pingH
+       , findNodeH
+       , getPeersH
+       , announceH
+       , handlers
 
-         -- ** Search
-       , ping
-
+         -- * Search
+         -- ** Step
        , Iteration
        , findNodeQ
        , getPeersQ
+       , announceQ
 
+         -- ** Traversal
        , Search
        , search
+       , publish
        ) where
 
 import Prelude hiding (ioError)
@@ -66,6 +76,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Control.Monad.Trans.Resource
 import Data.Conduit
+import Data.Conduit.List as C hiding (mapMaybe, mapM_)
 import Data.Default
 import Data.Either
 import Data.Fixed
@@ -76,9 +87,10 @@ import Data.Monoid
 import Data.Text as T
 import Data.Time
 import Data.Time.Clock.POSIX
+import Network (PortNumber)
 import System.Log.FastLogger
 import System.Random (randomIO)
-import Text.PrettyPrint as PP hiding ((<>))
+import Text.PrettyPrint as PP hiding ((<>), ($$))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.InfoHash
@@ -399,6 +411,12 @@ getPeerList ih = do
     then Left <$> getClosest ih
     else return (Right ps)
 
+insertTopic :: InfoHash -> PortNumber -> DHT ip ()
+insertTopic = undefined
+
+deleteTopic :: InfoHash -> PortNumber -> DHT ip ()
+deleteTopic = undefined
+
 {-----------------------------------------------------------------------
 -- Messaging
 -----------------------------------------------------------------------}
@@ -428,6 +446,11 @@ queryParallel queries = do
     cleanup :: [Either QueryFailure a] -> [a]
     cleanup = mapMaybe (either (const Nothing) Just)
 
+ping :: Address ip => NodeAddr ip -> DHT ip (NodeInfo ip)
+ping addr = do
+  (nid, Ping) <- queryNode addr Ping
+  return (NodeInfo nid addr)
+
 type NodeHandler ip = Handler (DHT ip)
 
 nodeHandler :: Address ip => KRPC (Query a) (Response b)
@@ -442,11 +465,6 @@ nodeHandler action = handler $ \ sockAddr (Query remoteId q) -> do
 {-----------------------------------------------------------------------
 --  Search
 -----------------------------------------------------------------------}
-
-ping :: Address ip => NodeAddr ip -> DHT ip (NodeInfo ip)
-ping addr = do
-  (nid, Ping) <- queryNode addr Ping
-  return (NodeInfo nid addr)
 
 type Iteration ip o = NodeInfo ip -> DHT ip (Either [NodeInfo ip] [o ip])
 
@@ -469,15 +487,59 @@ getPeersQ topic NodeInfo {..} = do
         <> if isLeft peers then "NODES" else "PEERS"
   return peers
 
+announceQ :: Address ip => InfoHash -> PortNumber -> Iteration ip NodeAddr
+announceQ ih p NodeInfo {..} = do
+  GotPeers {..} <- GetPeers ih <@> nodeAddr
+  case peers of
+    Left  ns
+      | False     -> undefined -- TODO check if we can announce
+      | otherwise -> return (Left ns)
+    Right ps -> do -- TODO *probably* add to peer cache
+      Announced <- Announce False ih p grantedToken <@> nodeAddr
+      return (Right [nodeAddr])
+
 type Search    ip o = Conduit [NodeInfo ip] (DHT ip) [o ip]
 
 -- TODO: use reorder and filter (Traversal option) leftovers
 search :: TableKey k => Address ip => k -> Iteration ip o -> Search ip o
 search k action = do
-  awaitForever $ \ inputs -> unless (L.null inputs) $ do
+  awaitForever $ \ batch -> unless (L.null batch) $ do
     $(logWarnS) "search" "start query"
-    responses <- lift $ queryParallel (action <$> inputs)
+    responses <- lift $ queryParallel (action <$> batch)
     let (nodes, results) = partitionEithers responses
     $(logWarnS) "search" "done query"
     leftover $ L.concat nodes
     mapM_ yield results
+
+publish :: Address ip => InfoHash -> PortNumber -> DHT ip ()
+publish ih port = do
+  nodes <- getClosest ih
+  _ <- sourceList [nodes] $= search ih (announceQ ih port) $$ C.take 20
+  return ()
+
+{-----------------------------------------------------------------------
+--  Handlers
+-----------------------------------------------------------------------}
+
+pingH :: Address ip => NodeHandler ip
+pingH = nodeHandler $ \ _ Ping -> do
+  return Ping
+
+findNodeH :: Address ip => NodeHandler ip
+findNodeH = nodeHandler $ \ _ (FindNode nid) -> do
+  NodeFound <$> getClosest nid
+
+getPeersH :: Address ip => NodeHandler ip
+getPeersH = nodeHandler $ \ naddr (GetPeers ih) -> do
+  GotPeers <$> getPeerList ih <*> grantToken naddr
+
+announceH :: Address ip => NodeHandler ip
+announceH = nodeHandler $ \ naddr @ NodeAddr {..} (Announce {..}) -> do
+  checkToken naddr sessionToken
+  let annPort  = if impliedPort then nodePort else port
+  let peerAddr = PeerAddr Nothing nodeHost annPort
+  insertPeer topic peerAddr
+  return Announced
+
+handlers :: Address ip => [NodeHandler ip]
+handlers = [pingH, findNodeH, getPeersH, announceH]

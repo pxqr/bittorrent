@@ -28,57 +28,16 @@ module Network.BitTorrent.DHT
        ) where
 
 import Control.Applicative
-import Control.Exception.Lifted
-import Control.Monad as M
 import Control.Monad.Logger
 import Control.Monad.Trans
 import Data.Conduit as C
 import Data.Conduit.List as C
-import Data.List as L
-import Data.Monoid
-import Data.Text as T
 import Network.Socket (PortNumber)
-import Text.PrettyPrint as PP hiding ((<>), ($$))
-import Text.PrettyPrint.Class
 
 import Data.Torrent.InfoHash
-import Network.KRPC (QueryFailure)
 import Network.BitTorrent.Core
-import Network.BitTorrent.DHT.Message
-import Network.BitTorrent.DHT.Routing
 import Network.BitTorrent.DHT.Session
 
-
-{-----------------------------------------------------------------------
---  Handlers
------------------------------------------------------------------------}
-
-pingH :: Address ip => NodeHandler ip
-pingH = nodeHandler $ \ _ Ping -> do
-  return Ping
-
-findNodeH :: Address ip => NodeHandler ip
-findNodeH = nodeHandler $ \ _ (FindNode nid) -> do
-  NodeFound <$> getClosest nid
-
-getPeersH :: Address ip => NodeHandler ip
-getPeersH = nodeHandler $ \ naddr (GetPeers ih) -> do
-  GotPeers <$> getPeerList ih <*> grantToken naddr
-
-announceH :: Address ip => NodeHandler ip
-announceH = nodeHandler $ \ naddr @ NodeAddr {..} (Announce {..}) -> do
-  checkToken naddr sessionToken
-  let annPort  = if impliedPort then nodePort else port
-  let peerAddr = PeerAddr Nothing nodeHost annPort
-  insertPeer topic peerAddr
-  return Announced
-
-handlers :: Address ip => [NodeHandler ip]
-handlers = [pingH, findNodeH, getPeersH, announceH]
-
-{-----------------------------------------------------------------------
---  DHT operations
------------------------------------------------------------------------}
 
 -- | Run DHT on specified port. <add note about resources>
 dht :: Address ip
@@ -93,7 +52,8 @@ dht = runDHT handlers
 -- usually obtained from 'Data.Torrent.tNodes' field. Bootstrapping
 -- process can take up to 5 minutes.
 --
---   This operation is synchronous and do block, use 'async' if needed.
+--   This operation is synchronous and do block, use
+--   'Control.Concurrent.Async.Lifted.async' if needed.
 --
 bootstrap :: Address ip => [NodeAddr ip] -> DHT ip ()
 bootstrap startNodes = do
@@ -118,19 +78,18 @@ lookup topic = do      -- TODO retry getClosest if bucket is empty
 -- | Announce that /this/ peer may have some pieces of the specified
 -- torrent.
 --
---   This operation is synchronous and do block, use 'async' if needed.
+--   This operation is synchronous and do block, use
+--   'Control.Concurrent.Async.Lifted.async' if needed.
 --
 insert :: Address ip => InfoHash -> PortNumber -> DHT ip ()
-insert ih port = do
-  nodes <- getClosest ih
-  forM_ (nodeAddr <$> nodes) $ \ addr -> do
---    GotPeers {..} <- GetPeers ih <@> addr
---    Announced     <- Announce False ih undefined grantedToken <@> addr
-    return ()
+insert ih p = do
+  publish ih p
+  insertTopic ih p
 
 -- | Stop announcing /this/ peer for the specified torrent.
 --
 --   This operation is atomic and may block for a while.
 --
-delete :: Address ip => InfoHash -> DHT ip ()
-delete = error "DHT.delete: not implemented"
+delete :: Address ip => InfoHash -> PortNumber -> DHT ip ()
+delete = deleteTopic
+{-# INLINE delete #-}
