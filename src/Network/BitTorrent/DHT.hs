@@ -21,7 +21,13 @@ module Network.BitTorrent.DHT
        ( -- * Distributed Hash Table
          DHT
        , dht
-       , Network.BitTorrent.DHT.bootstrap
+
+         -- * Initialization
+       , bootstrap
+       , snapshot
+       , restore
+
+         -- * Operations
        , Network.BitTorrent.DHT.lookup
        , Network.BitTorrent.DHT.insert
        , Network.BitTorrent.DHT.delete
@@ -30,6 +36,7 @@ module Network.BitTorrent.DHT
 import Control.Applicative
 import Control.Monad.Logger
 import Control.Monad.Trans
+import Data.ByteString as BS
 import Data.Conduit as C
 import Data.Conduit.List as C
 import Network.Socket (PortNumber)
@@ -66,6 +73,20 @@ bootstrap startNodes = do
 --     unless (full t) $ do
 --      nid <- getNodeId
 
+-- | Load previous session. (corrupted - exception/ignore ?)
+--
+--   This is blocking operation, use
+--   'Control.Concurrent.Async.Lifted.async' if needed.
+restore :: ByteString -> DHT ip ()
+restore = error "DHT.restore: not implemented"
+
+-- | Serialize current DHT session to byte string.
+--
+--   This is blocking operation, use
+-- 'Control.Concurrent.Async.Lifted.async' if needed.
+snapshot :: DHT ip ByteString
+snapshot = error "DHT.snapshot: not implemented"
+
 -- | Get list of peers which downloading this torrent.
 --
 --   This operation is incremental and do block.
@@ -76,7 +97,8 @@ lookup topic = do      -- TODO retry getClosest if bucket is empty
   sourceList [closest] $= search topic (getPeersQ topic)
 
 -- | Announce that /this/ peer may have some pieces of the specified
--- torrent.
+-- torrent. DHT will reannounce this data periodically using
+-- 'optReannounce' interval.
 --
 --   This operation is synchronous and do block, use
 --   'Control.Concurrent.Async.Lifted.async' if needed.
