@@ -13,7 +13,6 @@ import Control.Lens hiding (argument, (<.>))
 import Control.Monad
 import Control.Monad.Trans
 import Data.Conduit as C
-import Data.Conduit.List as C
 import Data.List as L
 import Data.Maybe as L
 import Data.Monoid
