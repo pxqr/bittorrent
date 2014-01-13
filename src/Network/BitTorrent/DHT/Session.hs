@@ -228,21 +228,26 @@ invalidateTokens curTime ts @ SessionTokens {..}
 -- Session
 -----------------------------------------------------------------------}
 
+-- | A set of torrents this peer intends to share.
 type AnnounceSet = Set (InfoHash, PortNumber)
 
+-- | Logger function.
 type Logger = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
+-- | DHT session keep track state of /this/ node.
 data Node ip = Node
-  { options       :: !Options
-  , thisNodeId    :: !NodeId
-  , manager       :: !(Manager (DHT       ip))
-  , routingTable  :: !(MVar    (Table     ip))
-  , contactInfo   :: !(TVar    (PeerStore ip))
-  , announceInfo  :: !(TVar     AnnounceSet  )
-  , sessionTokens :: !(TVar     SessionTokens)
+  { options       :: !Options                  -- ^ session configuration;
+  , thisNodeId    :: !NodeId                   -- ^ session identifier;
+  , manager       :: !(Manager (DHT       ip)) -- ^ RPC manager;
+  , routingTable  :: !(MVar    (Table     ip)) -- ^ search table;
+  , contactInfo   :: !(TVar    (PeerStore ip)) -- ^ published by other nodes;
+  , announceInfo  :: !(TVar     AnnounceSet  ) -- ^ to publish by this node;
+  , sessionTokens :: !(TVar     SessionTokens) -- ^ query session IDs.
   , loggerFun     :: !Logger
   }
 
+-- | DHT keep track current session and proper resource allocation for
+-- safe multithreading.
 newtype DHT ip a = DHT { unDHT :: ReaderT (Node ip) (ResourceT IO) a }
   deriving ( Functor, Applicative, Monad
            , MonadIO, MonadBase IO
@@ -268,17 +273,19 @@ instance MonadLogger (DHT ip) where
     logger <- asks loggerFun
     liftIO $ logger loc src lvl (toLogStr msg)
 
+-- | Run DHT session. Some resources like listener thread may live for
+-- some short period of time right after this DHT session closed.
 runDHT :: forall ip a. Address ip
        => [Handler (DHT ip)] -- ^ handlers to run on accepted queries;
        -> Options            -- ^ various dht options;
        -> NodeAddr ip        -- ^ node address to bind;
        -> DHT ip a           -- ^ DHT action to run;
        -> IO a               -- ^ result.
-runDHT handlers opts naddr action = runResourceT $ do
+runDHT hs opts naddr action = runResourceT $ do
   runStderrLoggingT $ LoggingT $  \ logger -> do
     let rpcOpts  = KRPC.def { optQueryTimeout = seconds (optTimeout opts) }
     let nodeAddr = toSockAddr naddr
-    (_, m) <- allocate (newManager rpcOpts nodeAddr handlers) closeManager
+    (_, m) <- allocate (newManager rpcOpts nodeAddr hs) closeManager
     myId   <- liftIO genNodeId
     node   <- liftIO $ Node opts myId m
              <$> newMVar (nullTable myId (optBucketCount opts))
