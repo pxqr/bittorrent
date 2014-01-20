@@ -17,6 +17,7 @@ module Network.BitTorrent.DHT.Session
          -- * Session
        , DHT
        , runDHT
+       , askOption
 
          -- * Tokens
        , grantToken
@@ -295,6 +296,11 @@ runDHT hs opts naddr action = runResourceT $ do
              <*> pure logger
     runReaderT (unDHT (listen >> action)) node
 
+
+askOption :: (Options -> a) -> DHT ip a
+askOption f = asks (f . options)
+{-# INLINE askOption #-}
+
 {-----------------------------------------------------------------------
 --  Routing
 -----------------------------------------------------------------------}
@@ -435,11 +441,6 @@ deleteTopic ih p = do
   var <- asks announceInfo
   liftIO $ atomically $ modifyTVar' var (S.delete (ih, p))
 
-republish :: DHT ip ThreadId
-republish = fork $ do
-  i <- asks (optReannounce . options)
-  error "DHT.republish: not implemented"
-
 {-----------------------------------------------------------------------
 -- Messaging
 -----------------------------------------------------------------------}
@@ -540,6 +541,11 @@ publish ih p = do
   r     <- asks (optReplication . options)
   _ <- sourceList [nodes] $= search ih (announceQ ih p) $$ C.take r
   return ()
+
+republish :: DHT ip ThreadId
+republish = fork $ do
+  i <- askOption optReannounce
+  error "DHT.republish: not implemented"
 
 {-----------------------------------------------------------------------
 --  Handlers
