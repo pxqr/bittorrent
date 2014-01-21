@@ -53,7 +53,7 @@ library
                        Data.Torrent.Piece
                        Data.Torrent.Progress
                        Data.Torrent.Tree
---                     Network.BitTorrent
+                       Network.BitTorrent
                        Network.BitTorrent.Client
                        Network.BitTorrent.Client.Swarm
                        Network.BitTorrent.Core
@@ -81,8 +81,6 @@ library
                        Network.BitTorrent.Tracker.RPC.UDP
                        Network.BitTorrent.Tracker.Wai
 --                     Network.BitTorrent.Tracker.Session
---                     Network.BitTorrent.Session
---                     Network.BitTorrent.Session.Types
                        System.Torrent.FileMap
                        System.Torrent.Storage
   other-modules:       Paths_bittorrent
