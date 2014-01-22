@@ -47,6 +47,10 @@ module Network.BitTorrent.DHT.Routing
        , Network.BitTorrent.DHT.Routing.nullTable
        , Network.BitTorrent.DHT.Routing.insert
 
+         -- * Conversion
+       , Network.BitTorrent.DHT.Routing.TableEntry
+       , Network.BitTorrent.DHT.Routing.toList
+
          -- * Routing
        , Timestamp
        , Routing
@@ -428,3 +432,21 @@ insert info @ NodeInfo {..} = go (0 :: BitIx)
       |        n == 0       =   Tip nid n     <$> insertNode info bucket
       |     otherwise       =   Tip nid n     <$> insertNode info bucket
                            <|>  go (succ i) (splitTip nid n i bucket)
+
+{-----------------------------------------------------------------------
+--  Conversion
+-----------------------------------------------------------------------}
+
+type TableEntry ip = (NodeInfo ip, Timestamp)
+
+tableEntry :: NodeEntry ip -> TableEntry ip
+tableEntry (a :-> b) = (a, b)
+
+-- | Non-empty list of buckets.
+toBucketList :: Table ip -> [Bucket ip]
+toBucketList (Tip _ _ b) = [b]
+toBucketList (Zero  t b) = b : toBucketList t
+toBucketList (One   b t) = b : toBucketList t
+
+toList :: Eq ip => Table ip -> [[TableEntry ip]]
+toList = L.map (L.map tableEntry . PSQ.toList) . toBucketList
