@@ -12,6 +12,6 @@ main :: IO ()
 main = do
   [path]  <- getArgs
   torrent <- fromFile path
-  client  <- newClient def
-  addTorrent torrent client
+  client  <- newClient def $ \ _ _ _ _ -> return ()
+--  addTorrent torrent client
   return ()
