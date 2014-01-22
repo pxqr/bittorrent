@@ -20,6 +20,7 @@
 module Network.BitTorrent.DHT
        ( -- * Distributed Hash Table
          DHT
+       , MonadDHT (..)
        , dht
 
          -- * Initialization
@@ -31,6 +32,14 @@ module Network.BitTorrent.DHT
        , Network.BitTorrent.DHT.lookup
        , Network.BitTorrent.DHT.insert
        , Network.BitTorrent.DHT.delete
+
+         -- * Internal
+         -- | Can be used to implement instance of 'MonadDHT'.
+       , LogFun
+       , Node
+       , handlers
+       , startNode
+       , runDHT
        ) where
 
 import Control.Applicative
@@ -45,6 +54,15 @@ import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Session
 
+{-----------------------------------------------------------------------
+--  DHT types
+-----------------------------------------------------------------------}
+
+class MonadDHT m where
+  liftDHT :: DHT IPv4 a -> m a
+
+instance MonadDHT (DHT IPv4) where
+  liftDHT = id
 
 -- | Run DHT on specified port. <add note about resources>
 dht :: Address ip
@@ -52,8 +70,16 @@ dht :: Address ip
     -> NodeAddr ip -- ^ address to bind this node;
     -> DHT ip a    -- ^ actions to run: 'bootstrap', 'lookup', etc;
     -> IO a        -- ^ result.
-dht = runDHT handlers
+dht opts addr action = do
+  runResourceT $ do
+    runStderrLoggingT $ LoggingT $ \ logger -> do
+      node <- startNode handlers opts addr logger
+      runDHT node action
 {-# INLINE dht #-}
+
+{-----------------------------------------------------------------------
+--  Initialization
+-----------------------------------------------------------------------}
 
 -- | One good node may be sufficient. The list of bootstrapping nodes
 -- usually obtained from 'Data.Torrent.tNodes' field. Bootstrapping
@@ -86,6 +112,10 @@ restore = error "DHT.restore: not implemented"
 -- 'Control.Concurrent.Async.Lifted.async' if needed.
 snapshot :: DHT ip ByteString
 snapshot = error "DHT.snapshot: not implemented"
+
+{-----------------------------------------------------------------------
+--  Operations
+-----------------------------------------------------------------------}
 
 -- | Get list of peers which downloading this torrent.
 --

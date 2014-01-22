@@ -1,3 +1,10 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -13,6 +20,11 @@ module Network.BitTorrent.DHT.Session
        , K
        , defaultK
        , Options (..)
+
+         -- * Node
+       , LogFun
+       , Node
+       , startNode
 
          -- * Session
        , DHT
@@ -233,7 +245,7 @@ invalidateTokens curTime ts @ SessionTokens {..}
 type AnnounceSet = Set (InfoHash, PortNumber)
 
 -- | Logger function.
-type Logger = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+type LogFun = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
 -- | DHT session keep track state of /this/ node.
 data Node ip = Node
@@ -244,7 +256,7 @@ data Node ip = Node
   , contactInfo   :: !(TVar    (PeerStore ip)) -- ^ published by other nodes;
   , announceInfo  :: !(TVar     AnnounceSet  ) -- ^ to publish by this node;
   , sessionTokens :: !(TVar     SessionTokens) -- ^ query session IDs.
-  , loggerFun     :: !Logger
+  , loggerFun     :: !LogFun
   }
 
 -- | DHT keep track current session and proper resource allocation for
@@ -274,28 +286,35 @@ instance MonadLogger (DHT ip) where
     logger <- asks loggerFun
     liftIO $ logger loc src lvl (toLogStr msg)
 
+type NodeHandler ip = Handler (DHT ip)
+
 -- | Run DHT session. Some resources like listener thread may live for
 -- some short period of time right after this DHT session closed.
-runDHT :: forall ip a. Address ip
-       => [Handler (DHT ip)] -- ^ handlers to run on accepted queries;
-       -> Options            -- ^ various dht options;
-       -> NodeAddr ip        -- ^ node address to bind;
-       -> DHT ip a           -- ^ DHT action to run;
-       -> IO a               -- ^ result.
-runDHT hs opts naddr action = runResourceT $ do
-  runStderrLoggingT $ LoggingT $  \ logger -> do
-    let rpcOpts  = KRPC.def { optQueryTimeout = seconds (optTimeout opts) }
-    let nodeAddr = toSockAddr naddr
-    (_, m) <- allocate (newManager rpcOpts nodeAddr hs) closeManager
+startNode :: Address ip
+          => [NodeHandler ip] -- ^ handlers to run on accepted queries;
+          -> Options          -- ^ various dht options;
+          -> NodeAddr ip      -- ^ node address to bind;
+          -> LogFun           -- ^
+          -> ResIO (Node ip)  -- ^ a new DHT node running at given address.
+startNode hs opts naddr logger = do
+--    (_, m) <- allocate (newManager rpcOpts nodeAddr hs) closeManager
+    m      <- liftIO $ newManager rpcOpts nodeAddr hs
     myId   <- liftIO genNodeId
     node   <- liftIO $ Node opts myId m
-             <$> newMVar (nullTable myId (optBucketCount opts))
-             <*> newTVarIO def
-             <*> newTVarIO S.empty
-             <*> (newTVarIO =<< nullSessionTokens)
-             <*> pure logger
-    runReaderT (unDHT (listen >> action)) node
+                <$> newMVar (nullTable myId (optBucketCount opts))
+                <*> newTVarIO def
+                <*> newTVarIO S.empty
+                <*> (newTVarIO =<< nullSessionTokens)
+                <*> pure logger
+    runReaderT (unDHT listen) node
+    return node
+  where
+    rpcOpts  = KRPC.def { optQueryTimeout = seconds (optTimeout opts) }
+    nodeAddr = toSockAddr naddr
 
+runDHT :: Node ip -> DHT ip a -> ResIO a
+runDHT node action = runReaderT (unDHT action) node
+{-# INLINE runDHT #-}
 
 askOption :: (Options -> a) -> DHT ip a
 askOption f = asks (f . options)
@@ -474,8 +493,6 @@ ping :: Address ip => NodeAddr ip -> DHT ip (NodeInfo ip)
 ping addr = do
   (nid, Ping) <- queryNode addr Ping
   return (NodeInfo nid addr)
-
-type NodeHandler ip = Handler (DHT ip)
 
 nodeHandler :: Address ip => KRPC (Query a) (Response b)
            => (NodeAddr ip -> a -> DHT ip b) -> NodeHandler ip
