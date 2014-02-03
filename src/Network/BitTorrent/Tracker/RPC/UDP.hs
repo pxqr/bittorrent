@@ -95,6 +95,28 @@ withManager :: Options -> (Manager -> IO a) -> IO a
 withManager opts = bracket (newManager opts) closeManager
 
 {-----------------------------------------------------------------------
+--  Host Addr resolution
+-----------------------------------------------------------------------}
+
+setPort :: PortNumber -> SockAddr -> SockAddr
+setPort p (SockAddrInet  _ h)     = SockAddrInet  p h
+setPort p (SockAddrInet6 _ f h s) = SockAddrInet6 p f h s
+setPort _  addr = addr
+
+resolveURI :: URI -> IO SockAddr
+resolveURI URI { uriAuthority = Just (URIAuth {..}) } = do
+  infos <- getAddrInfo Nothing (Just uriRegName) Nothing
+  let port = fromMaybe 0 (readMaybe (L.drop 1 uriPort) :: Maybe Int)
+  case infos of
+    AddrInfo {..} : _ -> return $ setPort (fromIntegral port) addrAddress
+    _                 -> fail "getTrackerAddr: unable to lookup host addr"
+resolveURI _       = fail "getTrackerAddr: hostname unknown"
+
+-- TODO caching?
+getTrackerAddr :: Manager -> URI -> IO SockAddr
+getTrackerAddr _ = resolveURI
+
+{-----------------------------------------------------------------------
   Tokens
 -----------------------------------------------------------------------}
 
@@ -268,20 +290,6 @@ isExpired Connection {..} = do
 maxPacketSize :: Int
 maxPacketSize = 98 -- announce request packet
 
-setPort :: PortNumber -> SockAddr -> SockAddr
-setPort p (SockAddrInet  _ h)     = SockAddrInet  p h
-setPort p (SockAddrInet6 _ f h s) = SockAddrInet6 p f h s
-setPort _  addr = addr
-
-getTrackerAddr :: URI -> IO SockAddr
-getTrackerAddr URI { uriAuthority = Just (URIAuth {..}) } = do
-  infos <- getAddrInfo Nothing (Just uriRegName) Nothing
-  let port = fromMaybe 0 (readMaybe (L.drop 1 uriPort) :: Maybe Int)
-  case infos of
-    AddrInfo {..} : _ -> return $ setPort (fromIntegral port) addrAddress
-    _                 -> fail "getTrackerAddr: unable to lookup host addr"
-getTrackerAddr _       = fail "getTrackerAddr: hostname unknown"
-
 call :: Manager -> SockAddr -> ByteString -> IO ByteString
 call Manager {..} addr arg = do
   BS.sendAllTo sock arg addr
@@ -315,7 +323,7 @@ transaction m tracker @ UDPTracker {..} request = do
   tid <- genTransactionId
   let trans = TransactionQ cid tid request
 
-  addr <- getTrackerAddr trackerURI
+  addr <- getTrackerAddr m trackerURI
   res  <- call m addr (encode trans)
   case decode res of
     Right (TransactionR {..})
@@ -345,6 +353,9 @@ freshConnection m tracker @ UDPTracker {..} = do
   when expired $ do
     connId <- connectUDP m tracker
     updateConnection connId tracker
+
+getConnection :: Manager -> URI -> IO Connection
+getConnection _ = undefined
 
 announce :: Manager -> AnnounceQuery -> UDPTracker -> IO AnnounceInfo
 announce m ann tracker = do
