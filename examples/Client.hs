@@ -2,16 +2,16 @@ module Main (main) where
 
 import Control.Concurrent
 import Data.Default
-import Data.Torrent
-import Network.BitTorrent.Client
 import System.Environment
 import Text.PrettyPrint.Class
+
+import Network.BitTorrent
 
 
 main :: IO ()
 main = do
   [path]  <- getArgs
   torrent <- fromFile path
-  client  <- newClient def $ \ _ _ _ _ -> return ()
---  addTorrent torrent client
-  return ()
+  let logger = \ _ _ _ _ -> return ()
+  withClient def logger $ flip runBitTorrent $ do
+    return ()

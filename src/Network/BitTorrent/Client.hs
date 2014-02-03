@@ -13,6 +13,8 @@ module Network.BitTorrent.Client
 
          -- ** Session initialization
        , newClient
+       , closeClient
+       , withClient
 
          -- * BitTorrent monad
        , BitTorrent
@@ -24,6 +26,7 @@ module Network.BitTorrent.Client
        , addTorrent
        ) where
 
+import Control.Exception
 import Control.Concurrent.STM
 import Control.Monad.Logger
 import Control.Monad.Reader
@@ -31,6 +34,7 @@ import Control.Monad.Trans.Resource
 import Data.Default
 import Data.Function
 import Data.HashMap.Strict as HM
+import Data.Maybe
 import Data.Ord
 import Data.Text
 import Network
@@ -50,7 +54,7 @@ data Options = Options
   , port        :: PortNumber
   , extensions  :: [Extension]
   , nodeAddr    :: NodeAddr IPv4
-  , bootNode    :: NodeAddr IPv4
+  , bootNode    :: Maybe (NodeAddr IPv4)
   }
 
 instance Default Options where
@@ -60,6 +64,7 @@ instance Default Options where
     , port        = 6882
     , extensions  = []
     , nodeAddr    = "0.0.0.0:6882"
+    , bootNode    = Nothing
     }
 
 data Client = Client
@@ -84,7 +89,7 @@ newClient Options {..} logger = do
   ts   <- newTVarIO HM.empty
   node <- runResourceT $ do
     node <- startNode handlers def nodeAddr logger
-    runDHT node $ bootstrap [bootNode]
+    runDHT node $ bootstrap (maybeToList bootNode)
     return node
 
   return Client
@@ -100,6 +105,9 @@ closeClient :: Client -> IO ()
 closeClient Client {..} = do
   return ()
 --  closeNode clientNode
+
+withClient :: Options -> LogFun -> (Client -> IO a) -> IO a
+withClient opts log action = bracket (newClient opts log) closeClient action
 
 {-----------------------------------------------------------------------
 --  BitTorrent monad

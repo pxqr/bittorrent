@@ -7,5 +7,8 @@
 --
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent
-       (
+       ( module BT
        ) where
+
+import Data.Torrent as BT
+import Network.BitTorrent.Client
