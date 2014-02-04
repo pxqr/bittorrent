@@ -14,13 +14,17 @@
 --   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
 --
 module Network.BitTorrent.Tracker.RPC.HTTP
-       ( Connection
-       , putConnection
+       ( -- * Manager
+         Options (..)
+       , Manager
+       , newManager
+       , closeManager
+       , withManager
 
          -- * RPC
-       , connect
        , announce
        , scrape
+       , scrapeOne
        ) where
 
 import Control.Applicative
@@ -30,55 +34,88 @@ import Data.BEncode as BE
 import Data.ByteString as B
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy  as BL
+import Data.Default
 import Data.List as L
-import Data.Map as M
 import Data.Monoid
 import Network.URI
-import Network.HTTP.Conduit
-import Network.HTTP.Conduit.Internal
-import Network.HTTP.Types.URI
+import           Network.HTTP.Conduit hiding
+                 (Manager, newManager, closeManager, withManager)
+import qualified Network.HTTP.Conduit as HTTP
+import           Network.HTTP.Conduit.Internal (setUri)
+import           Network.HTTP.Types.URI
 
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Tracker.Message
 
+{-----------------------------------------------------------------------
+--  Manager
+-----------------------------------------------------------------------}
 
-data Connection = Connection
-  { announceURI :: URI
-  , manager     :: Manager
-  , connProxy   :: Maybe Proxy
+-- | HTTP tracker specific RPC options.
+data Options = Options
+  { -- | Global HTTP announce query preferences.
+    optAnnounceExt  :: !AnnounceQueryExt
+
+    -- | Whether to use HTTP proxy for HTTP tracker requests.
+  , optHttpProxy    :: !(Maybe Proxy)
+
+    -- | HTTP manager options.
+  , optHttpOptions  :: !ManagerSettings
   }
 
-putConnection :: Connection -> IO ()
-putConnection = undefined
-
--- TODO share manager between several threads
-connect :: URI -> ResourceT IO Connection
-connect uri = do
-  (_, m) <- allocate (newManager def) closeManager
-  return Connection
-    { announceURI = uri
-    , manager     = m
-    , connProxy   = Nothing
+instance Default Options where
+  def = Options
+    { optAnnounceExt = def
+    , optHttpProxy   = Nothing
+    , optHttpOptions = def
     }
+
+-- | HTTP tracker manager.
+data Manager = Manager
+  { options :: !Options
+  , httpMgr :: !HTTP.Manager
+  }
+
+newManager :: Options -> IO Manager
+newManager opts = Manager opts <$> HTTP.newManager (optHttpOptions opts)
+
+closeManager :: Manager -> IO ()
+closeManager Manager {..} = HTTP.closeManager httpMgr
+
+withManager :: Options -> (Manager -> IO a) -> IO a
+withManager opts = bracket (newManager opts) closeManager
+
+{-----------------------------------------------------------------------
+--  Queries
+-----------------------------------------------------------------------}
 
 setSimpleQuery :: SimpleQuery -> Request m -> Request m
 setSimpleQuery q r = r
-  { queryString = undefined renderSimpleQuery False q
+  { queryString = renderSimpleQuery False q
   }
 
-trackerHTTP :: BEncode a => SimpleQuery -> Connection -> ResourceT IO a
-trackerHTTP q Connection {..} = do
-  request  <- setSimpleQuery q <$> setUri def announceURI
-  response <- httpLbs request { proxy = connProxy } manager
+httpTracker :: BEncode a => Manager -> URI -> SimpleQuery -> ResourceT IO a
+httpTracker Manager {..} uri q = do
+  request  <- setSimpleQuery q <$> setUri def uri
+  response <- httpLbs request { proxy = optHttpProxy options } httpMgr
   case BE.decode $ BL.toStrict $ responseBody response of
-    Left  msg  -> error "TODO"
+    Left  msg  -> error $ "httpTracker: " ++ msg
     Right info -> return info
+
+{-----------------------------------------------------------------------
+--  RPC
+-----------------------------------------------------------------------}
 
 -- | Send request and receive response from the tracker specified in
 -- announce list.
 --
-announce :: AnnounceQuery -> Connection -> ResourceT IO AnnounceInfo
-announce q = trackerHTTP (renderAnnounceQuery q)
+announce :: Manager -> URI -> AnnounceQuery -> ResourceT IO AnnounceInfo
+announce mgr uri q = httpTracker mgr uri (renderAnnounceRequest uriQ)
+  where
+    uriQ = AnnounceRequest
+      { announceQuery   = q
+      , announceAdvises = optAnnounceExt (options mgr)
+      }
 
 -- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'
 --   gives 'Nothing' then tracker do not support scraping.
@@ -99,17 +136,17 @@ scrapeURL uri = do
 --   However if the info hash list is 'null', the tracker should list
 --   all available torrents.
 --
-scrape :: ScrapeQuery -> Connection -> ResourceT IO ScrapeInfo
-scrape q conn @ Connection {..} = do
-  case scrapeURL announceURI of
+scrape :: Manager -> URI -> ScrapeQuery -> ResourceT IO ScrapeInfo
+scrape m u q = do
+  case scrapeURL u of
     Nothing  -> error "Tracker do not support scraping"
-    Just uri -> trackerHTTP (renderScrapeQuery q) conn { announceURI = uri }
+    Just uri -> httpTracker m uri (renderScrapeQuery q)
 
 -- | More particular version of 'scrape', just for one torrent.
 --
-scrapeOne :: InfoHash -> Connection -> ResourceT IO ScrapeEntry
-scrapeOne ih uri = do
-  xs <- scrape [ih] uri
+scrapeOne :: Manager -> URI -> InfoHash -> ResourceT IO ScrapeEntry
+scrapeOne m uri ih = do
+  xs <- scrape m uri [ih]
   case L.lookup ih xs of
     Nothing -> error "unable to find info hash in response dict"
     Just a  -> return a
