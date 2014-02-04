@@ -16,6 +16,7 @@ module Network.BitTorrent.Tracker.Wai
        , tracker
        ) where
 
+import Control.Applicative
 import Control.Monad.Trans.Resource
 import Data.BEncode as BE
 import Data.ByteString
@@ -30,9 +31,12 @@ import Network.BitTorrent.Tracker.Message
 
 -- | Various configuration settings used to generate tracker response.
 data TrackerSettings = TrackerSettings
-  { -- | If peer did not specified the "numwant" then this value is
+  { announcePath          :: !RawPath
+  , scrapePath            :: !RawPath
+
+    -- | If peer did not specified the "numwant" then this value is
     -- used.
-    defNumWant            :: {-# UNPACK #-} !Int
+  , defNumWant            :: {-# UNPACK #-} !Int
 
     -- | If peer specified too big numwant value.
   , maxNumWant            :: {-# UNPACK #-} !Int
@@ -63,7 +67,9 @@ data TrackerSettings = TrackerSettings
 -- | Conservative tracker settings compatible with any client.
 instance Default TrackerSettings where
   def = TrackerSettings
-    { defNumWant            = defaultNumWant
+    { announcePath          = defaultAnnouncePath
+    , scrapePath            = defaultScrapePath
+    , defNumWant            = defaultNumWant
     , maxNumWant            = defaultMaxNumWant
     , reannounceInterval    = defaultReannounceInterval
     , reannounceMinInterval = Nothing
@@ -73,34 +79,46 @@ instance Default TrackerSettings where
     , noPeerId              = False
     }
 
+
+
+{-----------------------------------------------------------------------
+--  Handlers
+-----------------------------------------------------------------------}
+
 getAnnounceR :: TrackerSettings -> AnnounceRequest -> ResourceT IO AnnounceInfo
 getAnnounceR = undefined
 
 getScrapeR :: TrackerSettings -> ScrapeQuery -> ResourceT IO ScrapeInfo
 getScrapeR = undefined
 
+{-----------------------------------------------------------------------
+--  Routing
+-----------------------------------------------------------------------}
+
+announceResponse :: AnnounceInfo -> Response
+announceResponse info = responseLBS ok200 headers $ BE.encode info
+  where
+    headers = [(hContentType, announceType)]
+
+scrapeResponse :: ScrapeInfo -> Response
+scrapeResponse info = responseLBS ok200 headers $ BE.encode info
+  where
+    headers = [(hContentType, scrapeType)]
+
 -- content-type: "text/plain"!
 tracker :: TrackerSettings -> Application
-tracker settings Request {..}
+tracker settings @ TrackerSettings {..} Request {..}
   | requestMethod /= methodGet
   = return $ responseLBS methodNotAllowed405 [] ""
 
-  | otherwise = do
-    case pathInfo of
-      ["announce"] ->
-        case parseAnnounceRequest $ queryToSimpleQuery queryString of
-          Right query -> do
-            info <- getAnnounceR settings query
-            return $ responseLBS ok200 [] $ BE.encode info
-          Left msg ->
-            return $ responseLBS (parseFailureStatus msg) [] ""
+  | rawPathInfo == announcePath = do
+    case parseAnnounceRequest $ queryToSimpleQuery queryString of
+      Right query -> announceResponse <$> getAnnounceR settings query
+      Left  msg   -> return $ responseLBS (parseFailureStatus msg) [] ""
 
-      ["scrape"]   ->
-        case Right $ parseScrapeQuery $ queryToSimpleQuery queryString of -- TODO
-          Right query -> do
-            info <- getScrapeR settings query
-            return $ responseLBS ok200 [] $ BE.encode info
-          Left _ ->
-            return $ responseLBS badRequest400 [] ""
+  | rawPathInfo == scrapePath   = do
+    case Right $ parseScrapeQuery $ queryToSimpleQuery queryString of -- TODO
+      Right query -> scrapeResponse <$> getScrapeR settings query
+      Left  msg   -> return $ responseLBS badRequest400 [] ""
 
-      _            -> undefined --badPath
+  |     otherwise               = undefined --badPath

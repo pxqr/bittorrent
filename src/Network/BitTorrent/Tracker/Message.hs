@@ -51,8 +51,6 @@ module Network.BitTorrent.Tracker.Message
        , defaultNumWant
        , defaultMaxNumWant
        , defaultReannounceInterval
-       , announceType
-       , parseFailureStatus
 
          -- * Scrape
          -- ** Query
@@ -63,6 +61,14 @@ module Network.BitTorrent.Tracker.Message
          -- ** Info
        , ScrapeEntry (..)
        , ScrapeInfo
+
+         -- * HTTP specific
+       , RawPath
+       , defaultAnnouncePath
+       , defaultScrapePath
+       , announceType
+       , scrapeType
+       , parseFailureStatus
 
          -- * Extra
        , queryToSimpleQuery
@@ -615,6 +621,14 @@ defaultMaxNumWant = 200
 defaultReannounceInterval :: Int
 defaultReannounceInterval = 30 * 60
 
+type RawPath = BS.ByteString
+
+defaultAnnouncePath :: RawPath
+defaultAnnouncePath = "announce"
+
+defaultScrapePath :: RawPath
+defaultScrapePath = "scrape"
+
 missingOffset :: Int
 missingOffset = 101
 
@@ -630,9 +644,13 @@ parseFailureMessage e = BS.concat $ case e of
   Missing p   -> ["Missing parameter: ", paramName p]
   Invalid p v -> ["Invalid parameter: ", paramName p, " = ", v]
 
--- | HTTP response /content type/.
+-- | HTTP response /content type/ for announce info.
 announceType :: ByteString
 announceType = "text/plain"
+
+-- | HTTP response /content type/ for scrape info.
+scrapeType :: ByteString
+scrapeType = "text/plain"
 
 -- | Get HTTP response status from a announce params parse failure.
 --
