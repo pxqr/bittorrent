@@ -24,11 +24,13 @@ spec = do
     context (show uri) $ do
       describe "announce" $ do
         it "have valid response" $ do
-          q    <- arbitrarySample
-          info <- runResourceT $ connect uri >>= announce q
-          validateInfo q info
+          withManager def $ \ mgr -> do
+            q    <- arbitrarySample
+            info <- runResourceT $ announce mgr uri q
+            validateInfo q info
 
       describe "scrape" $ do
         it "have valid response" $ do
-          xs <- runResourceT $ connect uri >>= scrape [def]
-          L.length xs `shouldSatisfy` (>= 1)
+          withManager def $ \ mgr -> do
+            xs <- runResourceT $ scrape mgr uri [def]
+            L.length xs `shouldSatisfy` (>= 1)

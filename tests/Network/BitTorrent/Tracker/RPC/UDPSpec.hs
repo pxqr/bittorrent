@@ -24,10 +24,12 @@ spec = do
     context (show uri) $ do
       describe "announce" $ do
         it "have valid response" $ do
-          q <- arbitrarySample
-          connect uri >>= announce q >>= validateInfo q
+          withManager def $ \ mgr -> do
+            q <- arbitrarySample
+            announce mgr uri q >>= validateInfo q
 
       describe "scrape" $ do
         it "have valid response" $ do
-          xs <- connect uri >>= scrape [def]
-          L.length xs `shouldSatisfy` (>= 1)
+          withManager def $ \ mgr -> do
+            xs <- scrape mgr uri [def]
+            L.length xs `shouldSatisfy` (>= 1)
