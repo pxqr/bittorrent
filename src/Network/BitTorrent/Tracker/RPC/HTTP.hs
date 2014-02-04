@@ -106,10 +106,10 @@ fillRequest Options {..} q r = r
       | BS.null a = b
       | otherwise = a <> "&" <> b
 
-httpTracker :: BEncode a => Manager -> URI -> SimpleQuery -> ResourceT IO a
+httpTracker :: BEncode a => Manager -> URI -> SimpleQuery -> IO a
 httpTracker Manager {..} uri q = do
   request  <- fillRequest options q <$> setUri def uri
-  response <- httpLbs request httpMgr
+  response <- runResourceT $ httpLbs request httpMgr
   case BE.decode $ BL.toStrict $ responseBody response of
     Left  msg  -> error $ "httpTracker: " ++ msg
     Right info -> return info
@@ -121,7 +121,7 @@ httpTracker Manager {..} uri q = do
 -- | Send request and receive response from the tracker specified in
 -- announce list.
 --
-announce :: Manager -> URI -> AnnounceQuery -> ResourceT IO AnnounceInfo
+announce :: Manager -> URI -> AnnounceQuery -> IO AnnounceInfo
 announce mgr uri q = httpTracker mgr uri (renderAnnounceRequest uriQ)
   where
     uriQ = AnnounceRequest
@@ -148,7 +148,7 @@ scrapeURL uri = do
 --   However if the info hash list is 'null', the tracker should list
 --   all available torrents.
 --
-scrape :: Manager -> URI -> ScrapeQuery -> ResourceT IO ScrapeInfo
+scrape :: Manager -> URI -> ScrapeQuery -> IO ScrapeInfo
 scrape m u q = do
   case scrapeURL u of
     Nothing  -> error "Tracker do not support scraping"
@@ -156,7 +156,7 @@ scrape m u q = do
 
 -- | More particular version of 'scrape', just for one torrent.
 --
-scrapeOne :: Manager -> URI -> InfoHash -> ResourceT IO ScrapeEntry
+scrapeOne :: Manager -> URI -> InfoHash -> IO ScrapeEntry
 scrapeOne m uri ih = do
   xs <- scrape m uri [ih]
   case L.lookup ih xs of

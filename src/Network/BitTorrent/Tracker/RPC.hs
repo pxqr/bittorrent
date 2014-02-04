@@ -24,7 +24,6 @@ module Network.BitTorrent.Tracker.RPC
        ) where
 
 import Control.Exception
-import Control.Monad.Trans.Resource
 import Data.Default
 import Network
 import Network.URI
@@ -130,13 +129,13 @@ dispatch URI {..} http udp
 announce :: Manager -> URI -> SAnnounceQuery -> IO AnnounceInfo
 announce Manager {..} uri simpleQuery
   = dispatch uri
-      (runResourceT (HTTP.announce httpMgr uri annQ))
-      (UDP.announce udpMgr uri annQ)
+      (HTTP.announce httpMgr uri annQ)
+      ( UDP.announce udpMgr  uri annQ)
   where
     annQ = fillAnnounceQuery peerInfo simpleQuery
 
 scrape :: Manager -> URI -> ScrapeQuery -> IO ScrapeInfo
 scrape Manager {..} uri q
   = dispatch uri
-      (runResourceT (HTTP.scrape httpMgr uri q))
-      (UDP.scrape udpMgr uri q)
+      (HTTP.scrape httpMgr uri q)
+      ( UDP.scrape udpMgr  uri q)
