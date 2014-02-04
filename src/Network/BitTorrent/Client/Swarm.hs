@@ -5,6 +5,7 @@ module Network.BitTorrent.Client.Swarm
        ) where
 
 import Data.Default
+import Data.Maybe
 import Network
 
 import Data.Torrent
@@ -18,18 +19,14 @@ data Swarm = Swarm
   { swarmTopic   :: InfoHash
   , thisPeerId   :: PeerId
   , listenerPort :: PortNumber
-  , trackerConn  :: Tracker
---  , infoDict     ::
   }
 
 newLeecher :: PeerId -> PortNumber -> Torrent -> IO Swarm
 newLeecher pid port Torrent {..} = do
-  tracker <- connect undefined
   return Swarm
     { swarmTopic   = idInfoHash tInfoDict
     , thisPeerId   = pid
     , listenerPort = port
-    , trackerConn  = tracker
     }
 
 getAnnounceQuery :: Swarm -> AnnounceQuery
@@ -45,5 +42,11 @@ getAnnounceQuery Swarm {..} = AnnounceQuery
 
 askPeers :: Swarm -> IO [PeerAddr IP]
 askPeers s @ Swarm {..} = do
-  AnnounceInfo {..} <- RPC.announce (getAnnounceQuery s) trackerConn
-  return (getPeerList respPeers)
+--  AnnounceInfo {..} <- RPC.announce (getAnnounceQuery s) trackerConn
+  return [] -- (getPeerList respPeers)
+
+--reannounce :: HTracker -> IO ()
+--reannounce = undefined
+
+--forceReannounce :: HTracker -> IO ()
+--forceReannounce = undefined
