@@ -25,11 +25,13 @@ module Network.BitTorrent.Core.Fingerprint
        ( ClientImpl (..)
        , Fingerprint (..)
        , libFingerprint
+       , libUserAgent
        ) where
 
 import Data.Default
 import Data.List as L
 import Data.List.Split as L
+import Data.Monoid
 import Data.String
 import Data.Version
 import Text.PrettyPrint hiding ((<>))
@@ -189,6 +191,11 @@ instance Pretty Fingerprint where
 --
 libFingerprint :: Fingerprint
 libFingerprint =  Fingerprint IlibHSbittorrent version
+
+-- | HTTP user agent of this (the bittorrent library) package. Can be
+-- used in HTTP tracker requests.
+libUserAgent :: String
+libUserAgent = render (pretty IlibHSbittorrent <> "/" <> pretty version)
 
 {-----------------------------------------------------------------------
 --  For torrent file

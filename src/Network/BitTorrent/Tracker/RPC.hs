@@ -18,6 +18,7 @@ module Network.BitTorrent.Tracker.RPC
        , withManager
 
          -- * RPC
+       , SAnnounceQuery (..)
        , announce
        , scrape
        ) where

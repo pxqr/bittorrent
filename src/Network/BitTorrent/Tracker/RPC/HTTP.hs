@@ -31,7 +31,7 @@ import Control.Applicative
 import Control.Exception
 import Control.Monad.Trans.Resource
 import Data.BEncode as BE
-import Data.ByteString as B
+import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy  as BL
 import Data.Default
@@ -42,9 +42,11 @@ import           Network.HTTP.Conduit hiding
                  (Manager, newManager, closeManager, withManager)
 import qualified Network.HTTP.Conduit as HTTP
 import           Network.HTTP.Conduit.Internal (setUri)
-import           Network.HTTP.Types.URI
+import           Network.HTTP.Types.Header (hUserAgent)
+import           Network.HTTP.Types.URI    (SimpleQuery, renderSimpleQuery)
 
-import Data.Torrent.InfoHash
+import Data.Torrent.InfoHash               (InfoHash)
+import Network.BitTorrent.Core.Fingerprint (libUserAgent)
 import Network.BitTorrent.Tracker.Message
 
 {-----------------------------------------------------------------------
@@ -59,6 +61,9 @@ data Options = Options
     -- | Whether to use HTTP proxy for HTTP tracker requests.
   , optHttpProxy    :: !(Maybe Proxy)
 
+    -- | Value to put in HTTP user agent header.
+  , optUserAgent    :: !BS.ByteString
+
     -- | HTTP manager options.
   , optHttpOptions  :: !ManagerSettings
   }
@@ -67,6 +72,7 @@ instance Default Options where
   def = Options
     { optAnnounceExt = def
     , optHttpProxy   = Nothing
+    , optUserAgent   = BC.pack libUserAgent
     , optHttpOptions = def
     }
 
@@ -89,15 +95,21 @@ withManager opts = bracket (newManager opts) closeManager
 --  Queries
 -----------------------------------------------------------------------}
 
-setSimpleQuery :: SimpleQuery -> Request m -> Request m
-setSimpleQuery q r = r
-  { queryString = renderSimpleQuery False q
+fillRequest :: Options -> SimpleQuery -> Request m -> Request m
+fillRequest Options {..} q r = r
+  { queryString    = joinQuery (queryString r) (renderSimpleQuery False q)
+  , requestHeaders = (hUserAgent, optUserAgent) : requestHeaders r
+  , proxy          = optHttpProxy
   }
+  where
+    joinQuery a b
+      | BS.null a = b
+      | otherwise = a <> "&" <> b
 
 httpTracker :: BEncode a => Manager -> URI -> SimpleQuery -> ResourceT IO a
 httpTracker Manager {..} uri q = do
-  request  <- setSimpleQuery q <$> setUri def uri
-  response <- httpLbs request { proxy = optHttpProxy options } httpMgr
+  request  <- fillRequest options q <$> setUri def uri
+  response <- httpLbs request httpMgr
   case BE.decode $ BL.toStrict $ responseBody response of
     Left  msg  -> error $ "httpTracker: " ++ msg
     Right info -> return info
@@ -127,9 +139,9 @@ scrapeURL uri = do
   where
     replace p
       | ps <- BC.splitWith (== '/') p
-      , "announce" `B.isPrefixOf` L.last ps
-      = let newSuff = "scrape" <> B.drop (B.length "announce") (L.last ps)
-        in Just (B.intercalate "/" (L.init ps ++ [newSuff]))
+      , "announce" `BS.isPrefixOf` L.last ps
+      = let newSuff = "scrape" <> BS.drop (BS.length "announce") (L.last ps)
+        in Just (BS.intercalate "/" (L.init ps ++ [newSuff]))
       | otherwise = Nothing
 
 -- | For each 'InfoHash' of torrents request scrape info from the tracker.
