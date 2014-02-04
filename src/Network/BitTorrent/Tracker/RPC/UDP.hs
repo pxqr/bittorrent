@@ -40,6 +40,7 @@ import Data.Serialize
 import Data.Text as T
 import Data.Text.Encoding
 import Data.Time
+import Data.Time.Clock.POSIX
 import Data.Word
 import Text.Read (readMaybe)
 import Network.Socket hiding (Connected, connect)
@@ -64,15 +65,21 @@ defMinTimeout = 15 * sec
 defMaxTimeout :: Int
 defMaxTimeout = 15 * 2 ^ (8 :: Int) * sec
 
+-- announce request packet
+defMaxPacketSize :: Int
+defMaxPacketSize = 98
+
 data Options = Options
-  { optMinTimeout :: {-# UNPACK #-} !Int
-  , optMaxTimeout :: {-# UNPACK #-} !Int
+  { optMaxPacketSize :: {-# UNPACK #-} !Int
+  , optMinTimeout    :: {-# UNPACK #-} !Int
+  , optMaxTimeout    :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
 
 instance Default Options where
   def = Options
-    { optMinTimeout = defMinTimeout
-    , optMaxTimeout = defMaxTimeout
+    { optMaxPacketSize = defMaxPacketSize
+    , optMinTimeout    = defMinTimeout
+    , optMaxTimeout    = defMaxTimeout
     }
 
 data Manager = Manager
@@ -133,9 +140,6 @@ newtype ConnectionId  = ConnectionId Word64
 
 instance Show ConnectionId where
   showsPrec _ (ConnectionId cid) = showString "0x" <> showHex cid
-
-genConnectionId :: IO ConnectionId
-genConnectionId = ConnectionId <$> genToken
 
 initialConnectionId :: ConnectionId
 initialConnectionId =  ConnectionId 0x41727101980
@@ -266,16 +270,17 @@ instance Serialize (Transaction Response) where
 connectionLifetime :: NominalDiffTime
 connectionLifetime = 60
 
-connectionLifetimeServer :: NominalDiffTime
-connectionLifetimeServer = 120
-
 data Connection = Connection
-    { connectionId        :: ConnectionId
-    , connectionTimestamp :: UTCTime
-    } deriving Show
+  { connectionId        :: ConnectionId
+  , connectionTimestamp :: UTCTime
+  } deriving Show
 
-initialConnection :: IO Connection
-initialConnection = Connection initialConnectionId <$> getCurrentTime
+-- placeholder for the first 'connect'
+initialConnection :: Connection
+initialConnection = Connection initialConnectionId (posixSecondsToUTCTime 0)
+
+establishedConnection :: ConnectionId -> IO Connection
+establishedConnection cid = Connection cid <$> getCurrentTime
 
 isExpired :: Connection -> IO Bool
 isExpired Connection {..} = do
@@ -284,46 +289,21 @@ isExpired Connection {..} = do
   return $ timeDiff > connectionLifetime
 
 {-----------------------------------------------------------------------
-  RPC
+--  Basic transaction
 -----------------------------------------------------------------------}
-
-maxPacketSize :: Int
-maxPacketSize = 98 -- announce request packet
 
 call :: Manager -> SockAddr -> ByteString -> IO ByteString
 call Manager {..} addr arg = do
   BS.sendAllTo sock arg addr
-  (res, addr') <- BS.recvFrom sock maxPacketSize
+  (res, addr') <- BS.recvFrom sock (optMaxPacketSize options)
   unless (addr' == addr) $ do
     throwIO $ userError "address mismatch"
   return res
 
-data UDPTracker = UDPTracker
-    { trackerURI        :: URI
-    , trackerConnection :: IORef Connection
-    }
-
-updateConnection :: ConnectionId -> UDPTracker -> IO ()
-updateConnection cid UDPTracker {..} = do
-  newConnection <- Connection cid <$> getCurrentTime
-  writeIORef trackerConnection newConnection
-
-getConnectionId :: UDPTracker -> IO ConnectionId
-getConnectionId UDPTracker {..}
-  = connectionId <$> readIORef trackerConnection
-
-putTracker :: UDPTracker -> IO ()
-putTracker UDPTracker {..} = do
-  print trackerURI
-  print =<< readIORef trackerConnection
-
-transaction :: Manager -> UDPTracker -> Request -> IO Response
-transaction m tracker @ UDPTracker {..} request = do
-  cid <- getConnectionId tracker
+transaction :: Manager -> SockAddr -> Connection -> Request -> IO Response
+transaction m addr conn request = do
   tid <- genTransactionId
-  let trans = TransactionQ cid tid request
-
-  addr <- getTrackerAddr m trackerURI
+  let trans = TransactionQ (connectionId conn) tid request
   res  <- call m addr (encode trans)
   case decode res of
     Right (TransactionR {..})
@@ -331,47 +311,48 @@ transaction m tracker @ UDPTracker {..} request = do
       |   otherwise     -> throwIO $ userError "transaction id mismatch"
     Left msg            -> throwIO $ userError msg
 
-connectUDP :: Manager -> UDPTracker -> IO ConnectionId
-connectUDP m tracker = do
-  resp <- transaction m tracker Connect
+{-----------------------------------------------------------------------
+--  Connection cache
+-----------------------------------------------------------------------}
+
+connect :: Manager -> SockAddr -> Connection -> IO ConnectionId
+connect m addr conn = do
+  resp <- transaction m addr conn Connect
   case resp of
     Connected cid -> return cid
     Failed    msg -> throwIO $ userError $ T.unpack msg
     _             -> throwIO $ userError "connect: response type mismatch"
 
-connect :: Manager -> URI -> IO UDPTracker
-connect m uri = do
-  tracker <- UDPTracker uri <$> (newIORef =<< initialConnection)
-  connId  <- connectUDP m tracker
-  updateConnection connId tracker
-  return tracker
+newConnection :: Manager -> SockAddr -> IO Connection
+newConnection m addr = do
+  connId  <- connect m addr initialConnection
+  establishedConnection connId
 
-freshConnection :: Manager -> UDPTracker -> IO ()
-freshConnection m tracker @ UDPTracker {..} = do
-  conn    <- readIORef trackerConnection
+refreshConnection :: Manager -> SockAddr -> Connection -> IO Connection
+refreshConnection mgr addr conn = do
   expired <- isExpired conn
-  when expired $ do
-    connId <- connectUDP m tracker
-    updateConnection connId tracker
+  if expired
+    then do
+      connId <- connect mgr addr conn
+      establishedConnection connId
+    else do
+      return conn
 
-getConnection :: Manager -> URI -> IO Connection
-getConnection _ = undefined
+withCache :: Manager -> SockAddr
+          -> (Maybe Connection -> IO Connection) -> IO Connection
+withCache mgr addr action = do
+  cache <- readIORef (connectionCache mgr)
+  conn  <- action (M.lookup addr cache)
+  writeIORef (connectionCache mgr) (M.insert addr conn cache)
+  return conn
 
-announce :: Manager -> AnnounceQuery -> UDPTracker -> IO AnnounceInfo
-announce m ann tracker = do
-  freshConnection m tracker
-  resp <- transaction m tracker (Announce ann)
-  case resp of
-    Announced info -> return info
-    _              -> fail "announce: response type mismatch"
+getConnection :: Manager -> SockAddr -> IO Connection
+getConnection mgr addr = withCache mgr addr $
+  maybe (newConnection mgr addr) (refreshConnection mgr addr)
 
-scrape :: Manager -> ScrapeQuery -> UDPTracker -> IO ScrapeInfo
-scrape m ihs tracker = do
-  freshConnection m tracker
-  resp <- transaction m tracker (Scrape ihs)
-  case resp of
-    Scraped info -> return $ L.zip ihs info
-    _            -> fail "scrape: response type mismatch"
+{-----------------------------------------------------------------------
+--  RPC
+-----------------------------------------------------------------------}
 
 retransmission :: Options -> IO a -> IO a
 retransmission Options {..} action = go optMinTimeout
@@ -381,3 +362,24 @@ retransmission Options {..} action = go optMinTimeout
       |         otherwise          = do
         r <- timeout curTimeout action
         maybe (go (2 * curTimeout)) return r
+
+queryTracker :: Manager -> URI -> Request -> IO Response
+queryTracker mgr uri req = do
+  addr <- getTrackerAddr mgr uri
+  retransmission (options mgr) $ do
+    conn <- getConnection  mgr addr
+    transaction mgr addr conn req
+
+announce :: Manager -> URI -> AnnounceQuery -> IO AnnounceInfo
+announce mgr uri q = do
+  resp <- queryTracker mgr uri (Announce q)
+  case resp of
+    Announced info -> return info
+    _              -> fail "announce: response type mismatch"
+
+scrape :: Manager -> URI -> ScrapeQuery -> IO ScrapeInfo
+scrape mgr uri ihs = do
+  resp <- queryTracker mgr uri (Scrape ihs)
+  case resp of
+    Scraped info -> return $ L.zip ihs info
+    _            -> fail "scrape: response type mismatch"
