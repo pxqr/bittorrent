@@ -2,8 +2,8 @@
 --   Copyright   :  (c) Sam Truzjan 2013
 --   License     :  BSD
 --   Maintainer  :  pxqr.sta@gmail.com
---   Stability   :  experimental
---   Portability :  non-portable
+--   Stability   :  provisional
+--   Portability :  portable
 --
 --   The tracker is an HTTP/HTTPS service used to discovery peers for
 --   a particular existing torrent and keep statistics about the
