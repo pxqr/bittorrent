@@ -13,6 +13,7 @@
 --   For more information see:
 --   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
 --
+{-# LANGUAGE DeriveDataTypeable #-}
 module Network.BitTorrent.Tracker.RPC.HTTP
        ( -- * Manager
          Options (..)
@@ -22,6 +23,7 @@ module Network.BitTorrent.Tracker.RPC.HTTP
        , withManager
 
          -- * RPC
+       , RpcException (..)
        , announce
        , scrape
        , scrapeOne
@@ -37,6 +39,7 @@ import Data.ByteString.Lazy  as BL
 import Data.Default
 import Data.List as L
 import Data.Monoid
+import Data.Typeable
 import Network.URI
 import           Network.HTTP.Conduit hiding
                  (Manager, newManager, closeManager, withManager)
@@ -48,6 +51,22 @@ import           Network.HTTP.Types.URI    (SimpleQuery, renderSimpleQuery)
 import Data.Torrent.InfoHash               (InfoHash)
 import Network.BitTorrent.Core.Fingerprint (libUserAgent)
 import Network.BitTorrent.Tracker.Message
+
+{-----------------------------------------------------------------------
+-- Exceptions
+-----------------------------------------------------------------------}
+
+data RpcException
+  = RequestFailed HttpException -- ^ failed HTTP request.
+  | ParserFailure String        -- ^ unable to decode tracker response;
+  | ScrapelessTracker           -- ^ tracker do not support scraping;
+  | BadScrape                   -- ^ unable to find info hash in response dict;
+    deriving (Show, Typeable)
+
+instance Exception RpcException
+
+packHttpException :: IO a -> IO a
+packHttpException m = try m >>= either (throwIO . RequestFailed) return
 
 {-----------------------------------------------------------------------
 --  Manager
@@ -109,9 +128,9 @@ fillRequest Options {..} q r = r
 httpTracker :: BEncode a => Manager -> URI -> SimpleQuery -> IO a
 httpTracker Manager {..} uri q = do
   request  <- fillRequest options q <$> setUri def uri
-  response <- runResourceT $ httpLbs request httpMgr
+  response <- packHttpException $ runResourceT $ httpLbs request httpMgr
   case BE.decode $ BL.toStrict $ responseBody response of
-    Left  msg  -> error $ "httpTracker: " ++ msg
+    Left  msg  -> throwIO (ParserFailure msg)
     Right info -> return info
 
 {-----------------------------------------------------------------------
@@ -120,6 +139,8 @@ httpTracker Manager {..} uri q = do
 
 -- | Send request and receive response from the tracker specified in
 -- announce list.
+--
+--   This function can throw 'RpcException'.
 --
 announce :: Manager -> URI -> AnnounceQuery -> IO AnnounceInfo
 announce mgr uri q = httpTracker mgr uri (renderAnnounceRequest uriQ)
@@ -148,17 +169,21 @@ scrapeURL uri = do
 --   However if the info hash list is 'null', the tracker should list
 --   all available torrents.
 --
+--   This function can throw 'RpcException'.
+--
 scrape :: Manager -> URI -> ScrapeQuery -> IO ScrapeInfo
 scrape m u q = do
   case scrapeURL u of
-    Nothing  -> error "Tracker do not support scraping"
+    Nothing  -> throwIO ScrapelessTracker
     Just uri -> httpTracker m uri (renderScrapeQuery q)
 
 -- | More particular version of 'scrape', just for one torrent.
+--
+--   This function can throw RpcException.
 --
 scrapeOne :: Manager -> URI -> InfoHash -> IO ScrapeEntry
 scrapeOne m uri ih = do
   xs <- scrape m uri [ih]
   case L.lookup ih xs of
-    Nothing -> error "unable to find info hash in response dict"
+    Nothing -> throwIO BadScrape
     Just a  -> return a
