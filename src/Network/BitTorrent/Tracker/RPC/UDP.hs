@@ -12,6 +12,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE TypeFamilies               #-}
 module Network.BitTorrent.Tracker.RPC.UDP
        ( -- * Manager
@@ -22,6 +23,7 @@ module Network.BitTorrent.Tracker.RPC.UDP
        , withManager
 
          -- * RPC
+       , RpcException (..)
        , announce
        , scrape
        ) where
@@ -41,6 +43,7 @@ import Data.Text as T
 import Data.Text.Encoding
 import Data.Time
 import Data.Time.Clock.POSIX
+import Data.Typeable
 import Data.Word
 import Text.Read (readMaybe)
 import Network.Socket hiding (Connected, connect)
@@ -71,7 +74,11 @@ defMaxPacketSize = 98
 
 data Options = Options
   { optMaxPacketSize :: {-# UNPACK #-} !Int
+
+    -- | in seconds.
   , optMinTimeout    :: {-# UNPACK #-} !Int
+
+    -- | in seconds.
   , optMaxTimeout    :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
 
@@ -102,6 +109,47 @@ withManager :: Options -> (Manager -> IO a) -> IO a
 withManager opts = bracket (newManager opts) closeManager
 
 {-----------------------------------------------------------------------
+--  Exceptions
+-----------------------------------------------------------------------}
+
+data RpcException
+    -- | Unable to lookup hostname;
+  = HostUnknown
+
+    -- | Unable to lookup hostname;
+  | HostLookupFailed
+
+    -- | Tracker exists but not responding for specific number of seconds.
+  | TrackerNotResponding Int
+
+    -- | Source\/destination socket address mismatch.
+    --
+    --   WARNING: This is a BUG and will be fixed!
+    --
+  | UnexpectedSource
+
+    -- | Source\/destination transaction id mismatch.
+    --
+    --   WARNING: This is a BUG and will be fixed!
+    --
+  | TransactionFailed
+
+    -- | Unable to decode tracker response;
+  | ParserFailure String
+
+    -- | Tracker respond with unexpected message type.
+  | UnexpectedResponse
+    { expectedMsg :: String
+    , actualMsg   :: String
+    }
+
+    -- | RPC succeed, but tracker respond with error code.
+  | QueryFailed Text
+    deriving (Show, Typeable)
+
+instance Exception RpcException
+
+{-----------------------------------------------------------------------
 --  Host Addr resolution
 -----------------------------------------------------------------------}
 
@@ -116,8 +164,8 @@ resolveURI URI { uriAuthority = Just (URIAuth {..}) } = do
   let port = fromMaybe 0 (readMaybe (L.drop 1 uriPort) :: Maybe Int)
   case infos of
     AddrInfo {..} : _ -> return $ setPort (fromIntegral port) addrAddress
-    _                 -> fail "getTrackerAddr: unable to lookup host addr"
-resolveURI _       = fail "getTrackerAddr: hostname unknown"
+    _                 -> throwIO HostLookupFailed
+resolveURI _       = throwIO HostUnknown
 
 -- TODO caching?
 getTrackerAddr :: Manager -> URI -> IO SockAddr
@@ -169,6 +217,12 @@ data Response = Connected ConnectionId
               | Scraped   [ScrapeEntry]
               | Failed    Text
                 deriving Show
+
+responseName :: Response -> String
+responseName (Connected _) = "connected"
+responseName (Announced _) = "announced"
+responseName (Scraped   _) = "scraped"
+responseName (Failed    _) = "failed"
 
 data family Transaction a
 data instance Transaction Request  = TransactionQ
@@ -297,7 +351,7 @@ call Manager {..} addr arg = do
   BS.sendAllTo sock arg addr
   (res, addr') <- BS.recvFrom sock (optMaxPacketSize options)
   unless (addr' == addr) $ do
-    throwIO $ userError "address mismatch"
+    throwIO $ UnexpectedSource
   return res
 
 transaction :: Manager -> SockAddr -> Connection -> Request -> IO Response
@@ -308,8 +362,8 @@ transaction m addr conn request = do
   case decode res of
     Right (TransactionR {..})
       | tid == transIdR -> return response
-      |   otherwise     -> throwIO $ userError "transaction id mismatch"
-    Left msg            -> throwIO $ userError msg
+      |   otherwise     -> throwIO $ TransactionFailed
+    Left msg            -> throwIO $ ParserFailure msg
 
 {-----------------------------------------------------------------------
 --  Connection cache
@@ -320,8 +374,8 @@ connect m addr conn = do
   resp <- transaction m addr conn Connect
   case resp of
     Connected cid -> return cid
-    Failed    msg -> throwIO $ userError $ T.unpack msg
-    _             -> throwIO $ userError "connect: response type mismatch"
+    Failed    msg -> throwIO $ QueryFailed msg
+    _ -> throwIO $ UnexpectedResponse "connected" (responseName resp)
 
 newConnection :: Manager -> SockAddr -> IO Connection
 newConnection m addr = do
@@ -358,7 +412,7 @@ retransmission :: Options -> IO a -> IO a
 retransmission Options {..} action = go optMinTimeout
   where
     go curTimeout
-      | curTimeout > optMaxTimeout = throwIO $ userError "tracker down"
+      | curTimeout > optMaxTimeout = throwIO $ TrackerNotResponding curTimeout
       |         otherwise          = do
         r <- timeout curTimeout action
         maybe (go (2 * curTimeout)) return r
@@ -370,16 +424,18 @@ queryTracker mgr uri req = do
     conn <- getConnection  mgr addr
     transaction mgr addr conn req
 
+-- | This function can throw 'RpcException'.
 announce :: Manager -> URI -> AnnounceQuery -> IO AnnounceInfo
 announce mgr uri q = do
   resp <- queryTracker mgr uri (Announce q)
   case resp of
     Announced info -> return info
-    _              -> fail "announce: response type mismatch"
+    _ -> throwIO $ UnexpectedResponse "announce" (responseName resp)
 
+-- | This function can throw 'RpcException'.
 scrape :: Manager -> URI -> ScrapeQuery -> IO ScrapeInfo
 scrape mgr uri ihs = do
   resp <- queryTracker mgr uri (Scrape ihs)
   case resp of
     Scraped info -> return $ L.zip ihs info
-    _            -> fail "scrape: response type mismatch"
+    _ -> throwIO $ UnexpectedResponse "scrape" (responseName resp)
