@@ -56,6 +56,7 @@ import Data.Bits.Extras
 import           Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Base64 as Base64
+import Data.Default
 import Data.Int
 import Data.Text.Encoding as T
 import Data.Typeable
@@ -170,6 +171,10 @@ instance FromJSON HashList where
   parseJSON = withText "HashArray" $
     either fail (return . HashList) . Base64.decode . T.encodeUtf8
 
+-- | Empty hash list.
+instance Default HashList where
+  def = HashList ""
+
 -- | Part of torrent file used for torrent content validation.
 data PieceInfo = PieceInfo
   { piPieceLength  :: {-# UNPACK #-} !PieceSize
@@ -188,6 +193,9 @@ makeLensesFor [("piPieceLength", "pieceLength")] ''PieceInfo
 makeLensesFor [("piPieceHashes", "pieceHashes")] ''PieceInfo
 
 instance NFData PieceInfo
+
+instance Default PieceInfo where
+  def = PieceInfo 1 def
 
 instance Lint PieceInfo where
   lint pinfo @ PieceInfo {..}

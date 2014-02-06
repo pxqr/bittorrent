@@ -140,6 +140,10 @@ instance Hashable InfoDict where
   hashWithSalt = Hashable.hashUsing idInfoHash
   {-# INLINE hashWithSalt #-}
 
+-- | Empty info dictionary with zero-length content.
+instance Default InfoDict where
+  def = infoDictionary def def False
+
 -- | Smart constructor: add a info hash to info dictionary.
 infoDictionary :: LayoutInfo -> PieceInfo -> Bool -> InfoDict
 infoDictionary li pinfo private = InfoDict ih li pinfo private
@@ -339,6 +343,10 @@ instance Pretty Torrent where
         "Publisher"     <:>? ((text . show) <$> tPublisher)    $$
         "Publisher URL" <:>? ((text . show) <$> tPublisherURL) $$
         "Signature"     <:>? ((text . show) <$> tSignature)
+
+-- | No files, no trackers, no nodes, etc...
+instance Default Torrent where
+  def = nullTorrent def
 
 -- | A simple torrent contains only required fields.
 nullTorrent :: InfoDict -> Torrent

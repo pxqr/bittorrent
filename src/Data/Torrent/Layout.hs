@@ -71,6 +71,7 @@ import Data.BEncode.Types
 import Data.ByteString as BS
 import Data.ByteString.Base16 as Base16
 import Data.ByteString.Char8 as BC
+import Data.Default
 import Data.Foldable as F
 import Data.List as L
 import Data.Text as T
@@ -221,6 +222,10 @@ makeLensesFor
 instance NFData LayoutInfo where
   rnf SingleFile {..} = ()
   rnf MultiFile  {..} = rnf liFiles
+
+-- | Empty multifile layout.
+instance Default LayoutInfo where
+  def = MultiFile [] ""
 
 getLayoutInfo :: Get LayoutInfo
 getLayoutInfo = single <|> multi
