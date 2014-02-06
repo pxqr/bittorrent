@@ -30,7 +30,7 @@ spec = do
         it "have valid response" $ do
           withManager def pinfo $ \ mgr -> do
             q    <- arbitrarySample
-            info <- announce mgr uri q
+            _    <- announce mgr uri q
             return ()
 
       describe "scrape" $ do
