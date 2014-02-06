@@ -7,6 +7,7 @@
 --
 --   Protocol independent bittorrent tracker API.
 --
+{-# LANGUAGE DeriveDataTypeable #-}
 module Network.BitTorrent.Tracker.RPC
        ( PeerInfo (..)
 
@@ -19,12 +20,14 @@ module Network.BitTorrent.Tracker.RPC
 
          -- * RPC
        , SAnnounceQuery (..)
+       , RpcException (..)
        , announce
        , scrape
        ) where
 
 import Control.Exception
 import Data.Default
+import Data.Typeable
 import Network
 import Network.URI
 import Network.Socket (HostAddress)
@@ -114,17 +117,31 @@ withManager :: Options -> PeerInfo -> (Manager -> IO a) -> IO a
 withManager opts info = bracket (newManager opts info) closeManager
 
 {-----------------------------------------------------------------------
+--  Exceptions
+-----------------------------------------------------------------------}
+-- TODO Catch IO exceptions on rpc calls (?)
+
+data RpcException
+  = UdpException    UDP.RpcException  -- ^
+  | HttpException   HTTP.RpcException -- ^
+  | UnknownProtocol String            -- ^ unknown tracker protocol scheme
+    deriving (Show, Typeable)
+
+instance Exception RpcException
+
+packException :: Exception e => (e -> RpcException) -> IO a -> IO a
+packException f m = try m >>= either (throwIO . f) return
+{-# INLINE packException #-}
+
+{-----------------------------------------------------------------------
 --  RPC calls
 -----------------------------------------------------------------------}
--- TODO Catch IO exceptions on rpc calls.
 
 dispatch :: URI -> IO a -> IO a -> IO a
 dispatch URI {..} http udp
-  | uriScheme == "http:" = http
-  | uriScheme == "udp:"  = udp
-  |       otherwise      = throwIO $ userError msg
-  where
-    msg  = "unknown tracker protocol scheme: " ++ show uriScheme
+  | uriScheme == "http:" = packException HttpException http
+  | uriScheme == "udp:"  = packException UdpException  udp
+  |       otherwise      = throwIO $ UnknownProtocol uriScheme
 
 announce :: Manager -> URI -> SAnnounceQuery -> IO AnnounceInfo
 announce Manager {..} uri simpleQuery
