@@ -122,9 +122,10 @@ withManager opts info = bracket (newManager opts info) closeManager
 -- TODO Catch IO exceptions on rpc calls (?)
 
 data RpcException
-  = UdpException    UDP.RpcException  -- ^
-  | HttpException   HTTP.RpcException -- ^
-  | UnknownProtocol String            -- ^ unknown tracker protocol scheme
+  = UdpException    UDP.RpcException  -- ^ UDP RPC driver failure;
+  | HttpException   HTTP.RpcException -- ^ HTTP RPC driver failure;
+  | UnrecognizedProtocol String       -- ^ unsupported scheme in announce URI;
+  | GenericException     String       -- ^ for furter extensibility.
     deriving (Show, Typeable)
 
 instance Exception RpcException
@@ -141,7 +142,7 @@ dispatch :: URI -> IO a -> IO a -> IO a
 dispatch URI {..} http udp
   | uriScheme == "http:" = packException HttpException http
   | uriScheme == "udp:"  = packException UdpException  udp
-  |       otherwise      = throwIO $ UnknownProtocol uriScheme
+  |       otherwise      = throwIO $ UnrecognizedProtocol uriScheme
 
 announce :: Manager -> URI -> SAnnounceQuery -> IO AnnounceInfo
 announce Manager {..} uri simpleQuery
