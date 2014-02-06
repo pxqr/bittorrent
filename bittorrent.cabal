@@ -74,7 +74,7 @@ library
 --                     Network.BitTorrent.Exchange.Session
                        Network.BitTorrent.Exchange.Status
                        Network.BitTorrent.Exchange.Wire
---                     Network.BitTorrent.Tracker
+                       Network.BitTorrent.Tracker.List
                        Network.BitTorrent.Tracker.Message
                        Network.BitTorrent.Tracker.RPC
                        Network.BitTorrent.Tracker.RPC.HTTP
@@ -153,12 +153,15 @@ library
                      , wai          >= 1.4 && < 2.0
                      , iproute
 
+                       -- RNG/PRNG
+                     , entropy        >= 0.2
+                     , random         >= 1.0.0.2
+                     , random-shuffle >= 0.0.0.4
+
                        -- System
                      , directory   >= 1.2
-                     , entropy     >= 0.2
                      , filepath    >= 1.3
                      , mmap        >= 0.5
-                     , random      >= 1.0.0.2
 
   ghc-options:         -Wall
   ghc-prof-options:
