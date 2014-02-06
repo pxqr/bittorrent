@@ -11,12 +11,26 @@ import Test.Hspec
 import Network.BitTorrent.Tracker.MessageSpec hiding (spec)
 import Network.BitTorrent.Tracker.RPC.UDP
 
+import Network.BitTorrent.Core
+import Network.BitTorrent.Tracker.Message as Message
+
 
 trackerURIs :: [URI]
 trackerURIs =
   [ fromJust $ parseURI "udp://tracker.openbittorrent.com:80/announce"
   , fromJust $ parseURI "udp://tracker.publicbt.com:80/announce"
   ]
+
+validateInfo :: AnnounceQuery -> AnnounceInfo -> Expectation
+validateInfo _ Message.Failure {..} = error "validateInfo: failure"
+validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
+    respComplete    `shouldSatisfy` isJust
+    respIncomplete  `shouldSatisfy` isJust
+    respMinInterval `shouldSatisfy` isNothing
+    respWarning     `shouldSatisfy` isNothing
+    peerList `shouldSatisfy` L.all (isNothing . peerId)
+  where
+    peerList = getPeerList respPeers
 
 spec :: Spec
 spec = do

@@ -4,7 +4,6 @@
 {-# OPTIONS -fno-warn-orphans  #-}
 module Network.BitTorrent.Tracker.MessageSpec
        ( spec
-       , validateInfo
        , arbitrarySample
        ) where
 
@@ -53,19 +52,6 @@ instance Arbitrary AnnounceInfo where
   arbitrary = AnnounceInfo
     <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
     <*> arbitrary <*> arbitrary
-
-validateInfo :: AnnounceQuery -> AnnounceInfo -> Expectation
-validateInfo _ Message.Failure {..} = error "validateInfo: failure"
-validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
-    respComplete    `shouldSatisfy` isJust
-    respIncomplete  `shouldSatisfy` isJust
-    respMinInterval `shouldSatisfy` isNothing
-    respWarning     `shouldSatisfy` isNothing
-    peerList `shouldSatisfy` L.all (isNothing . peerId)
-    fromJust respComplete + fromJust respIncomplete
-       `shouldBe` L.length peerList
-  where
-    peerList = getPeerList respPeers
 
 arbitrarySample :: Arbitrary a => IO a
 arbitrarySample = L.head <$> sample' arbitrary
