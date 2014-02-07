@@ -80,7 +80,6 @@ library
                        Network.BitTorrent.Tracker.RPC.HTTP
                        Network.BitTorrent.Tracker.RPC.UDP
                        Network.BitTorrent.Tracker.Wai
---                     Network.BitTorrent.Tracker.Session
                        System.Torrent.FileMap
                        System.Torrent.Storage
   other-modules:       Paths_bittorrent
@@ -189,6 +188,7 @@ test-suite spec
                        Network.BitTorrent.DHT.MessageSpec
                        Network.BitTorrent.DHT.RoutingSpec
                        Network.BitTorrent.DHT.TokenSpec
+                       Network.BitTorrent.Tracker.ListSpec
                        Network.BitTorrent.Tracker.MessageSpec
                        Network.BitTorrent.Tracker.RPCSpec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
