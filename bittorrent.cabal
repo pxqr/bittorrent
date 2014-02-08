@@ -190,7 +190,7 @@ test-suite spec
                        Network.BitTorrent.DHT.MessageSpec
                        Network.BitTorrent.DHT.RoutingSpec
                        Network.BitTorrent.DHT.TokenSpec
-                       Network.BitTorrent.Tracker.CacheSpeс
+                       Network.BitTorrent.Tracker.CacheSpec
                        Network.BitTorrent.Tracker.ListSpec
                        Network.BitTorrent.Tracker.MessageSpec
                        Network.BitTorrent.Tracker.RPCSpec
