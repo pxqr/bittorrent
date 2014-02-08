@@ -2,8 +2,9 @@ import Control.Lens
 import Data.Conduit
 import Data.Serialize as S
 
-import Data.BEncode as BE
 import Data.Torrent
-import Network.BitTorrent.DHT.Protocol
+import Network.BitTorrent.Client as Client
+import Network.BitTorrent.DHT as DHT
+import Network.BitTorrent.Tracker as Tracker
 import Network.BitTorrent.Exchange.Message
 import Network.BitTorrent.Exchange.Wire
