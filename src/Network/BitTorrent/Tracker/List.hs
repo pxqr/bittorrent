@@ -26,6 +26,7 @@ import Prelude hiding (mapM, foldr)
 import Control.Applicative
 import Control.Exception
 import Data.List as L (elem, any, filter, null)
+import Data.Maybe
 import Data.Foldable
 import Data.Traversable
 import Network.URI
@@ -95,9 +96,10 @@ fixList mxss mx = do
 
 -- | Extract set of trackers from torrent file. The 'tAnnounce' key is
 -- only ignored if the 'tAnnounceList' key is present.
-trackerList :: Torrent -> Maybe (TrackerList URI)
-trackerList Torrent {..} = TierList <$> (tAnnounceList `fixList` tAnnounce)
-                       <|> Announce <$>  tAnnounce
+trackerList :: Torrent -> TrackerList URI
+trackerList Torrent {..} = fromMaybe (TierList []) $ do
+       TierList <$> (tAnnounceList `fixList` tAnnounce)
+   <|> Announce <$>  tAnnounce
 
 -- | Shuffle /order of trackers/ in each tier, preserving original
 -- /order of tiers/. This can help to balance the load between the

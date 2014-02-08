@@ -18,14 +18,11 @@ uris = fmap (fromJust . parseURI . renderURI) [1..10 :: Int]
     renderURI n = "http://" ++ show n ++ ".org"
 
 list :: TrackerList URI
-list = fromJust $ trackerList def { tAnnounceList = Just [uris] }
+list = trackerList def { tAnnounceList = Just [uris] }
 
 spec :: Spec
 spec = do
   describe "TrackerList" $ do
-    it "trackerList is not empty" $ do
-      pending
-
     it "shuffleTiers (may fail with very small probability)" $ do
       list' <- shuffleTiers list
       list' `shouldSatisfy` (/= list)
