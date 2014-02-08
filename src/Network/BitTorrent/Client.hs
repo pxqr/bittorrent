@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell            #-}
 module Network.BitTorrent.Client
        ( -- * Options
          Options (..)
@@ -15,142 +16,92 @@ module Network.BitTorrent.Client
        , newClient
        , closeClient
        , withClient
+       , simpleClient
 
          -- * BitTorrent monad
+       , MonadBitTorrent (..)
        , BitTorrent
        , runBitTorrent
-       , MonadBitTorrent (..)
        , getClient
 
-         -- * Operations
-       , addTorrent
+         -- * Handle
+       , openTorrent
+       , openMagnet
+       , closeHandle
        ) where
 
 import Control.Exception
-import Control.Concurrent.STM
-import Control.Monad.Logger
-import Control.Monad.Reader
+import Control.Concurrent
 import Control.Monad.Trans.Resource
+
 import Data.Default
-import Data.Function
 import Data.HashMap.Strict as HM
 import Data.Maybe
-import Data.Ord
 import Data.Text
 import Network
-import System.Log.FastLogger
 
-import Data.Torrent
-import Data.Torrent.InfoHash
-import Network.BitTorrent.Client.Swarm
+import Network.BitTorrent.Client.Types
+import Network.BitTorrent.Client.Handle
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT
+import Network.BitTorrent.Tracker as Tracker hiding (Options)
 import Network.BitTorrent.Exchange.Message
 
 
 data Options = Options
-  { fingerprint :: Fingerprint
-  , name        :: Text
-  , port        :: PortNumber
-  , extensions  :: [Extension]
-  , nodeAddr    :: NodeAddr IPv4
-  , bootNode    :: Maybe (NodeAddr IPv4)
+  { optFingerprint :: Fingerprint
+  , optName        :: Text
+  , optPort        :: PortNumber
+  , optExtensions  :: [Extension]
+  , optNodeAddr    :: NodeAddr IPv4
+  , optBootNode    :: Maybe (NodeAddr IPv4)
   }
 
 instance Default Options where
   def = Options
-    { fingerprint = def
-    , name        = "hs-bittorrent"
-    , port        = 6882
-    , extensions  = []
-    , nodeAddr    = "0.0.0.0:6882"
-    , bootNode    = Nothing
+    { optFingerprint = def
+    , optName        = "hs-bittorrent"
+    , optPort        = 6882
+    , optExtensions  = []
+    , optNodeAddr    = "0.0.0.0:6882"
+    , optBootNode    = Nothing
     }
-
-data Client = Client
-  { clientPeerId       :: !PeerId
-  , clientListenerPort :: !PortNumber
-  , allowedExtensions  :: !Caps
-  , clientNode         :: !(Node IPv4)
-  , clientTorrents     :: !(TVar (HashMap InfoHash Swarm))
-  , clientLogger       :: !LogFun
--- , trackerClient     :: !(Manager)
-  }
-
-instance Eq Client where
-  (==) = (==) `on` clientPeerId
-
-instance Ord Client where
-  compare = comparing clientPeerId
 
 newClient :: Options -> LogFun -> IO Client
 newClient Options {..} logger = do
   pid  <- genPeerId
-  ts   <- newTVarIO HM.empty
+  ts   <- newMVar HM.empty
+  let peerInfo = PeerInfo pid Nothing optPort
+  mgr  <- Tracker.newManager def peerInfo
   node <- runResourceT $ do
-    node <- startNode handlers def nodeAddr logger
-    runDHT node $ bootstrap (maybeToList bootNode)
+    node <- startNode handlers def optNodeAddr logger
+    runDHT node $ bootstrap (maybeToList optBootNode)
     return node
 
   return Client
     { clientPeerId       = pid
-    , clientListenerPort = port
-    , allowedExtensions  = toCaps extensions
-    , clientTorrents     = ts
+    , clientListenerPort = optPort
+    , allowedExtensions  = toCaps optExtensions
+    , trackerManager     = mgr
     , clientNode         = node
+    , clientTorrents     = ts
     , clientLogger       = logger
     }
 
 closeClient :: Client -> IO ()
 closeClient Client {..} = do
+  Tracker.closeManager trackerManager
   return ()
 --  closeNode clientNode
 
 withClient :: Options -> LogFun -> (Client -> IO a) -> IO a
-withClient opts log action = bracket (newClient opts log) closeClient action
+withClient opts lf action = bracket (newClient opts lf) closeClient action
 
-{-----------------------------------------------------------------------
---  BitTorrent monad
------------------------------------------------------------------------}
-
-class MonadBitTorrent m where
-  liftBT :: BitTorrent a -> m a
-
-newtype BitTorrent a = BitTorrent
-  { unBitTorrent :: ReaderT Client (ResourceT IO) a
-  } deriving (Monad, MonadIO)
-
-instance MonadBitTorrent BitTorrent where
-  liftBT = id
-
-instance MonadDHT BitTorrent where
-  liftDHT action = BitTorrent $ do
-    node <- asks clientNode
-    liftIO $ runResourceT $ runDHT node action
-
-instance MonadLogger BitTorrent where
-  monadLoggerLog loc src lvl msg = BitTorrent $ do
-    logger <- asks clientLogger
-    liftIO $ logger loc src lvl (toLogStr msg)
-
-runBitTorrent :: Client -> BitTorrent a -> IO a
-runBitTorrent client action = runResourceT $
-  runReaderT (unBitTorrent action) client
-{-# INLINE runBitTorrent #-}
-
-getClient :: BitTorrent Client
-getClient = BitTorrent ask
-
-{-----------------------------------------------------------------------
---  Operations
------------------------------------------------------------------------}
--- All operations should be non blocking!
-
-addTorrent :: Torrent -> BitTorrent ()
-addTorrent t = do
-  Client {..} <- getClient
-  liftIO $ do
-    leecher <- newLeecher clientPeerId clientListenerPort t
-    let ih = idInfoHash (tInfoDict t)
-    atomically $ modifyTVar' clientTorrents (HM.insert ih leecher)
-    askPeers leecher >>= print
+-- | Run bittorrent client with default options and log to @stderr@.
+--
+--   For testing purposes only.
+--
+simpleClient :: BitTorrent () -> IO ()
+simpleClient m = withClient def logger (`runBitTorrent` m)
+  where
+    logger _ _ _ _ = return ()

@@ -1,17 +1,22 @@
 module Main (main) where
-
-import Control.Concurrent
-import Data.Default
 import System.Environment
-import Text.PrettyPrint.Class
-
+import System.Exit
+import System.IO
 import Network.BitTorrent
 
+parseArgs :: IO FilePath
+parseArgs = do
+  args <- getArgs
+  case args of
+    [path] -> return path
+    _      -> do
+      hPutStrLn stderr "Usage: client file.torrent"
+      exitFailure
 
 main :: IO ()
 main = do
-  [path]  <- getArgs
+  path    <- parseArgs
   torrent <- fromFile path
-  let logger = \ _ _ _ _ -> return ()
-  withClient def logger $ flip runBitTorrent $ do
+  simpleClient $ do
+    h <- openTorrent torrent
     return ()

@@ -55,7 +55,8 @@ library
                        Data.Torrent.Tree
                        Network.BitTorrent
                        Network.BitTorrent.Client
-                       Network.BitTorrent.Client.Swarm
+                       Network.BitTorrent.Client.Types
+                       Network.BitTorrent.Client.Handle
                        Network.BitTorrent.Core
                        Network.BitTorrent.Core.Fingerprint
                        Network.BitTorrent.Core.NodeInfo
