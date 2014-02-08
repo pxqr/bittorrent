@@ -73,6 +73,10 @@ newtype PeerId = PeerId { getPeerId :: ByteString }
 peerIdLen :: Int
 peerIdLen = 20
 
+-- | For testing purposes only.
+instance Default PeerId where
+  def = azureusStyle defaultClientId defaultVersionNumber ""
+
 instance Hashable PeerId where
   hashWithSalt = hashUsing getPeerId
   {-# INLINE hashWithSalt #-}

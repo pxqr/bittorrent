@@ -47,9 +47,12 @@ import qualified Network.BitTorrent.Tracker.RPC.UDP  as UDP
 -- | Info to advertise to trackers.
 data PeerInfo = PeerInfo
   { peerId   :: !PeerId
-  , peerPort :: !PortNumber
   , peerIP   :: !(Maybe HostAddress)
+  , peerPort :: !PortNumber
   } deriving (Show, Eq)
+
+instance Default PeerInfo where
+  def = PeerInfo def Nothing 6881
 
 -- | Simplified announce query.
 data SAnnounceQuery = SAnnounceQuery

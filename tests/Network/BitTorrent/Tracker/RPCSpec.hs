@@ -15,9 +15,6 @@ import Network.BitTorrent.Tracker.RPC as RPC
 uris :: [URI]
 uris = UDP.trackerURIs ++ HTTP.trackerURIs
 
-pinfo :: PeerInfo
-pinfo = PeerInfo "-HS0003-203534.37422" 6000 Nothing
-
 instance Arbitrary SAnnounceQuery where
   arbitrary = SAnnounceQuery <$> arbitrary <*> arbitrary
                              <*> arbitrary <*> arbitrary
@@ -28,13 +25,13 @@ spec = do
     context (show uri) $ do
       describe "announce" $ do
         it "have valid response" $ do
-          withManager def pinfo $ \ mgr -> do
+          withManager def def $ \ mgr -> do
             q    <- arbitrarySample
             _    <- announce mgr uri q
             return ()
 
       describe "scrape" $ do
         it "have valid response" $ do
-          withManager def pinfo $ \ mgr -> do
+          withManager def def $ \ mgr -> do
             xs <- scrape mgr uri [def]
             L.length xs `shouldSatisfy` (>= 1)
