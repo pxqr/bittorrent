@@ -1,8 +1,11 @@
 module Main (main) where
+import Control.Concurrent
+import Control.Monad.Trans
 import System.Environment
 import System.Exit
 import System.IO
 import Network.BitTorrent
+
 
 parseArgs :: IO FilePath
 parseArgs = do
@@ -19,4 +22,5 @@ main = do
   torrent <- fromFile path
   simpleClient $ do
     h <- openTorrent torrent
-    return ()
+    start h
+    liftIO $ threadDelay 10000000000

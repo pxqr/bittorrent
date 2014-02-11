@@ -28,8 +28,9 @@ import Data.Torrent
 import Data.Torrent.InfoHash
 import Data.Torrent.Magnet
 import Network.BitTorrent.Client.Types
-import Network.BitTorrent.DHT     as DHT
-import Network.BitTorrent.Tracker as Tracker
+import Network.BitTorrent.DHT      as DHT
+import Network.BitTorrent.Exchange as Exchange
+import Network.BitTorrent.Tracker  as Tracker
 
 {-----------------------------------------------------------------------
 --  Safe handle set manupulation
@@ -74,8 +75,9 @@ openTorrent :: Torrent -> BitTorrent Handle
 openTorrent t @ Torrent {..} = do
   let ih = idInfoHash tInfoDict
   allocHandle ih $ do
-    ses <- liftIO (Tracker.newSession ih (trackerList t))
-    return $ Handle ih (idPrivate tInfoDict) ses
+    tses <- liftIO $ Tracker.newSession ih (trackerList t)
+    eses <- liftIO $ Exchange.newSession undefined undefined undefined
+    return $ Handle ih (idPrivate tInfoDict) tses eses
 
 -- | Use 'nullMagnet' to open handle from 'InfoHash'.
 openMagnet :: Magnet -> BitTorrent Handle
@@ -105,6 +107,9 @@ start Handle {..} = do
   liftIO $ Tracker.notify trackerManager trackers Tracker.Started
   unless private $ do
     liftDHT $ DHT.insert topic undefined
+  peers <- liftIO $ askPeers trackerManager trackers
+  forM_ peers $ \ peer -> do
+    liftIO $ Exchange.insert peer exchange
 
 -- | Stop downloading this torrent.
 pause :: Handle -> BitTorrent ()

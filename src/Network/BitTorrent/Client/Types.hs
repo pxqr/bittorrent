@@ -24,15 +24,15 @@ import System.Log.FastLogger
 
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
-import Network.BitTorrent.DHT     as DHT
-import Network.BitTorrent.Tracker as Tracker
-import Network.BitTorrent.Exchange.Message
-
+import Network.BitTorrent.DHT      as DHT
+import Network.BitTorrent.Exchange as Exchange
+import Network.BitTorrent.Tracker  as Tracker
 
 data Handle = Handle
   { topic    :: !InfoHash
   , private  :: !Bool
   , trackers :: !Tracker.Session
+  , exchange :: !Exchange.Session
   }
 
 data Client = Client
@@ -40,6 +40,7 @@ data Client = Client
   , clientListenerPort :: !PortNumber
   , allowedExtensions  :: !Caps
   , trackerManager     :: !Tracker.Manager
+  , exchangeManager    :: !Exchange.Manager
   , clientNode         :: !(Node IPv4)
   , clientTorrents     :: !(MVar (HashMap InfoHash Handle))
   , clientLogger       :: !LogFun

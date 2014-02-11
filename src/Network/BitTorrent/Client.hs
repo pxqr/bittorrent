@@ -28,6 +28,10 @@ module Network.BitTorrent.Client
        , openTorrent
        , openMagnet
        , closeHandle
+
+       , start
+       , pause
+       , stop
        ) where
 
 import Control.Exception
@@ -40,12 +44,13 @@ import Data.Maybe
 import Data.Text
 import Network
 
-import Network.BitTorrent.Client.Types
-import Network.BitTorrent.Client.Handle
-import Network.BitTorrent.Core
-import Network.BitTorrent.DHT
-import Network.BitTorrent.Tracker as Tracker hiding (Options)
-import Network.BitTorrent.Exchange.Message
+import           Network.BitTorrent.Client.Types
+import           Network.BitTorrent.Client.Handle
+import           Network.BitTorrent.Core
+import           Network.BitTorrent.DHT
+import           Network.BitTorrent.Tracker  as Tracker  hiding (Options)
+import           Network.BitTorrent.Exchange as Exchange hiding (Options)
+import qualified Network.BitTorrent.Exchange as Exchange (Options(..))
 
 
 data Options = Options
@@ -67,30 +72,40 @@ instance Default Options where
     , optBootNode    = Nothing
     }
 
+exchangeOptions :: PeerId -> Options -> Exchange.Options
+exchangeOptions pid Options {..} = Exchange.Options
+  { optPeerAddr = PeerAddr (Just pid) (peerHost def) optPort
+  , optBacklog  = optBacklog def
+  }
+
+--connHandler :: HashMap InfoHash Handle -> Handler
+connHandler tmap = undefined
+
 newClient :: Options -> LogFun -> IO Client
-newClient Options {..} logger = do
+newClient opts @ Options {..} logger = do
   pid  <- genPeerId
-  ts   <- newMVar HM.empty
-  let peerInfo = PeerInfo pid Nothing optPort
-  mgr  <- Tracker.newManager def peerInfo
+  tmap <- newMVar HM.empty
+  tmgr <- Tracker.newManager def (PeerInfo pid Nothing optPort)
+  emgr <- Exchange.newManager (exchangeOptions pid opts) connHandler
   node <- runResourceT $ do
     node <- startNode handlers def optNodeAddr logger
     runDHT node $ bootstrap (maybeToList optBootNode)
     return node
-
   return Client
     { clientPeerId       = pid
     , clientListenerPort = optPort
     , allowedExtensions  = toCaps optExtensions
-    , trackerManager     = mgr
+    , trackerManager     = tmgr
+    , exchangeManager    = emgr
     , clientNode         = node
-    , clientTorrents     = ts
+    , clientTorrents     = tmap
     , clientLogger       = logger
     }
 
 closeClient :: Client -> IO ()
 closeClient Client {..} = do
-  Tracker.closeManager trackerManager
+  Exchange.closeManager exchangeManager
+  Tracker.closeManager  trackerManager
   return ()
 --  closeNode clientNode
 

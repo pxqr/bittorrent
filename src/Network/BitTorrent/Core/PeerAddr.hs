@@ -240,6 +240,10 @@ instance (Serialize a) => Serialize (PeerAddr a) where
 instance Default (PeerAddr IPv4) where
   def = "127.0.0.1:6881"
 
+-- | @127.0.0.1:6881@
+instance Default (PeerAddr IP) where
+  def = IPv4 <$> def
+
 -- | Example:
 --
 --   @peerPort \"127.0.0.1:6881\" == 6881@
