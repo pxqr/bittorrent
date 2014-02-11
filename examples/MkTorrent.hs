@@ -361,7 +361,7 @@ exchangeTorrent ih addr = do
   pid <- genPeerId
   var <- newEmptyMVar
   let hs = Handshake def (toCaps [ExtExtended]) ih pid
-  connectWire hs addr (toCaps [ExtMetadata]) $ do
+  connectWire () hs addr (toCaps [ExtMetadata]) $ do
     infodict <- getMetadata
     liftIO $ putMVar var infodict
   takeMVar var

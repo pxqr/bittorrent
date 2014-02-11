@@ -8,7 +8,7 @@ module Network.BitTorrent.Exchange.Session
        , Network.BitTorrent.Exchange.Session.insert
        ) where
 
-import Control.Concurrent.STM
+import Control.Concurrent
 import Control.Exception
 import Control.Lens
 import Control.Monad.Reader
@@ -37,24 +37,23 @@ data ExchangeError
   | CorruptedPiece PieceIx
 
 data Session = Session
-  { peerId      :: PeerId
+  { tpeerId      :: PeerId
   , bitfield    :: Bitfield
   , assembler   :: Assembler
   , storage     :: Storage
   , unchoked    :: [PeerAddr IP]
-  , handler     :: Exchange ()
-  , connections :: Map (PeerAddr IP) Connection
+  , connections :: MVar (Map (PeerAddr IP) (Connection Session))
   }
+
 
 newSession :: PeerAddr IP -> Storage -> Bitfield -> IO Session
 newSession addr st bf = do
   return Session
-    { peerId      = undefined
+    { tpeerId     = undefined
     , bitfield    = undefined
     , assembler   = undefined
     , storage     = undefined
     , unchoked    = undefined
-    , handler     = undefined
     , connections = undefined
     }
 
@@ -76,7 +75,7 @@ deleteAll = undefined
 --  Event loop
 -----------------------------------------------------------------------}
 
-type Exchange = StateT Session (ReaderT Connection IO)
+type Exchange = StateT Session (ReaderT (Connection Session) IO)
 
 --runExchange :: Exchange () -> [PeerAddr] -> IO ()
 --runExchange exchange peers = do
