@@ -56,6 +56,7 @@ module Network.BitTorrent.Exchange.Wire
 
          -- ** Query
        , getConnection
+       , getSession
        , getExtCaps
        , getStats
        , getMetadata
@@ -570,6 +571,9 @@ getStats = lift $ use connStats
 -- | See the 'Connection' section for more info.
 getConnection :: Wire s (Connection s)
 getConnection = lift ask
+
+getSession :: Wire s s
+getSession = lift (asks connSession)
 
 {-----------------------------------------------------------------------
 --  Wrapper
