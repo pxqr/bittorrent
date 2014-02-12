@@ -3,6 +3,7 @@ module Network.BitTorrent.Client.Types
        ( -- * Core types
          Handle (..)
        , Client (..)
+       , externalAddr
 
          -- * Monad BitTorrent
        , BitTorrent (..)
@@ -51,6 +52,16 @@ instance Eq Client where
 
 instance Ord Client where
   compare = comparing clientPeerId
+
+-- | External IP address of a host running a bittorrent client
+-- software may be used to acknowledge remote peer the host connected
+-- to. See 'Network.BitTorrent.Exchange.Message.ExtendedHandshake'.
+externalAddr :: Client -> PeerAddr (Maybe IP)
+externalAddr Client {..} = PeerAddr
+  { peerId   = Just clientPeerId
+  , peerHost = Nothing -- TODO return external IP address, if known
+  , peerPort = clientListenerPort
+  }
 
 {-----------------------------------------------------------------------
 --  BitTorrent monad
