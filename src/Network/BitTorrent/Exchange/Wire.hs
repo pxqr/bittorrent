@@ -53,6 +53,7 @@ module Network.BitTorrent.Exchange.Wire
          -- ** Messaging
        , recvMessage
        , sendMessage
+       , filterQueue
 
          -- ** Query
        , getConnection
@@ -76,6 +77,7 @@ import Data.Conduit.List
 import Data.Conduit.Network
 import Data.Default
 import Data.IORef
+import Data.List as L
 import Data.Maybe
 import Data.Monoid
 import Data.Serialize as S
@@ -483,6 +485,8 @@ data Connection s = Connection
 
     -- | Environment data.
   , connSession      :: !s
+
+  , connChan         :: !(Chan Message)
   }
 
 instance Pretty (Connection s) where
@@ -635,6 +639,12 @@ sendMessage msg = do
   ecaps <- use connExtCaps
   yield $ envelop ecaps msg
 
+-- | Filter pending messages from send buffer.
+filterQueue :: (Message -> Bool) -> Wire s ()
+filterQueue p = lift $ do
+  chan <- asks connChan
+  liftIO $ getChanContents chan >>= writeList2Chan chan . L.filter p
+
 -- | Forcefully terminate wire session and close socket.
 disconnectPeer :: Wire s a
 disconnectPeer = monadThrow DisconnectPeer
@@ -708,6 +718,7 @@ connectWire session hs addr extCaps chan wire =
         , connOptions      = def
         , connState        = cstate
         , connSession      = session
+        , connChan         = chan
         }
 
 -- | Accept 'Wire' connection using already 'Network.Socket.accept'ed

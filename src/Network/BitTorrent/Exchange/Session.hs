@@ -169,9 +169,6 @@ handleMessage (Port      n) = undefined
 handleMessage (Fast      _) = undefined
 handleMessage (Extended  _) = undefined
 
-filterQueue :: (Message -> Bool) -> Wire s ()
-filterQueue = undefined
-
 exchange :: Wire Session ()
 exchange = do
   e <- recvMessage
