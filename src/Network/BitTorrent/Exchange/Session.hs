@@ -128,6 +128,30 @@ readBlock bix @ BlockIx {..} s = do
     else throwIO $ InvalidRequest bix (InvalidSize ixLength)
 -}
 
+handleTransfer :: Transfer -> Wire Session ()
+handleTransfer (Request bix) = do
+--    Session {..} <- getSession
+--    addr <- getRemoteAddr
+--    when (addr `elem` unchoked && ixPiece bix `BF.member` bitfield) $ do
+--      blk <- liftIO $ readBlock bix storage
+--      sendMsg (Piece blk)
+    return ()
+
+handleTransfer (Piece   blk) = do
+{-
+    Session {..} <- getSession
+    when (blockIx blk `PS.member` pendingSet) $ do
+      insert blk stalledSet
+      sendBroadcast have
+      maybe send not interested
+-}
+    return ()
+
+handleTransfer (Cancel  bix) = filterQueue (not . (transferResponse bix))
+  where
+    transferResponse bix (Transfer (Piece blk)) = blockIx blk == bix
+    transferResponse _    _                     = False
+
 handleMessage :: Message -> Wire Session ()
 handleMessage KeepAlive       = return ()
 handleMessage (Status s)      = undefined
@@ -141,33 +165,10 @@ handleMessage (Available msg) = do
       | bf `BF.isSubsetOf` thisBf -> return ()
       |     otherwise             -> undefined
 
-handleMessage (Transfer  msg) = case msg of
-  Request bix -> do
---    Session {..} <- getSession
---    addr <- getRemoteAddr
---    when (addr `elem` unchoked && ixPiece bix `BF.member` bitfield) $ do
---      blk <- liftIO $ readBlock bix storage
---      sendMsg (Piece blk)
-    return ()
-
-  Piece   blk -> do
-{-
-    Session {..} <- getSession
-    when (blockIx blk `PS.member` pendingSet) $ do
-      insert blk stalledSet
-      sendBroadcast have
-      maybe send not interested
--}
-    return ()
-
-  Cancel  bix -> filterQueue (not . (transferResponse bix))
-    where
-      transferResponse bix (Transfer (Piece blk)) = blockIx blk == bix
-      transferResponse _    _                     = False
-
-handleMessage (Port      n) = undefined
-handleMessage (Fast      _) = undefined
-handleMessage (Extended  _) = undefined
+handleMessage (Transfer  msg) = handleTransfer msg
+handleMessage (Port      n)   = undefined
+handleMessage (Fast      _)   = undefined
+handleMessage (Extended  _)   = undefined
 
 exchange :: Wire Session ()
 exchange = do
