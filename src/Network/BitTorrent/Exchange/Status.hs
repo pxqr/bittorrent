@@ -19,8 +19,8 @@ module Network.BitTorrent.Exchange.Status
        , updateStatus
        , statusUpdates
 
-         -- * Session status
-       , SessionStatus(..)
+         -- * Connection status
+       , ConnectionStatus(..)
        , clientStatus
        , remoteStatus
 
@@ -94,35 +94,35 @@ statusUpdates a b = catMaybes $
   ]
 
 {-----------------------------------------------------------------------
---  Session status
+--  Connection status
 -----------------------------------------------------------------------}
 
 -- | Status of the both endpoints.
-data SessionStatus = SessionStatus
+data ConnectionStatus = ConnectionStatus
   { _clientStatus :: !PeerStatus
   , _remoteStatus :: !PeerStatus
   } deriving (Show, Eq)
 
-$(makeLenses ''SessionStatus)
-$(deriveJSON omitRecordPrefix ''SessionStatus)
+$(makeLenses ''ConnectionStatus)
+$(deriveJSON omitRecordPrefix ''ConnectionStatus)
 
-instance Pretty SessionStatus where
-  pretty SessionStatus {..} =
+instance Pretty ConnectionStatus where
+  pretty ConnectionStatus {..} =
     "this  " <+> pretty _clientStatus $$
     "remote" <+> pretty _remoteStatus
 
 -- | Connections start out choked and not interested.
-instance Default SessionStatus where
-  def = SessionStatus def def
+instance Default ConnectionStatus where
+  def = ConnectionStatus def def
 
 -- | Can the client transfer to the remote peer?
-canUpload :: SessionStatus -> Bool
-canUpload SessionStatus {..}
+canUpload :: ConnectionStatus -> Bool
+canUpload ConnectionStatus {..}
   = _interested _remoteStatus && not (_choking _clientStatus)
 
 -- | Can the client transfer from the remote peer?
-canDownload :: SessionStatus -> Bool
-canDownload SessionStatus {..}
+canDownload :: ConnectionStatus -> Bool
+canDownload ConnectionStatus {..}
   = _interested _clientStatus && not (_choking _remoteStatus)
 
 -- | Indicates how many peers are allowed to download from the client
