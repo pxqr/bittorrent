@@ -71,12 +71,13 @@ lookupHandle ih = do
 
 -- | Open a torrent in 'stop'ed state. Use 'nullTorrent' to open
 -- handle from 'InfoDict'. This operation do not block.
-openTorrent :: Torrent -> BitTorrent Handle
-openTorrent t @ Torrent {..} = do
+openTorrent :: FilePath -> Torrent -> BitTorrent Handle
+openTorrent rootPath t @ Torrent {..} = do
   let ih = idInfoHash tInfoDict
   allocHandle ih $ do
+    c @ Client {..} <- getClient
     tses <- liftIO $ Tracker.newSession ih (trackerList t)
-    eses <- liftIO $ Exchange.newSession undefined undefined undefined
+    eses <- liftIO $ Exchange.newSession (externalAddr c) rootPath tInfoDict
     return $ Handle ih (idPrivate tInfoDict) tses eses
 
 -- | Use 'nullMagnet' to open handle from 'InfoHash'.
@@ -91,6 +92,7 @@ closeHandle :: Handle -> BitTorrent ()
 closeHandle h @ Handle {..} = do
   freeHandle topic $ do
     stop h
+    liftIO $ Exchange.closeSession exchange
     liftIO $ Tracker.closeSession trackers
 
 {-----------------------------------------------------------------------

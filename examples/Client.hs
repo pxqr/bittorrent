@@ -21,6 +21,6 @@ main = do
   path    <- parseArgs
   torrent <- fromFile path
   simpleClient $ do
-    h <- openTorrent torrent
+    h <- openTorrent "data" torrent
     start h
     liftIO $ threadDelay 10000000000
