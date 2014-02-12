@@ -3,6 +3,7 @@ cabal-dev
 .cabal-sandbox
 cabal.sandbox.config
 tmp
+data
 upload-docs
 *.torrent
 *.aux
