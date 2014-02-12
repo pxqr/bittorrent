@@ -36,6 +36,7 @@ module Network.BitTorrent.Client
 
 import Control.Exception
 import Control.Concurrent
+import Control.Monad.Logger
 import Control.Monad.Trans.Resource
 
 import Data.Default
@@ -117,6 +118,6 @@ withClient opts lf action = bracket (newClient opts lf) closeClient action
 --   For testing purposes only.
 --
 simpleClient :: BitTorrent () -> IO ()
-simpleClient m = withClient def logger (`runBitTorrent` m)
-  where
-    logger _ _ _ _ = return ()
+simpleClient m = do
+  runStderrLoggingT $ LoggingT $ \ logger -> do
+    withClient def logger (`runBitTorrent` m)
