@@ -86,6 +86,25 @@ deleteAll :: Session -> IO ()
 deleteAll = undefined
 
 {-----------------------------------------------------------------------
+--  Query
+-----------------------------------------------------------------------}
+
+getThisBitfield :: Wire Session Bitfield
+getThisBitfield = undefined
+
+{-
+data PendingSet = PendingSet (Map (PeerAddr IP) [BlockIx])
+
+empty :: PendingSet
+empty = undefined
+
+member :: PeerAddr IP -> BlockIx -> PendingSet -> Bool
+member addr bix = undefined
+
+insert :: PeerAddr IP -> BlockIx -> PendingSet -> PendingSet
+insert addr bix = undefined
+-}
+{-----------------------------------------------------------------------
 --  Event loop
 -----------------------------------------------------------------------}
 {-
@@ -104,10 +123,20 @@ readBlock bix @ BlockIx {..} s = do
     then return chunk
     else throwIO $ InvalidRequest bix (InvalidSize ixLength)
 -}
+
 handleMessage :: Message -> Wire Session ()
 handleMessage KeepAlive       = return ()
 handleMessage (Status s)      = undefined
-handleMessage (Available a)   = undefined
+handleMessage (Available msg) = do
+  thisBf <- getThisBitfield
+  case msg of
+    Have     ix
+      | ix `BF.member`     thisBf -> return ()
+      |     otherwise             -> undefined
+    Bitfield bf
+      | bf `BF.isSubsetOf` thisBf -> return ()
+      |     otherwise             -> undefined
+
 handleMessage (Transfer  msg) = case msg of
   Request bix -> do
 --    Session {..} <- getSession
@@ -116,11 +145,28 @@ handleMessage (Transfer  msg) = case msg of
 --      blk <- liftIO $ readBlock bix storage
 --      sendMsg (Piece blk)
     return ()
-  Piece   blk -> return ()
-  Cancel  bix -> return ()
+
+  Piece   blk -> do
+{-
+    Session {..} <- getSession
+    when (blockIx blk `PS.member` pendingSet) $ do
+      insert blk stalledSet
+      sendBroadcast have
+      maybe send not interested
+-}
+    return ()
+
+  Cancel  bix -> filterQueue (not . (transferResponse bix))
+    where
+      transferResponse bix (Transfer (Piece blk)) = blockIx blk == bix
+      transferResponse _    _                     = False
+
 handleMessage (Port      n) = undefined
-handleMessage (Fast      _) = return ()
-handleMessage (Extended  _) = return ()
+handleMessage (Fast      _) = undefined
+handleMessage (Extended  _) = undefined
+
+filterQueue :: (Message -> Bool) -> Wire s ()
+filterQueue = undefined
 
 exchange :: Wire Session ()
 exchange = do
