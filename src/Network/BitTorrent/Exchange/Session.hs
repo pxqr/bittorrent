@@ -42,6 +42,7 @@ data Session = Session
   , storage     :: Storage
   , unchoked    :: [PeerAddr IP]
   , connections :: MVar (Map (PeerAddr IP) (Connection Session))
+  , broadcast   :: Chan Message
   }
 
 newSession :: PeerAddr (Maybe IP) -- ^ /external/ address of this peer;
@@ -51,6 +52,7 @@ newSession :: PeerAddr (Maybe IP) -- ^ /external/ address of this peer;
 newSession addr rootPath dict = do
   connVar <- newMVar M.empty
   store   <- openInfoDict ReadWriteEx rootPath dict
+  chan    <- newChan
   return Session
     { tpeerId     = fromMaybe (error "newSession: impossible") (peerId addr)
     , infohash    = idInfoHash dict
@@ -59,6 +61,7 @@ newSession addr rootPath dict = do
     , storage     = store
     , unchoked    = []
     , connections = connVar
+    , broadcast   = chan
     }
 
 closeSession :: Session -> IO ()
@@ -72,7 +75,8 @@ insert addr ses @ Session {..} = do
     let caps  = def
     let ecaps = def
     let hs = Handshake def caps infohash tpeerId
-    connectWire ses hs addr ecaps $ do
+    chan <- dupChan broadcast
+    connectWire ses hs addr ecaps chan $ do
       conn <- getConnection
 --      liftIO $ modifyMVar_ connections $ pure . M.insert addr conn
       exchange

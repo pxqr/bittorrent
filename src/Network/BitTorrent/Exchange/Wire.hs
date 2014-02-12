@@ -63,6 +63,7 @@ module Network.BitTorrent.Exchange.Wire
        ) where
 
 import Control.Applicative
+import Control.Concurrent hiding (yield)
 import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.State
@@ -85,6 +86,7 @@ import Network.Socket.ByteString as BS
 import Text.PrettyPrint as PP hiding (($$), (<>))
 import Text.PrettyPrint.Class
 import Text.Show.Functions
+import System.Timeout
 
 import Data.BEncode as BE
 import Data.Torrent
@@ -92,7 +94,7 @@ import Data.Torrent.Bitfield
 import Data.Torrent.InfoHash
 import Data.Torrent.Piece
 import Network.BitTorrent.Core
-import Network.BitTorrent.Exchange.Message
+import Network.BitTorrent.Exchange.Message as Msg
 
 -- TODO handle port message?
 -- TODO handle limits?
@@ -600,16 +602,27 @@ trackFlow side = iterM $ do
 --  Setup
 -----------------------------------------------------------------------}
 
+-- System.Timeout.timeout multiplier
+seconds :: Int
+seconds = 1000000
+
+sinkChan :: MonadIO m => Chan Message -> Sink Message m ()
+sinkChan chan = await >>= maybe (return ()) (liftIO . writeChan chan)
+
+sourceChan :: MonadIO m => Int -> Chan Message -> Source m Message
+sourceChan interval chan = do
+  mmsg <- liftIO $ timeout (interval * seconds) $ readChan chan
+  yield $ fromMaybe Msg.KeepAlive mmsg
+
 -- | Normally you should use 'connectWire' or 'acceptWire'.
-runWire :: Wire s () -> Socket -> Connection s -> IO ()
-runWire action sock conn = flip runReaderT conn $ runConnected $
+runWire :: Wire s () -> Socket -> Chan Message -> Connection s -> IO ()
+runWire action sock chan conn = flip runReaderT conn $ runConnected $
   sourceSocket sock        $=
     conduitGet S.get       $=
       trackFlow RemotePeer $=
          action            $=
-      trackFlow ThisPeer   $=
-    conduitPut S.put       $$
-  sinkSocket sock
+      trackFlow ThisPeer   $$
+    sinkChan chan
 
 -- | This function will block until a peer send new message. You can
 -- also use 'await'.
@@ -649,8 +662,9 @@ reconnect = undefined
 --
 -- This function can throw 'WireFailure' exception.
 --
-connectWire :: s -> Handshake -> PeerAddr IP -> ExtendedCaps -> Wire s () -> IO ()
-connectWire session hs addr extCaps wire =
+connectWire :: s -> Handshake -> PeerAddr IP -> ExtendedCaps -> Chan Message
+            -> Wire s () -> IO ()
+connectWire session hs addr extCaps chan wire =
   bracket (peerSocket Stream addr) close $ \ sock -> do
     hs' <- initiateHandshake sock hs
 
@@ -680,16 +694,21 @@ connectWire session hs addr extCaps wire =
       , _connMetadata     = Nothing
       }
 
-    runWire wire' sock $ Connection
-      { connProtocol     = hsProtocol hs
-      , connCaps         = caps
-      , connTopic        = hsInfoHash hs
-      , connRemotePeerId = hsPeerId   hs'
-      , connThisPeerId   = hsPeerId   hs
-      , connOptions      = def
-      , connState        = cstate
-      , connSession      = session
-      }
+    -- TODO make KA interval configurable
+    let kaInterval = defaultKeepAliveInterval
+    bracket
+      (forkIO $ sourceChan kaInterval chan $= conduitPut S.put $$ sinkSocket sock)
+      (killThread) $ \ _ ->
+      runWire wire' sock chan $ Connection
+        { connProtocol     = hsProtocol hs
+        , connCaps         = caps
+        , connTopic        = hsInfoHash hs
+        , connRemotePeerId = hsPeerId   hs'
+        , connThisPeerId   = hsPeerId   hs
+        , connOptions      = def
+        , connState        = cstate
+        , connSession      = session
+        }
 
 -- | Accept 'Wire' connection using already 'Network.Socket.accept'ed
 --   socket. For peer listener loop the 'acceptSafe' should be
