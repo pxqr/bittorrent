@@ -24,6 +24,7 @@ module System.Torrent.Storage
        , Mode (..)
        , def
        , open
+       , openInfoDict
        , close
        , withStorage
 
@@ -54,6 +55,7 @@ import Data.Conduit.Binary as C
 import Data.Conduit.List as C
 import Data.Typeable
 
+import Data.Torrent
 import Data.Torrent.Bitfield as BF
 import Data.Torrent.Layout
 import Data.Torrent.Piece
@@ -93,6 +95,11 @@ open :: Mode -> PieceSize -> FileLayout FileSize -> IO Storage
 open mode s l
   |   s <= 0  = throwIO (InvalidSize s)
   | otherwise = Storage mode s <$> mmapFiles mode l
+
+-- | Like 'open', but use 'InfoDict' file layout.
+openInfoDict :: Mode -> FilePath -> InfoDict -> IO Storage
+openInfoDict mode rootPath InfoDict {..} =
+  open mode (piPieceLength idPieceInfo) (flatLayout rootPath idLayoutInfo)
 
 -- | Unmaps all files forcefully. It is recommended but not required.
 close :: Storage -> IO ()
