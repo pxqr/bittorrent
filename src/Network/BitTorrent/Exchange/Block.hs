@@ -30,6 +30,7 @@ module Network.BitTorrent.Exchange.Block
        , blockSize
        , blockRange
        , isPiece
+       , leadingBlock
 
          -- * Block bucket
        , Bucket
@@ -193,6 +194,15 @@ isPiece :: PieceSize -> Block BL.ByteString -> Bool
 isPiece pieceLen blk @ (Block i offset _) =
      offset == 0 && blockSize blk == pieceLen && i >= 0
 {-# INLINE isPiece #-}
+
+-- | First block in the piece.
+leadingBlock :: PieceIx -> BlockSize -> BlockIx
+leadingBlock pix blockSize = BlockIx
+  { ixPiece  = pix
+  , ixOffset = 0
+  , ixLength = blockSize
+  }
+{-# INLINE leadingBlock #-}
 
 {-----------------------------------------------------------------------
 --  Bucket
