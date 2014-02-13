@@ -43,6 +43,7 @@ module Network.BitTorrent.Exchange.Block
          -- ** Construction
        , Network.BitTorrent.Exchange.Block.empty
        , Network.BitTorrent.Exchange.Block.insert
+       , Network.BitTorrent.Exchange.Block.insertLazy
        , Network.BitTorrent.Exchange.Block.merge
 
          -- ** Rendering
@@ -318,6 +319,10 @@ insert dstPos bs bucket = go 0 bucket
     go curPos bkt @ (Fill sz br xs)
       | intersects curPos sz = bkt
       |       otherwise      = fill sz br (go (curPos + sz) xs)
+
+-- TODO zero-copy
+insertLazy :: Pos -> BL.ByteString -> Bucket -> Bucket
+insertLazy pos bl = Network.BitTorrent.Exchange.Block.insert pos (BL.toStrict bl)
 
 -- | /O(n)/.
 merge :: Bucket -> Bucket -> Bucket
