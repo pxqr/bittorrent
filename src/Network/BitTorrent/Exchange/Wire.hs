@@ -58,6 +58,8 @@ module Network.BitTorrent.Exchange.Wire
          -- ** Query
        , getConnection
        , getSession
+       , getStatus
+       , updateConnStatus
        , getExtCaps
        , getStats
        , getMetadata
@@ -97,6 +99,7 @@ import Data.Torrent.InfoHash
 import Data.Torrent.Piece
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Message as Msg
+import Network.BitTorrent.Exchange.Status
 
 -- TODO handle port message?
 -- TODO handle limits?
@@ -445,6 +448,8 @@ data ConnectionState = ConnectionState {
     -- used to protect /this/ peer against flood attacks.
   , _connStats        :: !ConnectionStats
 
+  , _connStatus       :: !ConnectionStatus
+
     -- | Infodict associated with this Connection's connTopic.
   , _connMetadata     :: Maybe (Cached InfoDict)
   }
@@ -701,6 +706,7 @@ connectWire session hs addr extCaps chan wire =
                              outcomingFlow = FlowStats 1 $ handshakeStats hs
                            , incomingFlow  = FlowStats 1 $ handshakeStats hs'
                            }
+      , _connStatus       = def
       , _connMetadata     = Nothing
       }
 
@@ -731,6 +737,20 @@ acceptWire :: Socket -> PeerAddr IP -> Wire s () -> IO ()
 acceptWire sock peerAddr wire = do
   bracket (return sock) close $ \ _ -> do
     error "acceptWire: not implemented"
+
+{-----------------------------------------------------------------------
+--  Connection Status
+-----------------------------------------------------------------------}
+
+getStatus :: Wire s ConnectionStatus
+getStatus = lift $ use connStatus
+
+updateConnStatus :: ChannelSide -> StatusUpdate -> Wire s ()
+updateConnStatus side u = lift $ do
+    connStatus %= (over (statusSide side) (updateStatus u))
+  where
+    statusSide ThisPeer   = clientStatus
+    statusSide RemotePeer = remoteStatus
 
 {-----------------------------------------------------------------------
 --  Metadata exchange
