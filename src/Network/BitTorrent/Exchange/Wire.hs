@@ -49,6 +49,7 @@ module Network.BitTorrent.Exchange.Wire
        , runWire
        , connectWire
        , acceptWire
+       , resizeBitfield
 
          -- ** Messaging
        , recvMessage
@@ -59,7 +60,9 @@ module Network.BitTorrent.Exchange.Wire
        , getConnection
        , getSession
        , getStatus
+       , getRemoteBitfield
        , updateConnStatus
+       , updateRemoteBitfield
        , getExtCaps
        , getStats
        , getMetadata
@@ -94,7 +97,7 @@ import System.Timeout
 
 import Data.BEncode as BE
 import Data.Torrent
-import Data.Torrent.Bitfield
+import Data.Torrent.Bitfield as BF
 import Data.Torrent.InfoHash
 import Data.Torrent.Piece
 import Network.BitTorrent.Core
@@ -450,6 +453,9 @@ data ConnectionState = ConnectionState {
 
   , _connStatus       :: !ConnectionStatus
 
+    -- | Bitfield of remote endpoint.
+  , _connBitfield     :: !Bitfield
+
     -- | Infodict associated with this Connection's connTopic.
   , _connMetadata     :: Maybe (Cached InfoDict)
   }
@@ -707,6 +713,7 @@ connectWire session hs addr extCaps chan wire =
                            , incomingFlow  = FlowStats 1 $ handshakeStats hs'
                            }
       , _connStatus       = def
+      , _connBitfield     = BF.haveNone 0
       , _connMetadata     = Nothing
       }
 
@@ -751,6 +758,16 @@ updateConnStatus side u = lift $ do
   where
     statusSide ThisPeer   = clientStatus
     statusSide RemotePeer = remoteStatus
+
+getRemoteBitfield :: Wire s Bitfield
+getRemoteBitfield = lift $ use connBitfield
+
+updateRemoteBitfield :: (Bitfield -> Bitfield) -> Wire s ()
+updateRemoteBitfield f = lift $ connBitfield %= f
+
+-- | Used when size of bitfield becomes known.
+resizeBitfield :: Int -> Wire s ()
+resizeBitfield n = updateRemoteBitfield (adjustSize n)
 
 {-----------------------------------------------------------------------
 --  Metadata exchange
