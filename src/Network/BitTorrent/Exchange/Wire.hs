@@ -52,7 +52,7 @@ module Network.BitTorrent.Exchange.Wire
        , recvMessage
        , sendMessage
        , filterQueue
-       , getAdvertisedQueueLength
+       , getMaxQueueLength
 
          -- * Query
        , getMetadata
@@ -404,6 +404,8 @@ data Options = Options
     -- send any message for this period of time.
   , keepaliveTimeout    :: {-# UNPACK #-} !Int
 
+  , requestQueueLength  :: {-# UNPACK #-} !Int
+
     -- | Used to protect against flood attacks.
   , floodDetector       :: FloodDetector
 
@@ -434,11 +436,12 @@ data Options = Options
 -- change them.
 instance Default Options where
   def = Options
-    { keepaliveInterval = defaultKeepAliveInterval
-    , keepaliveTimeout  = defaultKeepAliveTimeout
-    , floodDetector     = def
-    , metadataFactor    = defaultMetadataFactor
-    , maxInfoDictSize   = defaultMaxInfoDictSize
+    { keepaliveInterval  = defaultKeepAliveInterval
+    , keepaliveTimeout   = defaultKeepAliveTimeout
+    , requestQueueLength = defaultRequestQueueLength
+    , floodDetector      = def
+    , metadataFactor     = defaultMetadataFactor
+    , maxInfoDictSize    = defaultMaxInfoDictSize
     }
 
 {-----------------------------------------------------------------------
@@ -591,19 +594,6 @@ instance MonadState ConnectionState (Connected s) where
 type Wire s a = ConduitM Message Message (Connected s) a
 
 {-----------------------------------------------------------------------
---  Query
------------------------------------------------------------------------}
-
--- TODO configurable
-defQueueLength :: Int
-defQueueLength = 1
-
-getAdvertisedQueueLength :: Connected s Int
-getAdvertisedQueueLength = do
-  ExtendedHandshake {..} <- use connRemoteEhs
-  return $ fromMaybe defQueueLength ehsQueueLength
-
-{-----------------------------------------------------------------------
 --  Wrapper
 -----------------------------------------------------------------------}
 
@@ -660,6 +650,12 @@ sendMessage :: PeerMessage msg => msg -> Wire s ()
 sendMessage msg = do
   ecaps <- use connExtCaps
   yield $ envelop ecaps msg
+
+getMaxQueueLength :: Connected s Int
+getMaxQueueLength = do
+  advertisedLen <- ehsQueueLength <$> use connRemoteEhs
+  defaultLen    <- asks (requestQueueLength . connOptions)
+  return $ fromMaybe defaultLen advertisedLen
 
 -- | Filter pending messages from send buffer.
 filterQueue :: (Message -> Bool) -> Wire s ()

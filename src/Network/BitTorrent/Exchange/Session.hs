@@ -191,7 +191,7 @@ sendBroadcast msg = do
 
 fillRequestQueue :: Wire Session ()
 fillRequestQueue = do
-  maxN <- lift $ getAdvertisedQueueLength
+  maxN <- lift getMaxQueueLength
   rbf  <- use connBitfield
   addr <- asks connRemoteAddr
   blks <- withStatusUpdates $ do

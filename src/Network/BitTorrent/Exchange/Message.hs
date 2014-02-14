@@ -62,6 +62,7 @@ module Network.BitTorrent.Exchange.Message
        , StatusUpdate   (..)
        , Available      (..)
        , Transfer       (..)
+       , defaultRequestQueueLength
 
          -- ** Fast extension
        , FastMessage    (..)
@@ -482,6 +483,11 @@ instance PeerMessage Transfer where
   stats (Request _  ) = ByteStats (4 + 1) (3 * 4) 0
   stats (Piece   p  ) = ByteStats (4 + 1) (4 + 4 + blockSize p) 0
   stats (Cancel  _  ) = ByteStats (4 + 1) (3 * 4) 0
+
+-- TODO increase
+-- | Max number of pending 'Request's inflight.
+defaultRequestQueueLength :: Int
+defaultRequestQueueLength = 1
 
 {-----------------------------------------------------------------------
 --  Fast messages
