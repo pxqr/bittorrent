@@ -18,41 +18,46 @@ module Network.BitTorrent.Exchange.Wire
          Connected
        , Wire
 
-         -- ** Connection
+         -- * Connection
        , Connection
+
+         -- ** Identity
        , connRemoteAddr
-       , connProtocol
-       , connCaps
        , connTopic
        , connRemotePeerId
        , connThisPeerId
+
+         -- ** Capabilities
+       , connProtocol
+       , connCaps
+       , connExtCaps
+       , connRemoteEhs
+
+         -- ** State
+       , connStatus
+       , connBitfield
+
+         -- ** Env
        , connOptions
        , connSession
+       , connStats
 
-         -- ** Setup
+         -- * Setup
        , runWire
        , connectWire
        , acceptWire
        , resizeBitfield
 
-         -- ** Messaging
+         -- * Messaging
        , recvMessage
        , sendMessage
        , filterQueue
        , getAdvertisedQueueLength
 
-         -- ** Query
-       , getConnection
-       , getSession
-       , getStatus
-       , getRemoteBitfield
-       , updateConnStatus
-       , updateRemoteBitfield
-       , getExtCaps
-       , getStats
+         -- * Query
        , getMetadata
 
-         -- ** Exceptions
+         -- * Exceptions
        , ChannelSide   (..)
        , ProtocolError (..)
        , WireFailure   (..)
@@ -60,15 +65,15 @@ module Network.BitTorrent.Exchange.Wire
        , isWireFailure
        , disconnectPeer
 
-         -- ** Stats
+         -- * Stats
        , ByteStats       (..)
        , FlowStats       (..)
        , ConnectionStats (..)
 
-         -- ** Flood detection
+         -- * Flood detection
        , FloodDetector   (..)
 
-         -- ** Options
+         -- * Options
        , Options         (..)
        ) where
 
@@ -449,6 +454,10 @@ data ConnectionState = ConnectionState {
     -- | If @not (allowed ExtExtended connCaps)@ then this set is always
     -- empty. Otherwise it has the BEP10 extension protocol mandated mapping of
     -- 'MessageId' to the message type for the remote peer.
+    --
+    --  Note that this value can change in current session if either
+    --  this or remote peer will initiate rehandshaking.
+    --
     _connExtCaps      :: !ExtendedCaps
 
     -- | Current extended handshake information from the remote peer
@@ -456,6 +465,9 @@ data ConnectionState = ConnectionState {
 
     -- | Various stats about messages sent and received. Stats can be
     -- used to protect /this/ peer against flood attacks.
+    --
+    -- Note that this value will change with the next sent or received
+    -- message.
   , _connStats        :: !ConnectionStats
 
   , _connStatus       :: !ConnectionStatus
@@ -565,70 +577,40 @@ initiateHandshake sock hs = do
 -----------------------------------------------------------------------}
 
 -- | do not expose this so we can change it without breaking api
-newtype Connected s m a = Connected { runConnected :: (ReaderT (Connection s) m a) }
+newtype Connected s a = Connected { runConnected :: (ReaderT (Connection s) IO a) }
     deriving (Functor, Applicative, Monad
              , MonadIO, MonadReader (Connection s), MonadThrow
              )
 
-instance MonadIO m => MonadState ConnectionState (Connected s m) where
+instance MonadState ConnectionState (Connected s) where
     get   = Connected (asks connState) >>= liftIO . readIORef
     put x = Connected (asks connState) >>= liftIO . flip writeIORef x
 
-instance MonadTrans (Connected s) where
-    lift = Connected . lift
-
 -- | A duplex channel connected to a remote peer which keep tracks
 -- connection parameters.
-type Wire s a = ConduitM Message Message (Connected s IO) a
+type Wire s a = ConduitM Message Message (Connected s) a
 
 {-----------------------------------------------------------------------
 --  Query
 -----------------------------------------------------------------------}
 
-setExtCaps :: ExtendedCaps -> Wire s ()
-setExtCaps x = lift $ connExtCaps .= x
-
--- | Get current extended capabilities. Note that this value can
--- change in current session if either this or remote peer will
--- initiate rehandshaking.
-getExtCaps :: Wire s ExtendedCaps
-getExtCaps = lift $ use connExtCaps
-
-setRemoteEhs :: ExtendedHandshake -> Wire s ()
-setRemoteEhs x = lift $ connRemoteEhs .= x
-
-getRemoteEhs :: Wire s ExtendedHandshake
-getRemoteEhs = lift $ use connRemoteEhs
-
--- | Get current stats. Note that this value will change with the next
--- sent or received message.
-getStats :: Wire s ConnectionStats
-getStats = lift $ use connStats
-
--- | See the 'Connection' section for more info.
-getConnection :: Wire s (Connection s)
-getConnection = lift ask
-
-getSession :: Wire s s
-getSession = lift (asks connSession)
-
 -- TODO configurable
 defQueueLength :: Int
 defQueueLength = 1
 
-getAdvertisedQueueLength :: Wire s Int
+getAdvertisedQueueLength :: Connected s Int
 getAdvertisedQueueLength = do
-  ExtendedHandshake {..} <- getRemoteEhs
+  ExtendedHandshake {..} <- use connRemoteEhs
   return $ fromMaybe defQueueLength ehsQueueLength
 
 {-----------------------------------------------------------------------
 --  Wrapper
 -----------------------------------------------------------------------}
 
-putStats :: ChannelSide -> Message -> Connected s IO ()
+putStats :: ChannelSide -> Message -> Connected s ()
 putStats side msg = connStats %= addStats side (stats msg)
 
-validate :: ChannelSide -> Message -> Connected s IO ()
+validate :: ChannelSide -> Message -> Connected s ()
 validate side msg = do
   caps <- asks connCaps
   case requires msg of
@@ -696,8 +678,8 @@ extendedHandshake caps = do
   msg <- recvMessage
   case msg of
     Extended (EHandshake remoteEhs@(ExtendedHandshake {..})) -> do
-      setExtCaps $ ehsCaps <> caps
-      setRemoteEhs remoteEhs
+      connExtCaps   .= (ehsCaps <> caps)
+      connRemoteEhs .= remoteEhs
     _ -> protocolError HandshakeRefused
 
 rehandshake :: ExtendedCaps -> Wire s ()
@@ -776,29 +758,9 @@ acceptWire sock peerAddr wire = do
   bracket (return sock) close $ \ _ -> do
     error "acceptWire: not implemented"
 
-{-----------------------------------------------------------------------
---  Connection Status
------------------------------------------------------------------------}
-
-getStatus :: Wire s ConnectionStatus
-getStatus = lift $ use connStatus
-
-updateConnStatus :: ChannelSide -> StatusUpdate -> Wire s ()
-updateConnStatus side u = lift $ do
-    connStatus %= (over (statusSide side) (updateStatus u))
-  where
-    statusSide ThisPeer   = clientStatus
-    statusSide RemotePeer = remoteStatus
-
-getRemoteBitfield :: Wire s Bitfield
-getRemoteBitfield = lift $ use connBitfield
-
-updateRemoteBitfield :: (Bitfield -> Bitfield) -> Wire s ()
-updateRemoteBitfield f = lift $ connBitfield %= f
-
 -- | Used when size of bitfield becomes known.
-resizeBitfield :: Int -> Wire s ()
-resizeBitfield n = updateRemoteBitfield (adjustSize n)
+resizeBitfield :: Int -> Connected s ()
+resizeBitfield n = connBitfield %= adjustSize n
 
 {-----------------------------------------------------------------------
 --  Metadata exchange
@@ -833,7 +795,7 @@ fetchMetadata = loop 0
 getMetadata :: Wire s InfoDict
 getMetadata = do
   chunks <- fetchMetadata
-  Connection {..} <- getConnection
+  Connection {..} <- ask
   case BE.decode (BS.concat chunks) of
      Right (infodict @ InfoDict {..})
        | connTopic == idInfoHash -> return infodict

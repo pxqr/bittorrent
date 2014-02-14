@@ -110,7 +110,7 @@ newSession logFun addr rootPath dict = do
 closeSession :: Session -> IO ()
 closeSession = undefined
 
-instance MonadIO m => MonadLogger (Connected Session m) where
+instance MonadLogger (Connected Session) where
   monadLoggerLog loc src lvl msg = do
     conn <- ask
     ses  <- asks connSession
@@ -143,9 +143,9 @@ insert addr ses @ Session {..} = do
       let hs = Handshake def caps infohash tpeerId
       chan <- dupChan broadcast
       connectWire ses hs addr ecaps chan $ do
-        conn <- getConnection
+        conn <- ask
 --      liftIO $ modifyMVar_ connections $ pure . M.insert addr conn
-        resizeBitfield (totalPieces storage)
+        lift $ resizeBitfield (totalPieces storage)
         logEvent "Connection established"
         exchange
 --      liftIO $ modifyMVar_ connections $ pure . M.delete addr
@@ -162,12 +162,12 @@ deleteAll = undefined
 
 withStatusUpdates :: StatusUpdates a -> Wire Session a
 withStatusUpdates m = do
-  Session {..} <- getSession
+  Session {..} <- asks connSession
   liftIO $ runStatusUpdates status m
 
 getThisBitfield :: Wire Session Bitfield
 getThisBitfield = do
-  ses <- getSession
+  ses <- asks connSession
   liftIO $ SS.getBitfield (status ses)
 
 readBlock :: BlockIx -> Storage -> IO (Block BL.ByteString)
@@ -181,8 +181,8 @@ readBlock bix @ BlockIx {..} s = do
 
 sendBroadcast :: PeerMessage msg => msg -> Wire Session ()
 sendBroadcast msg = do
-  Session {..} <- getSession
-  ecaps <- getExtCaps
+  Session {..} <- asks connSession
+  ecaps <- use connExtCaps
   liftIO $ writeChan broadcast (envelop ecaps msg)
 
 {-----------------------------------------------------------------------
@@ -191,9 +191,9 @@ sendBroadcast msg = do
 
 fillRequestQueue :: Wire Session ()
 fillRequestQueue = do
-  maxN <- getAdvertisedQueueLength
-  rbf  <- getRemoteBitfield
-  addr <- connRemoteAddr <$> getConnection
+  maxN <- lift $ getAdvertisedQueueLength
+  rbf  <- use connBitfield
+  addr <- asks connRemoteAddr
   blks <- withStatusUpdates $ do
     n <- getRequestQueueLength addr
     scheduleBlocks addr rbf (maxN - n)
@@ -201,13 +201,13 @@ fillRequestQueue = do
 
 tryFillRequestQueue :: Wire Session ()
 tryFillRequestQueue = do
-  allowed <- canDownload <$> getStatus
+  allowed <- canDownload <$> use connStatus
   when allowed $ do
     fillRequestQueue
 
 interesting :: Wire Session ()
 interesting = do
-  addr <- connRemoteAddr <$> getConnection
+  addr <- asks connRemoteAddr
   logMessage  (Status (Interested True))
   sendMessage (Interested True)
   logMessage  (Status (Choking    False))
@@ -220,17 +220,17 @@ interesting = do
 
 handleStatus :: StatusUpdate -> Wire Session ()
 handleStatus s = do
-  updateConnStatus RemotePeer s
+  connStatus %= over remoteStatus (updateStatus s)
   case s of
     Interested _     -> return ()
     Choking    True  -> do
-      addr <- connRemoteAddr <$> getConnection
+      addr <- asks connRemoteAddr
       withStatusUpdates (resetPending addr)
     Choking    False -> tryFillRequestQueue
 
 handleAvailable :: Available -> Wire Session ()
 handleAvailable msg = do
-  updateRemoteBitfield $ case msg of
+  connBitfield %= case msg of
     Have     ix -> BF.insert ix
     Bitfield bf -> const     bf
 
@@ -245,15 +245,15 @@ handleAvailable msg = do
 
 handleTransfer :: Transfer -> Wire Session ()
 handleTransfer (Request bix) = do
-  Session {..} <- getSession
+  Session {..} <- asks connSession
   bitfield <- getThisBitfield
-  upload   <- canUpload <$> getStatus
+  upload   <- canUpload <$> use connStatus
   when (upload && ixPiece bix `BF.member` bitfield) $ do
     blk <- liftIO $ readBlock bix storage
     sendMessage (Piece blk)
 
 handleTransfer (Piece   blk) = do
-  Session {..} <- getSession
+  Session {..} <- asks connSession
   isSuccess <- withStatusUpdates (pushBlock blk storage)
   case isSuccess of
     Nothing -> liftIO $ throwIO $ userError "block is not requested"
