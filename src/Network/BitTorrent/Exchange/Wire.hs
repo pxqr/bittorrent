@@ -18,25 +18,6 @@ module Network.BitTorrent.Exchange.Wire
          Connected
        , Wire
 
-         -- ** Exceptions
-       , ChannelSide   (..)
-       , ProtocolError (..)
-       , WireFailure   (..)
-       , peerPenalty
-       , isWireFailure
-       , disconnectPeer
-
-         -- ** Stats
-       , ByteStats       (..)
-       , FlowStats       (..)
-       , ConnectionStats (..)
-
-         -- ** Flood detection
-       , FloodDetector   (..)
-
-         -- ** Options
-       , Options         (..)
-
          -- ** Connection
        , Connection
        , connRemoteAddr
@@ -70,6 +51,25 @@ module Network.BitTorrent.Exchange.Wire
        , getExtCaps
        , getStats
        , getMetadata
+
+         -- ** Exceptions
+       , ChannelSide   (..)
+       , ProtocolError (..)
+       , WireFailure   (..)
+       , peerPenalty
+       , isWireFailure
+       , disconnectPeer
+
+         -- ** Stats
+       , ByteStats       (..)
+       , FlowStats       (..)
+       , ConnectionStats (..)
+
+         -- ** Flood detection
+       , FloodDetector   (..)
+
+         -- ** Options
+       , Options         (..)
        ) where
 
 import Control.Applicative
