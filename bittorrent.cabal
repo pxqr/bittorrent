@@ -74,6 +74,7 @@ library
                        Network.BitTorrent.Exchange.Message
                        Network.BitTorrent.Exchange.Selection
                        Network.BitTorrent.Exchange.Session
+                       Network.BitTorrent.Exchange.Session.Status
                        Network.BitTorrent.Exchange.Status
                        Network.BitTorrent.Exchange.Wire
                        Network.BitTorrent.Tracker

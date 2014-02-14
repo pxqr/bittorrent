@@ -1,7 +1,9 @@
-{-# LANGUAGE TemplateHaskell    #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
 module Network.BitTorrent.Exchange.Session
        ( Session
+       , LogFun
        , newSession
        , closeSession
 
@@ -12,76 +14,141 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Exception
 import Control.Lens
+import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.ByteString as BS
+import Data.ByteString.Lazy as BL
+import Data.Conduit
 import Data.Function
 import Data.IORef
+import Data.List as L
 import Data.Maybe
 import Data.Map as M
+import Data.Monoid
 import Data.Ord
+import Data.Set as S
+import Data.Text as T
 import Data.Typeable
-import Text.PrettyPrint
+import Text.PrettyPrint hiding ((<>))
+import Text.PrettyPrint.Class
+import System.Log.FastLogger (LogStr, ToLogStr (..))
 
 import Data.Torrent (InfoDict (..))
 import Data.Torrent.Bitfield as BF
 import Data.Torrent.InfoHash
+import Data.Torrent.Piece (pieceData, piPieceLength)
+import qualified Data.Torrent.Piece as Torrent (Piece (Piece))
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Assembler
-import Network.BitTorrent.Exchange.Block
+import Network.BitTorrent.Exchange.Block as Block
 import Network.BitTorrent.Exchange.Message
+import Network.BitTorrent.Exchange.Session.Status as SS
 import Network.BitTorrent.Exchange.Status
 import Network.BitTorrent.Exchange.Wire
 import System.Torrent.Storage
 
+{-----------------------------------------------------------------------
+--  Exceptions
+-----------------------------------------------------------------------}
 
-data Session = Session
-  { tpeerId     :: PeerId
-  , infohash    :: InfoHash
-  , bitfield    :: Bitfield
-  , assembler   :: Assembler
-  , storage     :: Storage
-  , unchoked    :: [PeerAddr IP]
-  , connections :: MVar (Map (PeerAddr IP) (Connection Session))
-  , broadcast   :: Chan Message
+data ExchangeError
+  = InvalidRequest BlockIx StorageFailure
+  | CorruptedPiece PieceIx
+    deriving (Show, Typeable)
+
+instance Exception ExchangeError
+
+packException :: Exception e => (e -> ExchangeError) -> IO a -> IO a
+packException f m = try m >>= either (throwIO . f) return
+
+{-----------------------------------------------------------------------
+--  Session
+-----------------------------------------------------------------------}
+
+data ConnectionEntry = ConnectionEntry
+  { initiatedBy :: !ChannelSide
+  , connection  :: !(Connection Session)
   }
 
-newSession :: PeerAddr (Maybe IP) -- ^ /external/ address of this peer;
+data Session = Session
+  { tpeerId      :: PeerId
+  , infohash     :: InfoHash
+  , storage      :: Storage
+  , status       :: MVar SessionStatus
+  , unchoked     :: [PeerAddr IP]
+  , connections  :: MVar (Map (PeerAddr IP) ConnectionEntry)
+  , broadcast    :: Chan Message
+  , logger       :: LogFun
+  }
+
+-- | Logger function.
+type LogFun = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+
+newSession :: LogFun
+           -> PeerAddr (Maybe IP) -- ^ /external/ address of this peer;
            -> FilePath            -- ^ root directory for content files;
            -> InfoDict            -- ^ torrent info dictionary;
            -> IO Session          -- ^
-newSession addr rootPath dict = do
-  connVar <- newMVar M.empty
-  store   <- openInfoDict ReadWriteEx rootPath dict
-  chan    <- newChan
+newSession logFun addr rootPath dict = do
+  connVar     <- newMVar M.empty
+  store       <- openInfoDict ReadWriteEx rootPath dict
+  statusVar   <- newMVar $ sessionStatus (BF.haveNone (totalPieces store))
+                                         (piPieceLength (idPieceInfo dict))
+  chan        <- newChan
   return Session
     { tpeerId     = fromMaybe (error "newSession: impossible") (peerId addr)
     , infohash    = idInfoHash dict
-    , bitfield    = BF.haveNone (totalPieces store)
-    , assembler   = error "newSession"
+    , status      = statusVar
     , storage     = store
     , unchoked    = []
     , connections = connVar
     , broadcast   = chan
+    , logger      = logFun
     }
 
 closeSession :: Session -> IO ()
 closeSession = undefined
 
+instance MonadIO m => MonadLogger (Connected Session m) where
+  monadLoggerLog loc src lvl msg = do
+    conn <- ask
+    ses  <- asks connSession
+    addr <- asks connRemoteAddr
+    let addrSrc = src <> " @ " <> T.pack (render (pretty addr))
+    liftIO $ logger ses loc addrSrc lvl (toLogStr msg)
+
+logMessage :: Message -> Wire Session ()
+logMessage msg = logDebugN $ T.pack (render (pretty msg))
+
+logEvent :: Text -> Wire Session ()
+logEvent = logInfoN
+
+{-----------------------------------------------------------------------
+--  Connections
+-----------------------------------------------------------------------}
+-- TODO unmap storage on zero connections
+
 insert :: PeerAddr IP
        -> {- Maybe Socket
        -> -} Session -> IO ()
 insert addr ses @ Session {..} = do
-  forkIO $ do
-    let caps  = def
-    let ecaps = def
-    let hs = Handshake def caps infohash tpeerId
-    chan <- dupChan broadcast
-    connectWire ses hs addr ecaps chan $ do
-      conn <- getConnection
+    forkIO $ do
+      action `finally` runStatusUpdates status (resetPending addr)
+    return ()
+  where
+    action = do
+      let caps  = def
+      let ecaps = def
+      let hs = Handshake def caps infohash tpeerId
+      chan <- dupChan broadcast
+      connectWire ses hs addr ecaps chan $ do
+        conn <- getConnection
 --      liftIO $ modifyMVar_ connections $ pure . M.insert addr conn
-      exchange
+        resizeBitfield (totalPieces storage)
+        logEvent "Connection established"
+        exchange
 --      liftIO $ modifyMVar_ connections $ pure . M.delete addr
-  return ()
 
 delete :: PeerAddr IP -> Session -> IO ()
 delete = undefined
@@ -90,81 +157,125 @@ deleteAll :: Session -> IO ()
 deleteAll = undefined
 
 {-----------------------------------------------------------------------
---  Query
+--  Helpers
 -----------------------------------------------------------------------}
+
+withStatusUpdates :: StatusUpdates a -> Wire Session a
+withStatusUpdates m = do
+  Session {..} <- getSession
+  liftIO $ runStatusUpdates status m
 
 getThisBitfield :: Wire Session Bitfield
-getThisBitfield = undefined
+getThisBitfield = do
+  ses <- getSession
+  liftIO $ SS.getBitfield (status ses)
 
-{-
-data PendingSet = PendingSet (Map (PeerAddr IP) [BlockIx])
-
-empty :: PendingSet
-empty = undefined
-
-member :: PeerAddr IP -> BlockIx -> PendingSet -> Bool
-member addr bix = undefined
-
-insert :: PeerAddr IP -> BlockIx -> PendingSet -> PendingSet
-insert addr bix = undefined
--}
-{-----------------------------------------------------------------------
---  Event loop
------------------------------------------------------------------------}
-{-
-data ExchangeError
-  = InvalidRequest BlockIx StorageFailure
-  | CorruptedPiece PieceIx
-
-packException :: Exception e => (e -> ExchangeError) -> IO a -> IO a
-packException f m = try >>= either (throwIO . f) m
-
-readBlock :: BlockIx -> Storage -> IO (Block ByteString)
+readBlock :: BlockIx -> Storage -> IO (Block BL.ByteString)
 readBlock bix @ BlockIx {..} s = do
-  p <- packException (InvalidRequest bix) $ do readPiece ixPiece storage
-  let chunk = BS.take ixLength $ BS.drop ixOffset p
-  if BS.length chunk == ixLength
-    then return chunk
+  p <- packException (InvalidRequest bix) $ do readPiece ixPiece s
+  let chunk = BL.take (fromIntegral ixLength) $
+              BL.drop (fromIntegral ixOffset) (pieceData p)
+  if BL.length chunk == fromIntegral ixLength
+    then return  $ Block ixPiece ixOffset chunk
     else throwIO $ InvalidRequest bix (InvalidSize ixLength)
--}
+
+sendBroadcast :: PeerMessage msg => msg -> Wire Session ()
+sendBroadcast msg = do
+  Session {..} <- getSession
+  ecaps <- getExtCaps
+  liftIO $ writeChan broadcast (envelop ecaps msg)
+
+{-----------------------------------------------------------------------
+--  Triggers
+-----------------------------------------------------------------------}
+
+fillRequestQueue :: Wire Session ()
+fillRequestQueue = do
+  maxN <- getAdvertisedQueueLength
+  rbf  <- getRemoteBitfield
+  addr <- connRemoteAddr <$> getConnection
+  blks <- withStatusUpdates $ do
+    n <- getRequestQueueLength addr
+    scheduleBlocks addr rbf (maxN - n)
+  mapM_ (sendMessage . Request) blks
+
+tryFillRequestQueue :: Wire Session ()
+tryFillRequestQueue = do
+  allowed <- canDownload <$> getStatus
+  when allowed $ do
+    fillRequestQueue
+
+interesting :: Wire Session ()
+interesting = do
+  addr <- connRemoteAddr <$> getConnection
+  logMessage  (Status (Interested True))
+  sendMessage (Interested True)
+  logMessage  (Status (Choking    False))
+  sendMessage (Choking    False)
+  tryFillRequestQueue
+
+{-----------------------------------------------------------------------
+--  Incoming message handling
+-----------------------------------------------------------------------}
+
+handleStatus :: StatusUpdate -> Wire Session ()
+handleStatus s = do
+  updateConnStatus RemotePeer s
+  case s of
+    Interested _     -> return ()
+    Choking    True  -> do
+      addr <- connRemoteAddr <$> getConnection
+      withStatusUpdates (resetPending addr)
+    Choking    False -> tryFillRequestQueue
+
+handleAvailable :: Available -> Wire Session ()
+handleAvailable msg = do
+  updateRemoteBitfield $ case msg of
+    Have     ix -> BF.insert ix
+    Bitfield bf -> const     bf
+
+  thisBf <- getThisBitfield
+  case msg of
+    Have     ix
+      | ix `BF.member`     thisBf -> return ()
+      |     otherwise             -> interesting
+    Bitfield bf
+      | bf `BF.isSubsetOf` thisBf -> return ()
+      |     otherwise             -> interesting
 
 handleTransfer :: Transfer -> Wire Session ()
 handleTransfer (Request bix) = do
---    Session {..} <- getSession
---    addr <- getRemoteAddr
---    when (addr `elem` unchoked && ixPiece bix `BF.member` bitfield) $ do
---      blk <- liftIO $ readBlock bix storage
---      sendMsg (Piece blk)
-    return ()
+  Session {..} <- getSession
+  bitfield <- getThisBitfield
+  upload   <- canUpload <$> getStatus
+  when (upload && ixPiece bix `BF.member` bitfield) $ do
+    blk <- liftIO $ readBlock bix storage
+    sendMessage (Piece blk)
 
 handleTransfer (Piece   blk) = do
-{-
-    Session {..} <- getSession
-    when (blockIx blk `PS.member` pendingSet) $ do
-      insert blk stalledSet
-      sendBroadcast have
-      maybe send not interested
--}
-    return ()
+  Session {..} <- getSession
+  isSuccess <- withStatusUpdates (pushBlock blk storage)
+  case isSuccess of
+    Nothing -> liftIO $ throwIO $ userError "block is not requested"
+    Just isCompleted -> do
+      when isCompleted $ do
+        sendBroadcast (Have (blkPiece blk))
+--        maybe send not interested
+      tryFillRequestQueue
 
 handleTransfer (Cancel  bix) = filterQueue (not . (transferResponse bix))
   where
     transferResponse bix (Transfer (Piece blk)) = blockIx blk == bix
     transferResponse _    _                     = False
 
+{-----------------------------------------------------------------------
+--  Event loop
+-----------------------------------------------------------------------}
+
 handleMessage :: Message -> Wire Session ()
 handleMessage KeepAlive       = return ()
-handleMessage (Status s)      = undefined
-handleMessage (Available msg) = do
-  thisBf <- getThisBitfield
-  case msg of
-    Have     ix
-      | ix `BF.member`     thisBf -> return ()
-      |     otherwise             -> undefined
-    Bitfield bf
-      | bf `BF.isSubsetOf` thisBf -> return ()
-      |     otherwise             -> undefined
-
+handleMessage (Status s)      = handleStatus s
+handleMessage (Available msg) = handleAvailable msg
 handleMessage (Transfer  msg) = handleTransfer msg
 handleMessage (Port      n)   = undefined
 handleMessage (Fast      _)   = undefined
@@ -172,18 +283,16 @@ handleMessage (Extended  _)   = undefined
 
 exchange :: Wire Session ()
 exchange = do
-  e <- recvMessage
-  liftIO $ print e
-
-type Exchange = StateT Session (ReaderT (Connection Session) IO)
-
---runExchange :: Exchange () -> [PeerAddr] -> IO ()
---runExchange exchange peers = do
---  forM_ peers $ \ peer -> do
---    forkIO $ runReaderT (runStateT exchange session )
+  bf <- getThisBitfield
+  sendMessage (Bitfield bf)
+  awaitForever $ \ msg -> do
+    logMessage msg
+    handleMessage msg
 
 data Event = NewMessage (PeerAddr IP) Message
            | Timeout -- for scheduling
+
+type Exchange a = Wire Session a
 
 awaitEvent :: Exchange Event
 awaitEvent = undefined

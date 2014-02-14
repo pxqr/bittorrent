@@ -15,7 +15,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Network.BitTorrent.Exchange.Wire
        ( -- * Wire
-         Wire
+         Connected
+       , Wire
 
          -- ** Exceptions
        , ChannelSide   (..)
@@ -38,12 +39,14 @@ module Network.BitTorrent.Exchange.Wire
 
          -- ** Connection
        , Connection
+       , connRemoteAddr
        , connProtocol
        , connCaps
        , connTopic
        , connRemotePeerId
        , connThisPeerId
        , connOptions
+       , connSession
 
          -- ** Setup
        , runWire
@@ -55,6 +58,7 @@ module Network.BitTorrent.Exchange.Wire
        , recvMessage
        , sendMessage
        , filterQueue
+       , getAdvertisedQueueLength
 
          -- ** Query
        , getConnection
@@ -93,6 +97,7 @@ import Network.Socket.ByteString as BS
 import Text.PrettyPrint as PP hiding (($$), (<>))
 import Text.PrettyPrint.Class
 import Text.Show.Functions
+import System.Log.FastLogger (ToLogStr(..))
 import System.Timeout
 
 import Data.BEncode as BE
@@ -190,13 +195,15 @@ errorPenalty (DisallowedMessage  _ _) = 1
 
 -- | Exceptions used to interrupt the current P2P session.
 data WireFailure
+  = ConnectionRefused IOError
+
     -- | Force termination of wire connection.
     --
     --   Normally you should throw only this exception from event loop
     --   using 'disconnectPeer', other exceptions are thrown
     --   automatically by functions from this module.
     --
-  = DisconnectPeer
+  | DisconnectPeer
 
      -- | A peer not responding and did not send a 'KeepAlive' message
      -- for a specified period of time.
@@ -464,10 +471,12 @@ makeLenses ''ConnectionState
 
 -- | Connection keep various info about both peers.
 data Connection s = Connection
-  { -- | /Both/ peers handshaked with this protocol string. The only
+  { connRemoteAddr   :: !(PeerAddr IP)
+
+    -- | /Both/ peers handshaked with this protocol string. The only
     -- value is \"Bittorrent Protocol\" but this can be changed in
     -- future.
-    connProtocol     :: !ProtocolName
+  , connProtocol     :: !ProtocolName
 
     -- | Set of enabled core extensions, i.e. the pre BEP10 extension
     -- mechanism. This value is used to check if a message is allowed
@@ -502,6 +511,17 @@ data Connection s = Connection
 
 instance Pretty (Connection s) where
   pretty Connection {..} = "Connection"
+
+instance ToLogStr (Connection s) where
+  toLogStr Connection {..} = mconcat
+    [ toLogStr (show connRemoteAddr)
+    , toLogStr (show connProtocol)
+    , toLogStr (show connCaps)
+    , toLogStr (show connTopic)
+    , toLogStr (show connRemotePeerId)
+    , toLogStr (show connThisPeerId)
+    , toLogStr (show connOptions)
+    ]
 
 -- TODO check extended messages too
 isAllowed :: Connection s -> Message -> Bool
@@ -591,6 +611,15 @@ getConnection = lift ask
 
 getSession :: Wire s s
 getSession = lift (asks connSession)
+
+-- TODO configurable
+defQueueLength :: Int
+defQueueLength = 1
+
+getAdvertisedQueueLength :: Wire s Int
+getAdvertisedQueueLength = do
+  ExtendedHandshake {..} <- getRemoteEhs
+  return $ fromMaybe defQueueLength ehsQueueLength
 
 {-----------------------------------------------------------------------
 --  Wrapper
@@ -685,8 +714,9 @@ reconnect = undefined
 --
 connectWire :: s -> Handshake -> PeerAddr IP -> ExtendedCaps -> Chan Message
             -> Wire s () -> IO ()
-connectWire session hs addr extCaps chan wire =
-  bracket (peerSocket Stream addr) close $ \ sock -> do
+connectWire session hs addr extCaps chan wire = do
+  let catchRefusal m = try m >>= either (throwIO . ConnectionRefused) return
+  bracket (catchRefusal (peerSocket Stream addr)) close $ \ sock -> do
     hs' <- initiateHandshake sock hs
 
     Prelude.mapM_ (\(t,e) -> unless t $ throwIO $ ProtocolError e) [
@@ -723,7 +753,8 @@ connectWire session hs addr extCaps chan wire =
       (forkIO $ sourceChan kaInterval chan $= conduitPut S.put $$ sinkSocket sock)
       (killThread) $ \ _ ->
       runWire wire' sock chan $ Connection
-        { connProtocol     = hsProtocol hs
+        { connRemoteAddr   = addr
+        , connProtocol     = hsProtocol hs
         , connCaps         = caps
         , connTopic        = hsInfoHash hs
         , connRemotePeerId = hsPeerId   hs'

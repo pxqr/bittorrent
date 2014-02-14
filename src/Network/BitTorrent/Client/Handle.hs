@@ -22,6 +22,7 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Trans
+import Data.List as L
 import Data.HashMap.Strict as HM
 
 import Data.Torrent
@@ -77,7 +78,8 @@ openTorrent rootPath t @ Torrent {..} = do
   allocHandle ih $ do
     c @ Client {..} <- getClient
     tses <- liftIO $ Tracker.newSession ih (trackerList t)
-    eses <- liftIO $ Exchange.newSession (externalAddr c) rootPath tInfoDict
+    eses <- liftIO $ Exchange.newSession clientLogger (externalAddr c) rootPath
+                                         tInfoDict
     return $ Handle ih (idPrivate tInfoDict) tses eses
 
 -- | Use 'nullMagnet' to open handle from 'InfoHash'.
@@ -109,9 +111,11 @@ start Handle {..} = do
   liftIO $ Tracker.notify trackerManager trackers Tracker.Started
   unless private $ do
     liftDHT $ DHT.insert topic undefined
-  peers <- liftIO $ askPeers trackerManager trackers
-  forM_ peers $ \ peer -> do
-    liftIO $ Exchange.insert peer exchange
+  liftIO $ do
+    peers <- askPeers trackerManager trackers
+    print $ "got: " ++ show (L.length peers) ++ " peers"
+    forM_ peers $ \ peer -> do
+      Exchange.insert peer exchange
 
 -- | Stop downloading this torrent.
 pause :: Handle -> BitTorrent ()
