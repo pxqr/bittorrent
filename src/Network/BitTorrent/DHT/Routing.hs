@@ -309,7 +309,10 @@ data Table ip
 
   -- right biased tree branch
   | One  (Bucket ip) (Table  ip)
-    deriving Generic
+    deriving (Show, Generic)
+
+instance Eq ip => Eq (Table ip) where
+  (==) = (==) `on` Network.BitTorrent.DHT.Routing.toList
 
 instance Serialize NominalDiffTime where
   put = putWord32be . fromIntegral   . fromEnum
