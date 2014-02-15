@@ -83,8 +83,8 @@ openTorrent rootPath t @ Torrent {..} = do
     return $ Handle ih (idPrivate tInfoDict) tses eses
 
 -- | Use 'nullMagnet' to open handle from 'InfoHash'.
-openMagnet :: Magnet -> BitTorrent Handle
-openMagnet = undefined
+openMagnet :: FilePath -> Magnet -> BitTorrent Handle
+openMagnet rootPath uri @ Magnet {..} = error "openMagnet: not implemnted"
 
 -- | Stop torrent and destroy all sessions. You don't need to close
 -- handles at application exit, all handles will be automatically
