@@ -337,10 +337,14 @@ nullTable nid n = Tip nid (bucketCount (pred n)) PSQ.empty
   where
     bucketCount x = max 0 (min 159 x)
 
+-- | Test if table is empty. In this case DHT should start
+-- bootstrapping process until table becomes 'full'.
 null :: Table ip -> Bool
 null (Tip _ _ b) = PSQ.null b
 null  _          = False
 
+-- | Test if table have maximum number of nodes. No more nodes can be
+-- 'insert'ed, except old ones becomes bad.
 full :: Table ip -> Bool
 full (Tip  _ n _) = n == 0
 full (Zero   t b) = PSQ.size b == defaultBucketSize && full t
