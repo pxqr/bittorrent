@@ -11,4 +11,6 @@ module Network.BitTorrent
        ) where
 
 import Data.Torrent as BT
+import Data.Torrent.InfoHash as BT
+import Data.Torrent.Magnet as BT
 import Network.BitTorrent.Client as BT
