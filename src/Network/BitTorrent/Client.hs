@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 module Network.BitTorrent.Client
@@ -25,8 +27,7 @@ module Network.BitTorrent.Client
        , getClient
 
          -- * Handle
-       , openTorrent
-       , openMagnet
+       , TorrentSource (..)
        , closeHandle
 
        , start
@@ -37,6 +38,7 @@ module Network.BitTorrent.Client
 import Control.Exception
 import Control.Concurrent
 import Control.Monad.Logger
+import Control.Monad.Trans
 import Control.Monad.Trans.Resource
 
 import Data.Default
@@ -45,6 +47,9 @@ import Data.Maybe
 import Data.Text
 import Network
 
+import           Data.Torrent
+import           Data.Torrent.InfoHash
+import           Data.Torrent.Magnet
 import           Network.BitTorrent.Client.Types
 import           Network.BitTorrent.Client.Handle
 import           Network.BitTorrent.Core
@@ -121,3 +126,32 @@ simpleClient :: BitTorrent () -> IO ()
 simpleClient m = do
   runStderrLoggingT $ LoggingT $ \ logger -> do
     withClient def logger (`runBitTorrent` m)
+
+{-----------------------------------------------------------------------
+--  Torrent identifiers
+-----------------------------------------------------------------------}
+
+class TorrentSource s where
+  openHandle :: FilePath -> s -> BitTorrent Handle
+
+instance TorrentSource InfoHash where
+  openHandle path ih = openMagnet path (nullMagnet ih)
+  {-# INLINE openHandle #-}
+
+instance TorrentSource Magnet where
+  openHandle = openMagnet
+  {-# INLINE openHandle #-}
+
+instance TorrentSource InfoDict where
+  openHandle path dict = openTorrent path (nullTorrent dict)
+  {-# INLINE openHandle #-}
+
+instance TorrentSource Torrent where
+  openHandle = openTorrent
+  {-# INLINE openHandle #-}
+
+instance TorrentSource FilePath where
+  openHandle contentDir torrentPath = do
+    t <- liftIO $ fromFile torrentPath
+    openTorrent contentDir t
+  {-# INLINE openHandle #-}
