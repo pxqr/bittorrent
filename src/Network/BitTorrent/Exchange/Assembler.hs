@@ -51,9 +51,9 @@ module Network.BitTorrent.Exchange.Assembler
        , Network.BitTorrent.Exchange.Assembler.null
        , Network.BitTorrent.Exchange.Assembler.size
 
-         -- * Construction
+         -- *
        , Network.BitTorrent.Exchange.Assembler.empty
-       , Network.BitTorrent.Exchange.Assembler.allowPiece
+       , allowPiece
 
          -- * Debugging
        , Network.BitTorrent.Exchange.Assembler.valid
@@ -75,6 +75,14 @@ import Network.BitTorrent.Exchange.Block as B
 --  Assembler
 -----------------------------------------------------------------------}
 
+type Timestamp = ()
+{-
+data BlockRequest = BlockRequest
+  { requestSent    :: Timestamp
+  , requestedPeer  :: PeerAddr IP
+  , requestedBlock :: BlockIx
+  }
+-}
 type BlockRange = (BlockOffset, BlockSize)
 type PieceMap = IntMap
 
@@ -124,7 +132,7 @@ allowedSet = undefined
 --  You should check if a returned by peer block is actually have
 -- been requested and in-flight. This is needed to avoid "I send
 -- random corrupted block" attacks.
-insert :: (PeerAddr IP) -> Block a -> Assembler -> Assembler
+insert :: PeerAddr IP -> Block a -> Assembler -> Assembler
 insert = undefined
 
 {-
