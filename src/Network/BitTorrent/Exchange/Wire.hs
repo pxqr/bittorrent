@@ -17,6 +17,7 @@ module Network.BitTorrent.Exchange.Wire
        ( -- * Wire
          Connected
        , Wire
+       , ChannelSide   (..)
 
          -- * Connection
        , Connection
@@ -54,11 +55,7 @@ module Network.BitTorrent.Exchange.Wire
        , filterQueue
        , getMaxQueueLength
 
-         -- * Query
-       , getMetadata
-
          -- * Exceptions
-       , ChannelSide   (..)
        , ProtocolError (..)
        , WireFailure   (..)
        , peerPenalty
@@ -448,11 +445,6 @@ instance Default Options where
 --  Connection
 -----------------------------------------------------------------------}
 
-data Cached a = Cached { unCache :: a, cached :: BS.ByteString }
-
-cache :: (BEncode a) => a -> Cached a
-cache s = Cached s (BSL.toStrict $ BE.encode s)
-
 data ConnectionState = ConnectionState {
     -- | If @not (allowed ExtExtended connCaps)@ then this set is always
     -- empty. Otherwise it has the BEP10 extension protocol mandated mapping of
@@ -477,9 +469,6 @@ data ConnectionState = ConnectionState {
 
     -- | Bitfield of remote endpoint.
   , _connBitfield     :: !Bitfield
-
-    -- | Infodict associated with this Connection's connTopic.
-  , _connMetadata     :: Maybe (Cached InfoDict)
   }
 
 makeLenses ''ConnectionState
@@ -722,7 +711,6 @@ connectWire session hs addr extCaps chan wire = do
                            }
       , _connStatus       = def
       , _connBitfield     = BF.haveNone 0
-      , _connMetadata     = Nothing
       }
 
     -- TODO make KA interval configurable
@@ -757,43 +745,3 @@ acceptWire sock peerAddr wire = do
 -- | Used when size of bitfield becomes known.
 resizeBitfield :: Int -> Connected s ()
 resizeBitfield n = connBitfield %= adjustSize n
-
-{-----------------------------------------------------------------------
---  Metadata exchange
------------------------------------------------------------------------}
--- TODO introduce new metadata exchange specific exceptions
-
-fetchMetadata :: Wire s [BS.ByteString]
-fetchMetadata = loop 0
-  where
-    recvData = recvMessage >>= inspect
-      where
-        inspect (Extended (EMetadata _ meta)) =
-          case meta of
-            MetadataRequest pix -> do
-              sendMessage (MetadataReject pix)
-              recvData
-            MetadataData   {..} -> return (piece, totalSize)
-            MetadataReject   _  -> disconnectPeer
-            MetadataUnknown   _ -> recvData
-        inspect _ = recvData
-
-    loop i = do
-      sendMessage (MetadataRequest i)
-      (piece, totalSize) <- recvData
-      unless (pieceIndex piece == i) $ do
-        disconnectPeer
-
-      if piece `isLastPiece` totalSize
-        then pure [pieceData piece]
-        else (pieceData piece :) <$> loop (succ i)
-
-getMetadata :: Wire s InfoDict
-getMetadata = do
-  chunks <- fetchMetadata
-  Connection {..} <- ask
-  case BE.decode (BS.concat chunks) of
-     Right (infodict @ InfoDict {..})
-       | connTopic == idInfoHash -> return infodict
-       |         otherwise       -> error "broken infodict"
-     Left err -> error $ "unable to parse infodict" ++ err

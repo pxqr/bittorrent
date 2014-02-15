@@ -363,7 +363,7 @@ exchangeTorrent ih addr = do
   let hs = Handshake def (toCaps [ExtExtended]) ih pid
   chan <- newChan
   connectWire () hs addr (toCaps [ExtMetadata]) chan $ do
-    infodict <- getMetadata
+    infodict <- undefined -- getMetadata
     liftIO $ putMVar var infodict
   takeMVar var
 
