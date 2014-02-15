@@ -199,7 +199,7 @@ defaultBucketSize :: BucketSize
 defaultBucketSize = 8
 
 -- | Bucket is also limited in its length — thus it's called k-bucket.
---   When bucket becomes full we should split it in two lists by
+--   When bucket becomes full, we should split it in two lists by
 --   current span bit. Span bit is defined by depth in the routing
 --   table tree. Size of the bucket should be choosen such that it's
 --   very unlikely that all nodes in bucket fail within an hour of
@@ -315,9 +315,9 @@ instance Serialize NominalDiffTime where
   put = putWord32be . fromIntegral   . fromEnum
   get = (toEnum     . fromIntegral) <$> getWord32be
 
--- | Normally, routing table should we saved between invocations of
--- the client software. Note that you don't need store /this/ 'NodeId'
--- since it is included in routing table.
+-- | Normally, routing table should be saved between invocations of
+-- the client software. Note that you don't need to store /this/
+-- 'NodeId' since it is already included in routing table.
 instance (Eq ip, Serialize ip) => Serialize (Table ip)
 
 -- | Shape of the table.
