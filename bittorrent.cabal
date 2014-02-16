@@ -208,32 +208,43 @@ test-suite spec
                        System.Torrent.StorageSpec
                        System.Torrent.FileMapSpec
   build-depends:       base == 4.*
+
+                       -- * Data
                      , bytestring
-                     , directory
-                     , filepath
-                     , time
+                     , containers
                      , convertible
                      , data-default
-                     , monad-loops
-                     , monad-logger
-                     , containers
-                     , iproute
+                     , text
+                     , time
 
+                       -- * Serialization
                      , aeson
                      , cereal
-                     , network
-                     , text
 
+                       -- * Monads
                      , mtl
                      , resourcet
                      , conduit
+                     , monad-loops
+                     , monad-logger
 
+                       -- * Network
+                     , http-types
+                     , iproute
+                     , network
+
+                       -- * System
+                     , process
+                     , directory
+                     , filepath
+
+                       -- * Testing
                      , hspec >= 1.8.1.1
                      , QuickCheck
                      , quickcheck-instances
-                     , http-types
+
+                       -- * Bittorrent
                      , bencoding
-                     , process
                      , krpc  >= 0.6
                      , bittorrent
   ghc-options:         -Wall -fno-warn-orphans
