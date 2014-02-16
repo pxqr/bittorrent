@@ -11,6 +11,7 @@ module Network.BitTorrent.DHT.Query
          -- * Search
          -- ** Step
        , Iteration
+       , pingQ
        , findNodeQ
        , getPeersQ
        , announceQ
@@ -84,6 +85,13 @@ handlers = [pingH, findNodeH, getPeersH, announceH]
 -----------------------------------------------------------------------}
 
 type Iteration ip o = NodeInfo ip -> DHT ip (Either [NodeInfo ip] [o ip])
+
+-- | The most basic query. May be used to check if the given node is
+-- alive or get its 'NodeId'.
+pingQ :: Address ip => NodeAddr ip -> DHT ip (NodeInfo ip)
+pingQ addr = do
+  (nid, Ping) <- queryNode addr Ping
+  return (NodeInfo nid addr)
 
 -- TODO match with expected node id
 findNodeQ :: Address ip => NodeId -> Iteration ip NodeInfo

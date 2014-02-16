@@ -55,7 +55,6 @@ module Network.BitTorrent.DHT.Session
        , queryNode
        , queryParallel
        , (<@>)
-       , ping
        ) where
 
 import Prelude hiding (ioError)
@@ -463,8 +462,3 @@ queryParallel queries = do
   where
     cleanup :: [Either QueryFailure a] -> [a]
     cleanup = mapMaybe (either (const Nothing) Just)
-
-ping :: Address ip => NodeAddr ip -> DHT ip (NodeInfo ip)
-ping addr = do
-  (nid, Ping) <- queryNode addr Ping
-  return (NodeInfo nid addr)
