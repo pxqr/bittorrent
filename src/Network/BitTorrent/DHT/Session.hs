@@ -20,17 +20,17 @@ module Network.BitTorrent.DHT.Session
        , K
        , Options (..)
 
-         -- * Node
+         -- * Session
        , Node
        , options
        , LogFun
        , NodeHandler
        , startNode
 
-         -- * Session
+         -- * DHT
+         -- | Use @asks options@ to get options passed to 'startNode'.
        , DHT
        , runDHT
-       , askOption
 
          -- * Tokens
        , grantToken
@@ -291,10 +291,6 @@ startNode hs opts naddr logger = do
 runDHT :: Node ip -> DHT ip a -> ResIO a
 runDHT node action = runReaderT (unDHT action) node
 {-# INLINE runDHT #-}
-
-askOption :: (Options -> a) -> DHT ip a
-askOption f = asks (f . options)
-{-# INLINE askOption #-}
 
 {-----------------------------------------------------------------------
 --  Routing

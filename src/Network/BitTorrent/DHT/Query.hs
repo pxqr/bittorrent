@@ -137,5 +137,5 @@ publish ih p = do
 
 republish :: DHT ip ThreadId
 republish = fork $ do
-  i <- askOption optReannounce
+  i <- asks (optReannounce . options)
   error "DHT.republish: not implemented"
