@@ -23,12 +23,16 @@ module Network.BitTorrent.DHT.Session
          -- * Session
        , Node
        , options
+       , thisNodeId
+
+         -- ** Initialization
        , LogFun
        , NodeHandler
        , startNode
 
          -- * DHT
-         -- | Use @asks options@ to get options passed to 'startNode'.
+         -- | Use @asks options@ to get options passed to 'startNode'
+         -- or @asks thisNodeId@ to get id of locally running node.
        , DHT
        , runDHT
 
@@ -38,7 +42,6 @@ module Network.BitTorrent.DHT.Session
 
          -- * Routing table
        , getTable
-       , getNodeId
        , getClosest
        , insertNode
 
@@ -225,8 +228,12 @@ type LogFun = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
 -- | DHT session keep track state of /this/ node.
 data Node ip = Node
-  { options       :: !Options                  -- ^ session configuration;
-  , thisNodeId    :: !NodeId                   -- ^ session identifier;
+  { -- | Session configuration;
+    options       :: !Options
+
+    -- | Pseudo-unique self-assigned session identifier. This value is
+    -- constant during DHT session and (optionally) between sessions.
+  , thisNodeId    :: !NodeId
   , manager       :: !(Manager (DHT       ip)) -- ^ RPC manager;
   , routingTable  :: !(MVar    (Table     ip)) -- ^ search table;
   , contactInfo   :: !(TVar    (PeerStore ip)) -- ^ published by other nodes;
@@ -361,10 +368,6 @@ getTable = do
   var <- asks routingTable
   liftIO (readMVar var)
 
--- | Get id of /this/ node. This value is constant during DHT session.
-getNodeId :: DHT ip NodeId
-getNodeId = asks thisNodeId
-
 -- | Find a set of closest nodes from routing table of this node. (in
 -- no particular order)
 --
@@ -440,7 +443,7 @@ deleteTopic ih p = do
 queryNode :: forall a b ip. Address ip => KRPC (Query a) (Response b)
           => NodeAddr ip -> a -> DHT ip (NodeId, b)
 queryNode addr q = do
-  nid <- getNodeId
+  nid <- asks thisNodeId
   Response remoteId r <- query (toSockAddr addr) (Query nid q)
   insertNode (NodeInfo remoteId addr)
   return (remoteId, r)

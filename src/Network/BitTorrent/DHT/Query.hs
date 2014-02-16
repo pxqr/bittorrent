@@ -54,7 +54,7 @@ nodeHandler action = handler $ \ sockAddr (Query remoteId q) -> do
     Nothing    -> throwIO BadAddress
     Just naddr -> do
       insertNode (NodeInfo remoteId naddr)
-      Response <$> getNodeId <*> action naddr q
+      Response <$> asks thisNodeId <*> action naddr q
 
 pingH :: Address ip => NodeHandler ip
 pingH = nodeHandler $ \ _ Ping -> do

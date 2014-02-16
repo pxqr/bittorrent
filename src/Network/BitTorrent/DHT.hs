@@ -53,6 +53,7 @@ module Network.BitTorrent.DHT
 
 import Control.Applicative
 import Control.Monad.Logger
+import Control.Monad.Reader
 import Control.Monad.Trans
 import Data.ByteString as BS
 import Data.Conduit as C
@@ -133,7 +134,7 @@ resolveHostName NodeAddr {..} = do
 bootstrap :: Address ip => [NodeAddr ip] -> DHT ip ()
 bootstrap startNodes = do
   $(logInfoS) "bootstrap" "Start node bootstrapping"
-  nid <- getNodeId
+  nid <- asks thisNodeId
   -- TODO filter duplicated in startNodes list
   aliveNodes <- queryParallel (ping <$> startNodes)
   _ <- sourceList [aliveNodes] $= search nid (findNodeQ nid) $$ C.consume
