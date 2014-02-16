@@ -64,6 +64,7 @@ library
                        Network.BitTorrent.Core.PeerAddr
                        Network.BitTorrent.DHT
                        Network.BitTorrent.DHT.Message
+                       Network.BitTorrent.DHT.Query
                        Network.BitTorrent.DHT.Routing
                        Network.BitTorrent.DHT.Session
                        Network.BitTorrent.DHT.Token

@@ -62,6 +62,7 @@ import Network.Socket
 import Data.Torrent (tNodes)
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
+import Network.BitTorrent.DHT.Query
 import Network.BitTorrent.DHT.Session
 import Network.BitTorrent.DHT.Routing as T
 
