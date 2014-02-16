@@ -19,6 +19,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFunctor              #-}
 module Network.BitTorrent.Core.NodeInfo
        (  -- * Node ID
          NodeId
@@ -143,7 +144,7 @@ distance (NodeId a) (NodeId b) = NodeDistance (BS.pack (BS.zipWith xor a b))
 data NodeAddr a = NodeAddr
   { nodeHost ::                !a
   , nodePort :: {-# UNPACK #-} !PortNumber
-  } deriving (Eq, Typeable)
+  } deriving (Eq, Typeable, Functor)
 
 $(deriveJSON omitRecordPrefix ''NodeAddr)
 
@@ -199,7 +200,7 @@ fromPeerAddr PeerAddr {..} = NodeAddr
 data NodeInfo a = NodeInfo
   { nodeId   :: !NodeId
   , nodeAddr :: !(NodeAddr a)
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Functor)
 
 $(deriveJSON omitRecordPrefix ''NodeInfo)
 
