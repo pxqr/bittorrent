@@ -15,10 +15,9 @@
 {-# LANGUAGE TemplateHaskell            #-}
 module Network.BitTorrent.DHT.Session
        ( -- * Options
+         -- | Use @optFooBar def@ to get default 'Alpha' or 'K'.
          Alpha
-       , defaultAlpha
        , K
-       , defaultK
        , Options (..)
 
          -- * Node
