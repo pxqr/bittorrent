@@ -226,6 +226,10 @@ data Torrent = Torrent
     -- torrent generating client's routing table. Alternatively, the
     -- key could be set to a known good 'Network.BitTorrent.Core.Node'
     -- such as one operated by the person generating the torrent.
+    --
+    -- Please do not automatically add \"router.bittorrent.com\" to
+    -- this list because different bittorrent software may prefer to
+    -- use different bootstrap node.
 
   , tPublisher    :: !(Maybe URI)
     -- ^ Containing the RSA public key of the publisher of the
