@@ -209,6 +209,9 @@ test-suite spec
                        System.Torrent.FileMapSpec
   build-depends:       base == 4.*
 
+                       -- * Concurrency
+                     , async
+
                        -- * Data
                      , bytestring
                      , containers

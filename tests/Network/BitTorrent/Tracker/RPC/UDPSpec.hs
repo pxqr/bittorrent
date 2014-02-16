@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.Tracker.RPC.UDPSpec (spec, trackerURIs) where
-
+import Control.Concurrent.Async
 import Control.Monad
 import Data.Default
 import Data.List as L
@@ -47,3 +47,9 @@ spec = parallel $ do
           withManager def $ \ mgr -> do
             xs <- scrape mgr uri [def]
             L.length xs `shouldSatisfy` (>= 1)
+
+      describe "Manager" $ do
+        it "should handle arbitrary intermixed concurrent queries" $ do
+          withManager def $ \ mgr -> do
+            _ <- mapConcurrently (\ _ -> scrape mgr uri [def]) [1..100]
+            return ()
