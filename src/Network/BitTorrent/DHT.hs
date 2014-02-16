@@ -28,6 +28,7 @@ module Network.BitTorrent.DHT
        , defaultBootstrapNodes
        , resolveHostName
        , bootstrap
+       , isBootstrapped
 
          -- * Initialization
        , snapshot
@@ -59,6 +60,7 @@ import Data.Torrent (tNodes)
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Session
+import Network.BitTorrent.DHT.Routing as T
 
 {-----------------------------------------------------------------------
 --  DHT types
@@ -132,6 +134,14 @@ bootstrap startNodes = do
   aliveNodes <- queryParallel (ping <$> startNodes)
   _ <- sourceList [aliveNodes] $= search nid (findNodeQ nid) $$ C.consume
   $(logInfoS) "bootstrap" "Node bootstrapping finished"
+
+-- | Check if this node is already bootstrapped.
+--   @bootstrap [good_node] >> isBootstrapped@@ should always return 'True'.
+--
+--   This operation do not block.
+--
+isBootstrapped :: DHT ip Bool
+isBootstrapped = T.full <$> getTable
 
 {-----------------------------------------------------------------------
 -- Initialization
