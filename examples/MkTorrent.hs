@@ -39,7 +39,7 @@ import Data.Torrent.Layout
 import Data.Torrent.Magnet hiding (Magnet)
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Session hiding (Options)
-import Network.BitTorrent.DHT as DHT
+import Network.BitTorrent.DHT as DHT  hiding (Options)
 import Network.BitTorrent.Exchange.Message
 import Network.BitTorrent.Exchange.Wire hiding (Options)
 import System.Torrent.Storage
