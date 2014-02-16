@@ -53,7 +53,7 @@ import           Data.Torrent.Magnet
 import           Network.BitTorrent.Client.Types
 import           Network.BitTorrent.Client.Handle
 import           Network.BitTorrent.Core
-import           Network.BitTorrent.DHT
+import           Network.BitTorrent.DHT      as DHT      hiding (Options)
 import           Network.BitTorrent.Tracker  as Tracker  hiding (Options)
 import           Network.BitTorrent.Exchange as Exchange hiding (Options)
 import qualified Network.BitTorrent.Exchange as Exchange (Options(..))

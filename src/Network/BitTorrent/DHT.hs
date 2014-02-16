@@ -20,7 +20,7 @@
 module Network.BitTorrent.DHT
        ( -- * Distributed Hash Table
          DHT
-       , MonadDHT (..)
+       , Options (..)
        , dht
 
          -- * Bootstrapping
@@ -39,12 +39,15 @@ module Network.BitTorrent.DHT
        , Network.BitTorrent.DHT.insert
        , Network.BitTorrent.DHT.delete
 
-         -- * Internal
-         -- | Can be used to implement instance of 'MonadDHT'.
+         -- * Embedding
+         -- ** Session
        , LogFun
        , Node
        , handlers
        , startNode
+
+         -- ** Monad
+       , MonadDHT (..)
        , runDHT
        ) where
 
