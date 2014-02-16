@@ -18,6 +18,7 @@
 --
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE OverlappingInstances       #-}
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
@@ -85,6 +86,7 @@ import           Data.Text as T
 import Data.Time
 import Data.Time.Clock.POSIX
 import Data.Typeable
+import Network (HostName)
 import Network.URI
 import Text.PrettyPrint as PP
 import Text.PrettyPrint.Class
@@ -219,7 +221,7 @@ data Torrent = Torrent
   , tInfoDict     :: !InfoDict
     -- ^ Info about each content file.
 
-  , tNodes        :: !(Maybe [NodeAddr ByteString])
+  , tNodes        :: !(Maybe [NodeAddr HostName])
     -- ^ This key should be set to the /K closest/ nodes in the
     -- torrent generating client's routing table. Alternatively, the
     -- key could be set to a known good 'Network.BitTorrent.Core.Node'
@@ -285,6 +287,11 @@ instance BEncode POSIXTime where
   toBEncode pt = toBEncode (floor pt :: Integer)
   fromBEncode (BInteger i) = return $ fromIntegral i
   fromBEncode _            = decodingError $ "POSIXTime"
+
+-- TODO to bencoding package
+instance BEncode String where
+  toBEncode = toBEncode . T.pack
+  fromBEncode v = T.unpack <$> fromBEncode v
 
 instance BEncode Torrent where
   toBEncode Torrent {..} = toDict $
