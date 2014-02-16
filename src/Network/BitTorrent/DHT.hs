@@ -132,9 +132,6 @@ bootstrap startNodes = do
   aliveNodes <- queryParallel (ping <$> startNodes)
   _ <- sourceList [aliveNodes] $= search nid (findNodeQ nid) $$ C.consume
   $(logInfoS) "bootstrap" "Node bootstrapping finished"
---     t <- getTable
---     unless (full t) $ do
---      nid <- getNodeId
 
 {-----------------------------------------------------------------------
 -- Initialization
