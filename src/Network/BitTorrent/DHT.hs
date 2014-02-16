@@ -23,8 +23,13 @@ module Network.BitTorrent.DHT
        , MonadDHT (..)
        , dht
 
-         -- * Initialization
+         -- * Bootstrapping
+       , tNodes
+       , defaultBootstrapNodes
+       , resolveHostName
        , bootstrap
+
+         -- * Initialization
        , snapshot
        , restore
 
@@ -48,8 +53,9 @@ import Control.Monad.Trans
 import Data.ByteString as BS
 import Data.Conduit as C
 import Data.Conduit.List as C
-import Network.Socket (PortNumber)
+import Network.Socket
 
+import Data.Torrent (tNodes)
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Session
@@ -78,26 +84,61 @@ dht opts addr action = do
 {-# INLINE dht #-}
 
 {-----------------------------------------------------------------------
---  Initialization
+--  Bootstrapping
 -----------------------------------------------------------------------}
-
--- | One good node may be sufficient. The list of bootstrapping nodes
--- usually obtained from 'Data.Torrent.tNodes' field. Bootstrapping
--- process can take up to 5 minutes.
+-- Do not include the following hosts in the default bootstrap nodes list:
 --
---   This operation is synchronous and do block, use
+--   * "dht.aelitis.com" and "dht6.azureusplatform.com" - since
+--   Azureus client have a different (and probably incompatible) DHT
+--   protocol implementation.
+--
+--   * "router.utorrent.com" since it is just an alias to
+--   "router.bittorrent.com".
+
+-- | List of bootstrap nodes maintained by different bittorrent
+-- software authors.
+defaultBootstrapNodes :: [NodeAddr HostName]
+defaultBootstrapNodes =
+  [ NodeAddr "router.bittorrent.com"  6881 -- by BitTorrent Inc.
+
+    -- doesn't work at the moment (use git blame)  of commit
+  , NodeAddr "dht.transmissionbt.com" 6881 -- by Transmission project
+  ]
+
+-- TODO Multihomed hosts
+
+-- | Resolve either a numeric network address or a hostname to a
+-- numeric IP address of the node.  Usually used to resolve
+-- 'defaultBootstrapNodes' or 'Data.Torrent.tNodes' lists.
+resolveHostName :: NodeAddr HostName -> IO (NodeAddr IPv4)
+resolveHostName NodeAddr {..} = do
+  let hints = defaultHints { addrFamily = AF_INET, addrSocketType = Datagram }
+  -- getAddrInfo throws exception on empty list, so the pattern matching never fail
+  info : _ <- getAddrInfo (Just hints) (Just nodeHost) (Just (show nodePort))
+  case fromSockAddr (addrAddress info) of
+    Nothing   -> error "resolveNodeAddr: impossible"
+    Just addr -> return addr
+
+-- | One good node may be sufficient.
+--
+--   This operation do block, use
 --   'Control.Concurrent.Async.Lifted.async' if needed.
 --
 bootstrap :: Address ip => [NodeAddr ip] -> DHT ip ()
 bootstrap startNodes = do
   $(logInfoS) "bootstrap" "Start node bootstrapping"
   nid <- getNodeId
+  -- TODO filter duplicated in startNodes list
   aliveNodes <- queryParallel (ping <$> startNodes)
   _ <- sourceList [aliveNodes] $= search nid (findNodeQ nid) $$ C.consume
   $(logInfoS) "bootstrap" "Node bootstrapping finished"
 --     t <- getTable
 --     unless (full t) $ do
 --      nid <- getNodeId
+
+{-----------------------------------------------------------------------
+-- Initialization
+-----------------------------------------------------------------------}
 
 -- | Load previous session. (corrupted - exception/ignore ?)
 --
