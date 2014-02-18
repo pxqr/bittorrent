@@ -50,14 +50,14 @@ spec = do
 
   describe "peer storage" $ do
     it "should return nodes, if there are no peers" $ property $ \ ih -> do
-      nodes <- simpleDHT $ do getPeerList ih
-      nodes `shouldSatisfy` isLeft
+      res <- simpleDHT $ do getPeerList ih
+      res `shouldSatisfy` isLeft
 
     it "should return peers, if any" $ property $ \ ih addr -> do
-      peers <- simpleDHT $ do
+      res <- simpleDHT $ do
                  insertPeer ih addr
                  getPeerList ih
-      peers `shouldSatisfy` isRight
+      res `shouldSatisfy` isRight
 
   describe "topic storage" $ do
     return ()
