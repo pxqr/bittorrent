@@ -349,12 +349,11 @@ grantToken addr = do
 
 -- | Throws 'HandlerError' if the token is invalid or already
 -- expired. See 'TokenMap' for details.
-checkToken :: Hashable a => NodeAddr a -> Token -> DHT ip ()
+checkToken :: Hashable a => NodeAddr a -> Token -> DHT ip Bool
 checkToken addr questionableToken = do
   tryUpdateSecret
   toks <- asks sessionTokens >>= liftIO . readTVarIO
-  unless (T.member addr questionableToken (tokenMap toks)) $
-    throwIO $ InvalidParameter "token"
+  return $ T.member addr questionableToken (tokenMap toks)
 
 {-----------------------------------------------------------------------
 -- Routing table

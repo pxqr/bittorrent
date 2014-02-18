@@ -71,7 +71,10 @@ getPeersH = nodeHandler $ \ naddr (GetPeers ih) -> do
 
 announceH :: Address ip => NodeHandler ip
 announceH = nodeHandler $ \ naddr @ NodeAddr {..} (Announce {..}) -> do
-  checkToken naddr sessionToken
+  valid <- checkToken naddr sessionToken
+  unless valid $ do
+    throwIO $ InvalidParameter "token"
+
   let annPort  = if impliedPort then nodePort else port
   let peerAddr = PeerAddr Nothing nodeHost annPort
   insertPeer topic peerAddr

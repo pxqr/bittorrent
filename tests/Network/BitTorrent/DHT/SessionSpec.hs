@@ -2,6 +2,7 @@
 module Network.BitTorrent.DHT.SessionSpec (spec) where
 import Control.Monad.Reader
 import Data.Default
+import Data.List as L
 import Test.Hspec
 import Test.QuickCheck
 
@@ -33,14 +34,17 @@ spec = do
   describe "tokens" $ do
     it "should not complain about valid token" $
       property $ \ (addrs :: [NodeAddr IPv4]) -> do
-        simpleDHT $ do
-          forM_ addrs $ \ addr -> do
+        isOks <- simpleDHT $ do
+          forM addrs $ \ addr -> do
             token <- grantToken addr
             checkToken addr token
-{-
-    it "" $ property $ \ (addr :: NodeAddr IPv4) token -> do
-      simpleDHT (checkToken addr token) `shouldThrow` (== undefined)
--}
+        L.and isOks `shouldBe` True
+
+    it "should complain about invalid token" $
+      property $ \ (addr :: NodeAddr IPv4) token -> do
+        isOk <- simpleDHT (checkToken addr token)
+        isOk `shouldBe` False
+
   describe "routing table" $ do
     return ()
 
