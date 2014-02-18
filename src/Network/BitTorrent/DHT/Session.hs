@@ -36,22 +36,22 @@ module Network.BitTorrent.DHT.Session
        , DHT
        , runDHT
 
-         -- * Tokens
+         -- ** Tokens
        , grantToken
        , checkToken
 
-         -- * Routing table
+         -- ** Routing table
        , getTable
        , getClosest
        , insertNode
 
-         -- * Peer storage
+         -- ** Peer storage
        , insertPeer
        , getPeerList
        , insertTopic
        , deleteTopic
 
-         -- * Messaging
+         -- ** Messaging
        , queryNode
        , queryParallel
        , (<@>)
