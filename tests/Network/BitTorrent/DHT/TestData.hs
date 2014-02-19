@@ -15,31 +15,31 @@ testTorrents :: [TestEntry]
 testTorrents =
   [ TestEntry
     { entryName  = "Automate with Arduino, Android..."
-    , entryHash  = "8C0433E541DC5D1CFC095799CEF171CD4EB586F7"
+    , entryHash  = "8c0433e541dc5d1cfc095799cef171cd4eb586f7"
     , entryPeers = 300
     }
 
   , TestEntry
     { entryName  = "Beginning Programming with Java For Dummies"
-    , entryHash  = "FD8967721731CC16C8B203A03E49CE839CECF184"
+    , entryHash  = "fd8967721731cc16c8b203a03e49ce839cecf184"
     , entryPeers = 200
     }
 
   , TestEntry
     { entryName  = "The C Programming Language"
-    , entryHash  = "146D13F090E50E97091DBBE5B37678DD1471CFAD"
+    , entryHash  = "146d13f090e50e97091dbbe5b37678dd1471cfad"
     , entryPeers = 100
     }
 
   , TestEntry
     { entryName  = "The C++ Programming Language"
-    , entryHash  = "8E8E8E6319031A22CFF26D895AFE050085C84A7F"
+    , entryHash  = "8e8e8e6319031a22cff26d895afe050085c84a7f"
     , entryPeers = 50
     }
 
   , TestEntry
     { entryName  = "Game and Graphics Programming for iOS..."
-    , entryHash  = "703D0595B727FCCBFAA3D03BE25F57347CCFD6DE"
+    , entryHash  = "703d0595b727fccbfaa3d03be25f57347ccfd6de"
     , entryPeers = 30
     }
   ]
