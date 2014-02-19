@@ -72,21 +72,25 @@ nodeHandler action = handler $ \ sockAddr (Query remoteId q) -> do
   case fromSockAddr sockAddr of
     Nothing    -> throwIO BadAddress
     Just naddr -> do
-      insertNode (NodeInfo remoteId naddr)
+      insertNode (NodeInfo remoteId naddr) -- TODO need to block. why?
       Response <$> asks thisNodeId <*> action naddr q
 
+-- | Default 'Ping' handler.
 pingH :: Address ip => NodeHandler ip
 pingH = nodeHandler $ \ _ Ping -> do
   return Ping
 
+-- | Default 'FindNode' handler.
 findNodeH :: Address ip => NodeHandler ip
 findNodeH = nodeHandler $ \ _ (FindNode nid) -> do
   NodeFound <$> getClosest nid
 
+-- | Default 'GetPeers' handler.
 getPeersH :: Address ip => NodeHandler ip
 getPeersH = nodeHandler $ \ naddr (GetPeers ih) -> do
   GotPeers <$> getPeerList ih <*> grantToken naddr
 
+-- | Default 'Announce' handler.
 announceH :: Address ip => NodeHandler ip
 announceH = nodeHandler $ \ naddr @ NodeAddr {..} (Announce {..}) -> do
   valid <- checkToken naddr sessionToken
