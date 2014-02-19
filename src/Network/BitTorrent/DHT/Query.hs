@@ -1,22 +1,40 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2014
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  experimental
+--   Portability :  portable
+--
+--   This module provides functions to interact with other nodes.
+--   Normally, you don't need to import this module, use
+--   "Network.BitTorrent.DHT" instead.
+--
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Network.BitTorrent.DHT.Query
        ( -- * Handler
+         -- | To bind specific set of handlers you need to pass
+         -- handler list to the 'startNode' function.
          pingH
        , findNodeH
        , getPeersH
        , announceH
        , defaultHandlers
 
-         -- * Search
-         -- ** Step
+         -- * Query
+         -- ** Basic
+         -- | A basic query perform a single request expecting a
+         -- single response.
        , Iteration
        , pingQ
        , findNodeQ
        , getPeersQ
        , announceQ
 
-         -- ** Traversal
+         -- ** Iterative
+         -- | An iterative query perform multiple basic queries,
+         -- concatenate its responses, optionally yielding result and
+         -- continue to the next iteration.
        , Search
        , search
        , publish
@@ -80,12 +98,12 @@ announceH = nodeHandler $ \ naddr @ NodeAddr {..} (Announce {..}) -> do
   insertPeer topic peerAddr
   return Announced
 
--- | Includes all query handlers.
+-- | Includes all default query handlers.
 defaultHandlers :: Address ip => [NodeHandler ip]
 defaultHandlers = [pingH, findNodeH, getPeersH, announceH]
 
 {-----------------------------------------------------------------------
---  Search
+--  Basic queries
 -----------------------------------------------------------------------}
 
 type Iteration ip o = NodeInfo ip -> DHT ip (Either [NodeInfo ip] [o ip])
@@ -126,6 +144,10 @@ announceQ ih p NodeInfo {..} = do
     Right ps -> do -- TODO *probably* add to peer cache
       Announced <- Announce False ih p grantedToken <@> nodeAddr
       return (Right [nodeAddr])
+
+{-----------------------------------------------------------------------
+--  Iterative queries
+-----------------------------------------------------------------------}
 
 type Search    ip o = Conduit [NodeInfo ip] (DHT ip) [o ip]
 
