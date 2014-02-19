@@ -1,5 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Network.BitTorrent.DHT.SessionSpec (spec) where
+import Control.Applicative
+import Control.Concurrent
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 import Data.Default
@@ -57,8 +59,15 @@ spec = do
         isOk <- simpleDHT (checkToken addr token)
         isOk `shouldBe` False
 
-  describe "routing table" $ do
-    return ()
+  describe "routing table" $
+    it "accept any node entry when table is empty" $
+      property $ \ (nid :: NodeId) -> do
+        let info = NodeInfo nid myAddr
+        closest <- simpleDHT $ do
+           insertNode info
+           liftIO $ yield
+           getClosest nid
+        closest `shouldSatisfy` L.elem info
 
   describe "peer storage" $ do
     it "should return nodes, if there are no peers" $ property $ \ ih -> do
@@ -72,7 +81,8 @@ spec = do
       res `shouldSatisfy` isRight
 
   describe "topic storage" $ do
-    return ()
+    it "should not grow indefinitely" $ do
+      pending
 
   describe "messaging" $ do
     describe "queryNode" $ do
@@ -84,7 +94,12 @@ spec = do
         rid `shouldBe` tid
 
     describe "queryParallel" $ do
-      return ()
+      it "should handle parallel requests" $ do
+        (nid, resps) <- simpleDHT $ (,)
+          <$> asks thisNodeId
+          <*> queryParallel (L.replicate 100 $ queryNode myAddr Ping)
+        resps `shouldSatisfy` L.all (== (nid, Ping))
 
     describe "(<@>) operator" $ do
-      return ()
+      it "" $
+         pending
