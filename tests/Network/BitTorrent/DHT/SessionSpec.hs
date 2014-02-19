@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Network.BitTorrent.DHT.SessionSpec (spec) where
 import Control.Monad.Reader
+import Control.Monad.Trans.Resource
 import Data.Default
 import Data.List as L
 import Test.Hspec
@@ -29,8 +30,19 @@ isRight (Right _) = True
 isLeft :: Either a b -> Bool
 isLeft = not . isRight
 
+nullLogger :: LogFun
+nullLogger _ _ _ _ = return ()
+
 spec :: Spec
 spec = do
+  describe "session" $ do
+    it "is active until stopNode called" $ do
+      node <- startNode [] def myAddr nullLogger
+      runDHT node monadActive `shouldReturn` True
+      runDHT node monadActive `shouldReturn` True
+      stopNode node
+      runDHT node monadActive `shouldReturn` False
+
   describe "tokens" $ do
     it "should not complain about valid token" $
       property $ \ (addrs :: [NodeAddr IPv4]) -> do

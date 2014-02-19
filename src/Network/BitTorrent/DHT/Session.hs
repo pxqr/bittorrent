@@ -264,6 +264,12 @@ instance MonadBaseControl IO (DHT ip) where
   restoreM = DHT . restoreM . unSt
   {-# INLINE restoreM #-}
 
+-- | Check is it is possible to run 'queryNode' or handle pending
+-- query from remote node.
+instance MonadActive (DHT ip) where
+  monadActive = getManager >>= liftIO . isActive
+  {-# INLINE monadActive #-}
+
 -- | All allocated resources will be closed at 'stopNode'.
 instance MonadResource (DHT ip) where
   liftResourceT m = do
