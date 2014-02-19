@@ -154,7 +154,7 @@ library
 
                        -- Network
                      , network      >= 2.4
-                     , krpc         >= 0.6
+                     , krpc         >= 0.6.1
                      , http-types   >= 0.8
                      , http-conduit >= 1.9 && < 2.0
                      , wai          >= 1.4 && < 2.0
@@ -249,7 +249,7 @@ test-suite spec
 
                        -- * Bittorrent
                      , bencoding
-                     , krpc  >= 0.6
+                     , krpc  >= 0.6.1
                      , bittorrent
   ghc-options:         -Wall -fno-warn-orphans
 
