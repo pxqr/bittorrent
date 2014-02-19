@@ -1,9 +1,14 @@
 -- |
---   Copyright   :  (c) Sam Truzjan 2013
+--   Copyright   :  (c) Sam Truzjan 2013-2014
 --   License     :  BSD3
 --   Maintainer  :  pxqr.sta@gmail.com
 --   Stability   :  experimental
 --   Portability :  portable
+--
+--   This module defines internal state of a node instance. You can
+--   have multiple nodes per application but usually you don't have
+--   to. Normally, you don't need to import this module, use
+--   "Network.BitTorrent.DHT" instead.
 --
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
