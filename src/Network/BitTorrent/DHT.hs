@@ -45,6 +45,7 @@ module Network.BitTorrent.DHT
        , Node
        , handlers
        , startNode
+       , stopNode
 
          -- ** Monad
        , MonadDHT (..)

@@ -308,6 +308,7 @@ startNode hs opts naddr logger = do
 stopNode :: Node ip -> IO ()
 stopNode Node {..} = closeInternalState resources
 
+-- | Run DHT operation on the given session.
 runDHT :: Node ip -> DHT ip a -> IO a
 runDHT node action = runReaderT (unDHT action) node
 {-# INLINE runDHT #-}

@@ -80,6 +80,7 @@ announceH = nodeHandler $ \ naddr @ NodeAddr {..} (Announce {..}) -> do
   insertPeer topic peerAddr
   return Announced
 
+-- | Includes all query handlers.
 handlers :: Address ip => [NodeHandler ip]
 handlers = [pingH, findNodeH, getPeersH, announceH]
 

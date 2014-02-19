@@ -112,6 +112,7 @@ closeClient :: Client -> IO ()
 closeClient Client {..} = do
   Exchange.closeManager exchangeManager
   Tracker.closeManager  trackerManager
+  DHT.stopNode clientNode
   return ()
 --  closeNode clientNode
 
