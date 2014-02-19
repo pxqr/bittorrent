@@ -250,6 +250,7 @@ newtype DHT ip a = DHT { unDHT :: ReaderT (Node ip) IO a }
   deriving ( Functor, Applicative, Monad
            , MonadIO, MonadBase IO
            , MonadReader (Node ip)
+           , MonadThrow, MonadUnsafeIO
            )
 
 instance MonadBaseControl IO (DHT ip) where
@@ -262,6 +263,12 @@ instance MonadBaseControl IO (DHT ip) where
 
   restoreM = DHT . restoreM . unSt
   {-# INLINE restoreM #-}
+
+-- | All allocated resources will be closed at 'stopNode'.
+instance MonadResource (DHT ip) where
+  liftResourceT m = do
+    s <- asks resources
+    liftIO $ runInternalState m s
 
 instance MonadKRPC (DHT ip) (DHT ip) where
   getManager = asks manager
