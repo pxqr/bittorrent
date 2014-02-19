@@ -6,7 +6,7 @@ module Network.BitTorrent.DHT.Query
        , findNodeH
        , getPeersH
        , announceH
-       , handlers
+       , defaultHandlers
 
          -- * Search
          -- ** Step
@@ -81,8 +81,8 @@ announceH = nodeHandler $ \ naddr @ NodeAddr {..} (Announce {..}) -> do
   return Announced
 
 -- | Includes all query handlers.
-handlers :: Address ip => [NodeHandler ip]
-handlers = [pingH, findNodeH, getPeersH, announceH]
+defaultHandlers :: Address ip => [NodeHandler ip]
+defaultHandlers = [pingH, findNodeH, getPeersH, announceH]
 
 {-----------------------------------------------------------------------
 --  Search
