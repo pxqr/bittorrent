@@ -29,6 +29,7 @@ module Network.BitTorrent.DHT.Session
        , LogFun
        , NodeHandler
        , startNode
+       , stopNode
 
          -- * DHT
          -- | Use @asks options@ to get options passed to 'startNode'
@@ -233,6 +234,8 @@ data Node ip = Node
     -- | Pseudo-unique self-assigned session identifier. This value is
     -- constant during DHT session and (optionally) between sessions.
   , thisNodeId    :: !NodeId
+
+  , resources     :: !InternalState
   , manager       :: !(Manager (DHT       ip)) -- ^ RPC manager;
   , routingTable  :: !(MVar    (Table     ip)) -- ^ search table;
   , contactInfo   :: !(TVar    (PeerStore ip)) -- ^ published by other nodes;
@@ -243,7 +246,7 @@ data Node ip = Node
 
 -- | DHT keep track current session and proper resource allocation for
 -- safe multithreading.
-newtype DHT ip a = DHT { unDHT :: ReaderT (Node ip) (ResourceT IO) a }
+newtype DHT ip a = DHT { unDHT :: ReaderT (Node ip) IO a }
   deriving ( Functor, Applicative, Monad
            , MonadIO, MonadBase IO
            , MonadReader (Node ip)
@@ -251,7 +254,7 @@ newtype DHT ip a = DHT { unDHT :: ReaderT (Node ip) (ResourceT IO) a }
 
 instance MonadBaseControl IO (DHT ip) where
   newtype StM (DHT ip) a = StM {
-      unSt :: StM (ReaderT (Node ip) (ResourceT IO)) a
+      unSt :: StM (ReaderT (Node ip) IO) a
     }
   liftBaseWith cc = DHT $ liftBaseWith $ \ cc' ->
       cc $ \ (DHT m) -> StM <$> cc' m
@@ -270,31 +273,42 @@ instance MonadLogger (DHT ip) where
 
 type NodeHandler ip = Handler (DHT ip)
 
--- | Run DHT session. Some resources like listener thread may live for
--- some short period of time right after this DHT session closed.
+-- | Run DHT session. You /must/ properly close session using
+-- 'stopNode' function, otherwise socket or other scarce resources may
+-- leak.
 startNode :: Address ip
           => [NodeHandler ip] -- ^ handlers to run on accepted queries;
           -> Options          -- ^ various dht options;
           -> NodeAddr ip      -- ^ node address to bind;
           -> LogFun           -- ^
-          -> ResIO (Node ip)  -- ^ a new DHT node running at given address.
+          -> IO (Node ip)     -- ^ a new DHT node running at given address.
 startNode hs opts naddr logger = do
---    (_, m) <- allocate (newManager rpcOpts nodeAddr hs) closeManager
-    m      <- liftIO $ newManager rpcOpts nodeAddr hs
-    myId   <- liftIO genNodeId
-    node   <- liftIO $ Node opts myId m
+    s <- createInternalState
+    runInternalState initNode s
+      `onException` closeInternalState s
+  where
+    rpcOpts  = KRPC.def { optQueryTimeout = seconds (optTimeout opts) }
+    nodeAddr = toSockAddr naddr
+    initNode = do
+      s      <- getInternalState
+      (_, m) <- allocate (newManager rpcOpts nodeAddr hs) closeManager
+      liftIO $ do
+        myId   <- genNodeId
+        node   <- Node opts myId s m
                 <$> newMVar (nullTable myId (optBucketCount opts))
                 <*> newTVarIO def
                 <*> newTVarIO S.empty
                 <*> (newTVarIO =<< nullSessionTokens)
                 <*> pure logger
-    runReaderT (unDHT listen) node
-    return node
-  where
-    rpcOpts  = KRPC.def { optQueryTimeout = seconds (optTimeout opts) }
-    nodeAddr = toSockAddr naddr
+        runReaderT (unDHT listen) node
+        return node
 
-runDHT :: Node ip -> DHT ip a -> ResIO a
+-- | Some resources like listener thread may live for
+-- some short period of time right after this DHT session closed.
+stopNode :: Node ip -> IO ()
+stopNode Node {..} = closeInternalState resources
+
+runDHT :: Node ip -> DHT ip a -> IO a
 runDHT node action = runReaderT (unDHT action) node
 {-# INLINE runDHT #-}
 

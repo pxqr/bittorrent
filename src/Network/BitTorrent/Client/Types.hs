@@ -80,7 +80,7 @@ instance MonadBitTorrent BitTorrent where
 instance MonadDHT BitTorrent where
   liftDHT action = BitTorrent $ do
     node <- asks clientNode
-    liftIO $ runResourceT $ runDHT node action
+    liftIO $ runDHT node action
 
 instance MonadLogger BitTorrent where
   monadLoggerLog loc src lvl msg = BitTorrent $ do

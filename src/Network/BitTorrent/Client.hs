@@ -93,7 +93,7 @@ newClient opts @ Options {..} logger = do
   tmap <- newMVar HM.empty
   tmgr <- Tracker.newManager def (PeerInfo pid Nothing optPort)
   emgr <- Exchange.newManager (exchangeOptions pid opts) connHandler
-  node <- runResourceT $ do
+  node <- do
     node <- startNode handlers def optNodeAddr logger
     runDHT node $ bootstrap (maybeToList optBootNode)
     return node

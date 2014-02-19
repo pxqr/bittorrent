@@ -55,6 +55,7 @@ import Control.Applicative
 import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans
+import Control.Exception
 import Data.ByteString as BS
 import Data.Conduit as C
 import Data.Conduit.List as C
@@ -84,9 +85,8 @@ dht :: Address ip
     -> DHT ip a    -- ^ actions to run: 'bootstrap', 'lookup', etc;
     -> IO a        -- ^ result.
 dht opts addr action = do
-  runResourceT $ do
-    runStderrLoggingT $ LoggingT $ \ logger -> do
-      node <- startNode handlers opts addr logger
+  runStderrLoggingT $ LoggingT $ \ logger -> do
+    bracket (startNode handlers opts addr logger) stopNode $ \ node ->
       runDHT node action
 {-# INLINE dht #-}
 
