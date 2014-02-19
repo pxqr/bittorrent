@@ -194,6 +194,7 @@ test-suite spec
                        Network.BitTorrent.Core.PeerAddrSpec
                        Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.DHTSpec
+                       Network.BitTorrent.DHT.TestData
                        Network.BitTorrent.DHT.MessageSpec
                        Network.BitTorrent.DHT.RoutingSpec
                        Network.BitTorrent.DHT.SessionSpec
