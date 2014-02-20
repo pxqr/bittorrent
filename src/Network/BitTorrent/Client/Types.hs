@@ -13,6 +13,7 @@ module Network.BitTorrent.Client.Types
        , MonadBitTorrent (..)
        ) where
 
+import Control.Applicative
 import Control.Concurrent
 import Control.Monad.Logger
 import Control.Monad.Reader
@@ -40,6 +41,7 @@ data Client = Client
   { clientPeerId       :: !PeerId
   , clientListenerPort :: !PortNumber
   , allowedExtensions  :: !Caps
+  , clientResources    :: !InternalState
   , trackerManager     :: !Tracker.Manager
   , exchangeManager    :: !Exchange.Manager
   , clientNode         :: !(Node IPv4)
@@ -68,14 +70,21 @@ externalAddr Client {..} = PeerAddr
 -----------------------------------------------------------------------}
 
 newtype BitTorrent a = BitTorrent
-  { unBitTorrent :: ReaderT Client (ResourceT IO) a
-  } deriving (Functor, Monad, MonadIO)
+  { unBitTorrent :: ReaderT Client IO a
+  } deriving ( Functor, Applicative, Monad
+             , MonadIO, MonadThrow, MonadUnsafeIO
+             )
 
 class MonadBitTorrent m where
   liftBT :: BitTorrent a -> m a
 
 instance MonadBitTorrent BitTorrent where
   liftBT = id
+
+instance MonadResource BitTorrent where
+  liftResourceT m = BitTorrent $ do
+    s <- asks clientResources
+    liftIO $ runInternalState m s
 
 instance MonadDHT BitTorrent where
   liftDHT action = BitTorrent $ do
@@ -88,8 +97,7 @@ instance MonadLogger BitTorrent where
     liftIO $ logger loc src lvl (toLogStr msg)
 
 runBitTorrent :: Client -> BitTorrent a -> IO a
-runBitTorrent client action = runResourceT $
-  runReaderT (unBitTorrent action) client
+runBitTorrent client action = runReaderT (unBitTorrent action) client
 {-# INLINE runBitTorrent #-}
 
 getClient :: BitTorrent Client

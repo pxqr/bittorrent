@@ -39,10 +39,10 @@ import Control.Exception
 import Control.Concurrent
 import Control.Monad.Logger
 import Control.Monad.Trans
+import Control.Monad.Trans.Resource
 
 import Data.Default
 import Data.HashMap.Strict as HM
-import Data.Maybe
 import Data.Text
 import Network
 
@@ -86,37 +86,51 @@ exchangeOptions pid Options {..} = Exchange.Options
 connHandler :: MVar (HashMap InfoHash Handle) -> Exchange.Handler
 connHandler _tmap = undefined
 
-newClient :: Options -> LogFun -> IO Client
-newClient opts @ Options {..} logger = do
-  pid  <- genPeerId
-  tmap <- newMVar HM.empty
-  tmgr <- Tracker.newManager def (PeerInfo pid Nothing optPort)
-  emgr <- Exchange.newManager (exchangeOptions pid opts) (connHandler tmap)
-  node <- do
-    node <- startNode defaultHandlers def optNodeAddr logger
-    runDHT node $ bootstrap (maybeToList optBootNode)
-    return node
+initClient :: Options -> LogFun -> ResIO Client
+initClient opts @ Options {..} logFun = do
+  pid  <- liftIO genPeerId
+  tmap <- liftIO $ newMVar HM.empty
+
+  let peerInfo = PeerInfo pid Nothing optPort
+  let mkTracker = Tracker.newManager def peerInfo
+  (_, tmgr) <- allocate mkTracker Tracker.closeManager
+
+  let mkEx = Exchange.newManager (exchangeOptions pid opts) (connHandler tmap)
+  (_, emgr) <- allocate mkEx Exchange.closeManager
+
+  let mkNode = startNode defaultHandlers def optNodeAddr logFun
+  (_, node) <- allocate mkNode stopNode
+
+  resourceMap <- getInternalState
   return Client
     { clientPeerId       = pid
     , clientListenerPort = optPort
     , allowedExtensions  = toCaps optExtensions
+    , clientResources    = resourceMap
     , trackerManager     = tmgr
     , exchangeManager    = emgr
     , clientNode         = node
     , clientTorrents     = tmap
-    , clientLogger       = logger
+    , clientLogger       = logFun
     }
 
+newClient :: Options -> LogFun -> IO Client
+newClient opts logFun = do
+  s <- createInternalState
+  runInternalState (initClient opts logFun) s
+    `onException` closeInternalState s
+
 closeClient :: Client -> IO ()
-closeClient Client {..} = do
-  Exchange.closeManager exchangeManager
-  Tracker.closeManager  trackerManager
-  DHT.stopNode clientNode
-  return ()
---  closeNode clientNode
+closeClient Client {..} = closeInternalState clientResources
 
 withClient :: Options -> LogFun -> (Client -> IO a) -> IO a
 withClient opts lf action = bracket (newClient opts lf) closeClient action
+
+-- do not perform IO in 'initClient', do it in the 'boot'
+--boot :: BitTorrent ()
+--boot = do
+--  Options {..} <- asks options
+--  liftDHT $ bootstrap (maybeToList optBootNode)
 
 -- | Run bittorrent client with default options and log to @stderr@.
 --
