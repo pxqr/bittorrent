@@ -78,14 +78,18 @@ newtype BitTorrent a = BitTorrent
 class MonadBitTorrent m where
   liftBT :: BitTorrent a -> m a
 
+-- | NOP.
 instance MonadBitTorrent BitTorrent where
   liftBT = id
 
+-- | Registered but not closed manually resources will be
+-- automatically closed at 'Network.BitTorrent.Client.closeClient'
 instance MonadResource BitTorrent where
   liftResourceT m = BitTorrent $ do
     s <- asks clientResources
     liftIO $ runInternalState m s
 
+-- | Run DHT operation, only if the client node is running.
 instance MonadDHT BitTorrent where
   liftDHT action = BitTorrent $ do
     node <- asks clientNode
