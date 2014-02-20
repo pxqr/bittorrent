@@ -39,10 +39,10 @@ spec :: Spec
 spec = do
   describe "session" $ do
     it "is active until stopNode called" $ do
-      node <- startNode [] def myAddr nullLogger
+      node <- newNode [] def myAddr nullLogger
       runDHT node monadActive `shouldReturn` True
       runDHT node monadActive `shouldReturn` True
-      stopNode node
+      closeNode node
       runDHT node monadActive `shouldReturn` False
 
   describe "tokens" $ do

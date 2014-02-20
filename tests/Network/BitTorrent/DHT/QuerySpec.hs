@@ -28,7 +28,7 @@ nullLogger _ _ _ _ = return ()
 
 simpleDHT :: [NodeHandler IPv4] -> DHT IPv4 a -> IO a
 simpleDHT hs m =
-  bracket (startNode hs def myAddr nullLogger) stopNode $ \ node ->
+  bracket (newNode hs def myAddr nullLogger) closeNode $ \ node ->
     runDHT node m
 
 getBootInfo :: IO (NodeInfo IPv4)

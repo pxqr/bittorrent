@@ -98,8 +98,8 @@ initClient opts @ Options {..} logFun = do
   let mkEx = Exchange.newManager (exchangeOptions pid opts) (connHandler tmap)
   (_, emgr) <- allocate mkEx Exchange.closeManager
 
-  let mkNode = startNode defaultHandlers def optNodeAddr logFun
-  (_, node) <- allocate mkNode stopNode
+  let mkNode = DHT.newNode defaultHandlers def optNodeAddr logFun
+  (_, node) <- allocate mkNode DHT.closeNode
 
   resourceMap <- getInternalState
   return Client

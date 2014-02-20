@@ -44,8 +44,8 @@ module Network.BitTorrent.DHT
        , LogFun
        , Node
        , defaultHandlers
-       , startNode
-       , stopNode
+       , newNode
+       , closeNode
 
          -- ** Monad
        , MonadDHT (..)
@@ -86,7 +86,7 @@ dht :: Address ip
     -> IO a        -- ^ result.
 dht opts addr action = do
   runStderrLoggingT $ LoggingT $ \ logger -> do
-    bracket (startNode defaultHandlers opts addr logger) stopNode $
+    bracket (newNode defaultHandlers opts addr logger) closeNode $
       \ node -> runDHT node action
 {-# INLINE dht #-}
 

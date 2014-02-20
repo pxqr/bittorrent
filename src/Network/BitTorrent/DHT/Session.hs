@@ -33,8 +33,8 @@ module Network.BitTorrent.DHT.Session
          -- ** Initialization
        , LogFun
        , NodeHandler
-       , startNode
-       , stopNode
+       , newNode
+       , closeNode
 
          -- * DHT
          -- | Use @asks options@ to get options passed to 'startNode'
@@ -294,13 +294,13 @@ type NodeHandler ip = Handler (DHT ip)
 -- | Run DHT session. You /must/ properly close session using
 -- 'stopNode' function, otherwise socket or other scarce resources may
 -- leak.
-startNode :: Address ip
+newNode :: Address ip
           => [NodeHandler ip] -- ^ handlers to run on accepted queries;
           -> Options          -- ^ various dht options;
           -> NodeAddr ip      -- ^ node address to bind;
           -> LogFun           -- ^
           -> IO (Node ip)     -- ^ a new DHT node running at given address.
-startNode hs opts naddr logger = do
+newNode hs opts naddr logger = do
     s <- createInternalState
     runInternalState initNode s
       `onException` closeInternalState s
@@ -323,8 +323,8 @@ startNode hs opts naddr logger = do
 
 -- | Some resources like listener thread may live for
 -- some short period of time right after this DHT session closed.
-stopNode :: Node ip -> IO ()
-stopNode Node {..} = closeInternalState resources
+closeNode :: Node ip -> IO ()
+closeNode Node {..} = closeInternalState resources
 
 -- | Run DHT operation on the given session.
 runDHT :: Node ip -> DHT ip a -> IO a
