@@ -80,16 +80,14 @@ spec = do
     it "announce" $ do
       bootNode <- getBootInfo
       _ <- simpleDHT [] $ do
-        nid <- asks thisNodeId
-        Right nodes <- findNodeQ nid bootNode
+        let ih = entryHash (L.head testTorrents)
+        Right nodes <- findNodeQ ih bootNode
 
         when (L.null nodes) $
           error "boot node malfunction"
 
-        let ih = entryHash (L.head testTorrents)
-        let port = nodePort myAddr
         queryParallel $ do
-          announceQ ih port <$> nodes
+          announceQ ih (nodePort myAddr) <$> nodes
 
       return ()
 
@@ -100,8 +98,7 @@ spec = do
         it "get at least 10 unique peers for each infohash" $ do
           bootNode <- getBootInfo
           peers <- simpleDHT [] $ do
-            nid <- asks thisNodeId
-            Right startNodes <- findNodeQ nid bootNode
+            Right startNodes <- findNodeQ entryHash bootNode
             sourceList [startNodes] $=
               search entryHash (getPeersQ entryHash) $=
                 CL.concat $$ CL.take 10
