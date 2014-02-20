@@ -109,7 +109,7 @@ import Data.Torrent.InfoHash
 import Data.Torrent.Piece
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Message as Msg
-import Network.BitTorrent.Exchange.Status
+import Network.BitTorrent.Exchange.Wire.Status
 
 -- TODO handle port message?
 -- TODO handle limits?

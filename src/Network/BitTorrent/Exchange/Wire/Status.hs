@@ -9,7 +9,7 @@
 --   sides.
 --
 {-# LANGUAGE TemplateHaskell   #-}
-module Network.BitTorrent.Exchange.Status
+module Network.BitTorrent.Exchange.Wire.Status
        ( -- * Peer status
          PeerStatus(..)
        , choking
