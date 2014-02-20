@@ -16,19 +16,13 @@ import Control.Exception hiding (Handler)
 import Control.Lens
 import Control.Monad.Logger
 import Control.Monad.Reader
-import Control.Monad.State
 import Data.ByteString as BS
 import Data.ByteString.Lazy as BL
 import Data.Conduit
 import Data.Conduit.List as CL (iterM)
-import Data.Function
-import Data.IORef
-import Data.List as L
 import Data.Maybe
 import Data.Map as M
 import Data.Monoid
-import Data.Ord
-import Data.Set as S
 import Data.Text as T
 import Data.Typeable
 import Text.PrettyPrint hiding ((<>))
@@ -40,9 +34,8 @@ import Data.Torrent (InfoDict (..))
 import Data.Torrent.Bitfield as BF
 import Data.Torrent.InfoHash
 import Data.Torrent.Piece
-import qualified Data.Torrent.Piece as Torrent (Piece (Piece))
+import qualified Data.Torrent.Piece as Torrent (Piece ())
 import Network.BitTorrent.Core
-import Network.BitTorrent.Exchange.Assembler
 import Network.BitTorrent.Exchange.Block   as Block
 import Network.BitTorrent.Exchange.Message as Message
 import Network.BitTorrent.Exchange.Session.Metadata as Metadata

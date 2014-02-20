@@ -98,15 +98,12 @@ import Network.Socket hiding (Connected)
 import Network.Socket.ByteString as BS
 import Text.PrettyPrint as PP hiding (($$), (<>))
 import Text.PrettyPrint.Class
-import Text.Show.Functions
+import Text.Show.Functions ()
 import System.Log.FastLogger (ToLogStr(..))
 import System.Timeout
 
-import Data.BEncode as BE
-import Data.Torrent
 import Data.Torrent.Bitfield as BF
 import Data.Torrent.InfoHash
-import Data.Torrent.Piece
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Message as Msg
 import Network.BitTorrent.Exchange.Wire.Status
