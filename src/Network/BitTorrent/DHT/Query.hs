@@ -119,10 +119,12 @@ pingQ addr = do
   (nid, Ping) <- queryNode addr Ping
   return (NodeInfo nid addr)
 
--- TODO match with expected node id
-findNodeQ :: Address ip => NodeId -> Iteration ip NodeInfo
-findNodeQ nid NodeInfo {..} = do
-  NodeFound closest <- FindNode nid <@> nodeAddr
+-- TODO [robustness] match range of returned node ids with the
+-- expected range and either filter bad nodes or discard response at
+-- all throwing an exception
+findNodeQ :: Address ip => TableKey key => key -> Iteration ip NodeInfo
+findNodeQ key NodeInfo {..} = do
+  NodeFound closest <- FindNode (toNodeId key) <@> nodeAddr
   return $ Right closest
 
 isLeft :: Either a b -> Bool
