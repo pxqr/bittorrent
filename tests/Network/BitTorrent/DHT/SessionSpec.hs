@@ -2,6 +2,7 @@
 module Network.BitTorrent.DHT.SessionSpec (spec) where
 import Control.Applicative
 import Control.Concurrent
+import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 import Data.Default
@@ -23,7 +24,9 @@ myAddr :: NodeAddr IPv4
 myAddr = "127.0.0.1:60000"
 
 simpleDHT :: DHT IPv4 a -> IO a
-simpleDHT = dht def myAddr
+simpleDHT m =
+  bracket (newNode defaultHandlers def myAddr nullLogger) closeNode $ \ node ->
+    runDHT node m
 
 isRight :: Either a b -> Bool
 isRight (Left  _) = False
