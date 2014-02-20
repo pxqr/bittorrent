@@ -64,7 +64,7 @@ spec = do
       property $ \ (nid :: NodeId) -> do
         let info = NodeInfo nid myAddr
         closest <- simpleDHT $ do
-           insertNode info
+           _ <- insertNode info
            liftIO $ yield
            getClosest nid
         closest `shouldSatisfy` L.elem info

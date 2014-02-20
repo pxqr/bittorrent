@@ -39,7 +39,6 @@ import Control.Exception
 import Control.Concurrent
 import Control.Monad.Logger
 import Control.Monad.Trans
-import Control.Monad.Trans.Resource
 
 import Data.Default
 import Data.HashMap.Strict as HM
@@ -84,15 +83,15 @@ exchangeOptions pid Options {..} = Exchange.Options
   , optBacklog  = optBacklog def
   }
 
---connHandler :: HashMap InfoHash Handle -> Handler
-connHandler tmap = undefined
+connHandler :: MVar (HashMap InfoHash Handle) -> Exchange.Handler
+connHandler _tmap = undefined
 
 newClient :: Options -> LogFun -> IO Client
 newClient opts @ Options {..} logger = do
   pid  <- genPeerId
   tmap <- newMVar HM.empty
   tmgr <- Tracker.newManager def (PeerInfo pid Nothing optPort)
-  emgr <- Exchange.newManager (exchangeOptions pid opts) connHandler
+  emgr <- Exchange.newManager (exchangeOptions pid opts) (connHandler tmap)
   node <- do
     node <- startNode defaultHandlers def optNodeAddr logger
     runDHT node $ bootstrap (maybeToList optBootNode)

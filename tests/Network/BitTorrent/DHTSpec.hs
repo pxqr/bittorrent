@@ -4,11 +4,9 @@ import Control.Monad
 import Data.Default
 import Data.List as L
 import Test.Hspec
-import Test.QuickCheck
 import System.Timeout
 
 import Data.Torrent.InfoHash
-import Network.BitTorrent.Core
 import Network.BitTorrent.DHT
 
 
@@ -38,7 +36,7 @@ spec = do
     it "partial bootstrapping should finish in less than 10 seconds" $ do
       node <- resolveHostName (L.head defaultBootstrapNodes)
       res  <- timeout partialBootstrapTimeout $ do
-                dht def def $ do
+                dht opts def $ do
                   bootstrap [node]
                   isBootstrapped
       res `shouldBe` Just True

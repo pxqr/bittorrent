@@ -55,7 +55,6 @@ module Network.BitTorrent.DHT
 import Control.Applicative
 import Control.Monad.Logger
 import Control.Monad.Reader
-import Control.Monad.Trans
 import Control.Exception
 import Data.ByteString as BS
 import Data.Conduit as C
