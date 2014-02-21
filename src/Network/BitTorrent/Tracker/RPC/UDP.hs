@@ -226,7 +226,7 @@ initialConnectionId =  ConnectionId 0x41727101980
 
 -- | Transaction Id is used within a UDP RPC.
 newtype TransactionId = TransactionId Word32
-  deriving (Eq, Ord, Serialize)
+  deriving (Eq, Ord, Enum, Bounded, Serialize)
 
 instance Show TransactionId where
   showsPrec _ (TransactionId tid) = showString "0x" <> showHex tid
@@ -377,6 +377,35 @@ isExpired Connection {..} = do
 --  Transactions
 -----------------------------------------------------------------------}
 
+-- | Sometimes 'genTransactionId' may return already used transaction
+-- id. We use a good entropy source but the issue /still/ (with very
+-- small probabality) may happen. If the collision happen then this
+-- function tries to find nearest unused slot, otherwise pending
+-- transactions table is full.
+firstUnused :: SockAddr -> TransactionId -> PendingQueries -> TransactionId
+firstUnused addr rid m = do
+  case M.splitLookup rid <$> M.lookup addr m of
+    Nothing                -> rid
+    Just (_ , Nothing, _ ) -> rid
+    Just (lt, Just _ , gt) ->
+      case backwardHole (keys lt) rid <|> forwardHole rid (keys gt) of
+        Nothing  -> error "firstUnused: table is full" -- impossible
+        Just tid -> tid
+  where
+    forwardHole a []
+      | a == maxBound = Nothing
+      |   otherwise   = Just (succ a)
+    forwardHole a (b : xs)
+      | succ a == b   = forwardHole b xs
+      |   otherwise   = Just (succ a)
+
+    backwardHole [] a
+      | a == minBound = Nothing
+      |   otherwise   = Just (pred a)
+    backwardHole (b : xs) a
+      | b == pred a   = backwardHole xs b
+      |   otherwise   = Just (pred a)
+
 register :: SockAddr -> TransactionId -> PendingResponse
          -> PendingQueries -> PendingQueries
 register addr tid ares = M.alter insertId addr
@@ -394,15 +423,13 @@ unregister addr tid = M.update deleteId addr
       where
         m' = M.delete tid m
 
--- | Generate a new unused transaction id.
-allocTransaction :: Manager -> SockAddr -> MVar Response -> IO TransactionId
-allocTransaction Manager {..} addr ares = modifyMVar pendingResps bindId
-  where
-    bindId m = do
-      tid  <- genTransactionId
-      case M.lookup tid =<< M.lookup addr m of
-        Just _  -> bindId m -- already used, retry
-        Nothing -> return (register addr tid ares m, tid)
+-- | Generate a new unused transaction id and register as pending.
+allocTransaction :: Manager -> SockAddr -> PendingResponse -> IO TransactionId
+allocTransaction Manager {..} addr ares =
+  modifyMVar pendingResps $ \ m -> do
+    rndId <- genTransactionId
+    let tid = firstUnused addr rndId m
+    return (register addr tid ares m, tid)
 
 -- | Wake up blocked thread and return response back.
 commitTransaction :: Manager -> SockAddr -> TransactionId -> Response -> IO ()
