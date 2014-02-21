@@ -363,6 +363,7 @@ isExpired Connection {..} = do
 --  Transactions
 -----------------------------------------------------------------------}
 
+-- | Generate a new unused transaction id.
 allocTransaction :: Manager -> SockAddr -> MVar Response -> IO TransactionId
 allocTransaction Manager {..} addr ares = modifyMVar pendingResps bindId
   where
@@ -375,6 +376,7 @@ allocTransaction Manager {..} addr ares = modifyMVar pendingResps bindId
     insertId tid Nothing  = Just (M.singleton tid ares)
     insertId tid (Just m) = Just (M.insert tid ares m)
 
+-- | Wake up blocked thread and return response back.
 commitTransaction :: Manager -> SockAddr -> TransactionId -> Response -> IO ()
 commitTransaction Manager {..} addr tid resp =
   modifyMVarMasked_ pendingResps $ \ m -> do
@@ -390,6 +392,7 @@ commitTransaction Manager {..} addr tid resp =
       where
         m' = M.delete tid m
 
+-- | Abort transaction forcefully.
 cancelTransaction :: Manager -> SockAddr -> TransactionId -> IO ()
 cancelTransaction Manager {..} addr tid =
     modifyMVarMasked_ pendingResps $ \m ->
@@ -401,14 +404,17 @@ cancelTransaction Manager {..} addr tid =
       where
         m' = M.delete tid m
 
+-- | Handle responses from trackers.
 listen :: Manager -> IO ()
 listen mgr @ Manager {..} = do
   forever $ do
     (bs, addr) <- BS.recvFrom sock (optMaxPacketSize options)
     case decode bs of
-      Left  _                   -> return ()
+      Left  _                   -> return () -- parser failed, ignoring
       Right (TransactionR {..}) -> commitTransaction mgr addr transIdR response
 
+-- | Perform RPC transaction. If the action interrupted transaction
+-- will be aborted.
 transaction :: Manager -> SockAddr -> Connection -> Request -> IO Response
 transaction mgr @ Manager {..} addr conn request = do
     ares <- newEmptyMVar
