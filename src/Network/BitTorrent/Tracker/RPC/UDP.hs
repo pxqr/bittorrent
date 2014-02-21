@@ -377,7 +377,7 @@ allocTransaction Manager {..} addr ares = modifyMVar pendingResps bindId
 
 commitTransaction :: Manager -> SockAddr -> TransactionId -> Response -> IO ()
 commitTransaction Manager {..} addr tid resp =
-  modifyMVar_ pendingResps $ \ m -> do
+  modifyMVarMasked_ pendingResps $ \ m -> do
     case M.lookup tid =<< M.lookup addr m of
       Nothing   -> return m -- tracker responded after 'cancelTransaction' fired
       Just ares -> do
@@ -392,7 +392,7 @@ commitTransaction Manager {..} addr tid resp =
 
 cancelTransaction :: Manager -> SockAddr -> TransactionId -> IO ()
 cancelTransaction Manager {..} addr tid =
-    modifyMVar_ pendingResps $ \m ->
+    modifyMVarMasked_ pendingResps $ \m ->
       return $ M.update deleteId addr m
   where
     deleteId m
