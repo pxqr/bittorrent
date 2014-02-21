@@ -51,5 +51,5 @@ spec = parallel $ do
       describe "Manager" $ do
         it "should handle arbitrary intermixed concurrent queries" $ do
           withManager def $ \ mgr -> do
-            _ <- mapConcurrently (\ _ -> scrape mgr uri [def]) [1..100]
+            _ <- mapConcurrently (\ _ -> scrape mgr uri [def]) [1..100 :: Int]
             return ()
