@@ -93,14 +93,16 @@ instance Default Options where
 --  Manager state
 -----------------------------------------------------------------------}
 
+type ConnectionCache     = Map SockAddr Connection
 type PendingTransactions = Map TransactionId (MVar Response)
+type PendingQueries      = Map SockAddr PendingTransactions
 
 data Manager = Manager
   { options         :: !Options
   , sock            :: !Socket
 --  , dnsCache        :: !(IORef (Map URI SockAddr))
-  , connectionCache :: !(IORef (Map SockAddr Connection))
-  , pendingResps    :: !(MVar  (Map SockAddr PendingTransactions))
+  , connectionCache :: !(IORef ConnectionCache)
+  , pendingResps    :: !(MVar  PendingQueries)
   , listenerThread  :: !(MVar ThreadId)
   }
 
@@ -363,6 +365,23 @@ isExpired Connection {..} = do
 --  Transactions
 -----------------------------------------------------------------------}
 
+register :: SockAddr -> TransactionId -> MVar Response
+         -> PendingQueries -> PendingQueries
+register addr tid ares = M.alter insertId addr
+  where
+    insertId Nothing  = Just (M.singleton tid ares)
+    insertId (Just m) = Just (M.insert tid ares m)
+
+unregister :: SockAddr -> TransactionId
+           -> PendingQueries -> PendingQueries
+unregister addr tid = M.update deleteId addr
+  where
+    deleteId m
+      | M.null m' = Nothing
+      | otherwise = Just m'
+      where
+        m' = M.delete tid m
+
 -- | Generate a new unused transaction id.
 allocTransaction :: Manager -> SockAddr -> MVar Response -> IO TransactionId
 allocTransaction Manager {..} addr ares = modifyMVar pendingResps bindId
@@ -371,10 +390,7 @@ allocTransaction Manager {..} addr ares = modifyMVar pendingResps bindId
       tid  <- genTransactionId
       case M.lookup tid =<< M.lookup addr m of
         Just _  -> bindId m -- already used, retry
-        Nothing -> return (M.alter (insertId tid) addr m, tid)
-
-    insertId tid Nothing  = Just (M.singleton tid ares)
-    insertId tid (Just m) = Just (M.insert tid ares m)
+        Nothing -> return (register addr tid ares m, tid)
 
 -- | Wake up blocked thread and return response back.
 commitTransaction :: Manager -> SockAddr -> TransactionId -> Response -> IO ()
@@ -384,25 +400,13 @@ commitTransaction Manager {..} addr tid resp =
       Nothing   -> return m -- tracker responded after 'cancelTransaction' fired
       Just ares -> do
         putMVar ares resp
-        return $ M.update deleteId addr m
-  where
-    deleteId m
-      | M.null m' = Nothing
-      | otherwise = Just m'
-      where
-        m' = M.delete tid m
+        return $ unregister addr tid m
 
 -- | Abort transaction forcefully.
 cancelTransaction :: Manager -> SockAddr -> TransactionId -> IO ()
 cancelTransaction Manager {..} addr tid =
-    modifyMVarMasked_ pendingResps $ \m ->
-      return $ M.update deleteId addr m
-  where
-    deleteId m
-      | M.null m' = Nothing
-      | otherwise = Just m'
-      where
-        m' = M.delete tid m
+  modifyMVarMasked_ pendingResps $ \m ->
+    return $ unregister addr tid m
 
 -- | Handle responses from trackers.
 listen :: Manager -> IO ()
