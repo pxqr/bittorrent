@@ -33,8 +33,11 @@ validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
     peerList = getPeerList respPeers
 
 spec :: Spec
-spec = parallel $ do
-  forM_ trackerURIs $ \ uri ->
+spec = do
+--  describe "RpcException" $
+
+  parallel $ do
+   forM_ trackerURIs $ \ uri ->
     context (show uri) $ do
       describe "announce" $ do
         it "have valid response" $ do

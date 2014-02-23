@@ -212,6 +212,7 @@ nullSessionTokens = SessionTokens
   <*> liftIO getCurrentTime
   <*> pure defaultUpdateInterval
 
+-- TODO invalidate *twice* if needed
 invalidateTokens :: UTCTime -> SessionTokens -> SessionTokens
 invalidateTokens curTime ts @ SessionTokens {..}
   | curTime `diffUTCTime` lastUpdate > maxInterval = SessionTokens

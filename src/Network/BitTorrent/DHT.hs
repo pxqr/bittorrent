@@ -156,7 +156,7 @@ isBootstrapped = T.full <$> getTable
 --
 --   This is blocking operation, use
 --   'Control.Concurrent.Async.Lifted.async' if needed.
-restore :: ByteString -> DHT ip ()
+restore :: ByteString -> IO (Node ip)
 restore = error "DHT.restore: not implemented"
 
 -- | Serialize current DHT session to byte string.
@@ -178,6 +178,8 @@ lookup :: Address ip => InfoHash -> DHT ip `Source` [PeerAddr ip]
 lookup topic = do      -- TODO retry getClosest if bucket is empty
   closest <- lift $ getClosest topic
   sourceList [closest] $= search topic (getPeersQ topic)
+
+-- TODO do not republish if the topic is already in announceSet
 
 -- | Announce that /this/ peer may have some pieces of the specified
 -- torrent. DHT will reannounce this data periodically using
