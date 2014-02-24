@@ -393,6 +393,10 @@ data FloodDetector = FloodDetector
   , floodPredicate :: Detector ConnectionStats
   } deriving Show
 
+instance Eq FloodDetector where
+  a == b = floodFactor    a == floodFactor    b
+        && floodThreshold a == floodThreshold b
+
 -- | Flood detector with very permissive options.
 instance Default FloodDetector where
   def = FloodDetector
@@ -444,7 +448,7 @@ data Options = Options
     --   'ExtendedMetadata' for more info.
     --
   , maxInfoDictSize     :: {-# UNPACK #-} !Int
-  } deriving Show
+  } deriving (Show, Eq)
 
 -- | Permissive default parameters, most likely you don't need to
 -- change them.
@@ -736,7 +740,7 @@ data ConnectionPrefs = ConnectionPrefs
   , prefProtocol :: !ProtocolName
   , prefCaps     :: !Caps
   , prefExtCaps  :: !ExtendedCaps
-  }
+  } deriving (Show, Eq)
 
 instance Default ConnectionPrefs where
   def = ConnectionPrefs
