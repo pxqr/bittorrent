@@ -1,37 +1,76 @@
+{-# LANGUAGE RecordWildCards #-}
 module Main where
-
-import Spec
+import Control.Exception
+import Control.Monad
+import Data.Functor
+import Data.List
+import Data.Maybe
 import System.Exit
 import System.Environment
 import System.Process
 import System.Directory
-import Control.Exception
-import Data.List
-import Data.Maybe
-import Data.Functor
+import Text.Printf
 
-clients :: [(String, String)]
-clients = [
- ("rtorrent","rtorrent -p 51234-51234 -O dht=on -O dht_port=6881 -O session=rtorrent-sessiondir testfile.torrent") ]
+import Config
+import Spec
+
+
+type Command = String
+type Descr = (ClientName, ClientOpts -> FilePath -> Command)
+
+torrents :: [FilePath]
+torrents =
+    [ "dapper-dvd-amd64-iso.torrent"
+    , "pkg.torrent"
+    , "testfile.torrent"
+    ]
+
+clients :: [Descr]
+clients =
+  [ ("rtorrent"
+    , \ ClientOpts {..} tfile -> printf
+     "rtorrent -p %i-%i -O dht=on -O dht_port=%i -O session=rtorrent-sessiondir %s"
+     (fromEnum peerPort) (fromEnum peerPort) (fromEnum nodePort) tfile
+    )
+  ]
+
+sessionName :: String -- screen session name
+sessionName = "bittorrent-testsuite"
+
+setupEnv :: EnvOpts -> IO (Maybe ())
+setupEnv EnvOpts {..}
+  | Just client <- testClient
+  , Just mkCmd  <- lookup client clients = do
+    let runner = printf "screen -dm -S %s %s" sessionName
+                 (mkCmd remoteOpts "testfile.torrent")
+    dir <- getCurrentDirectory
+    _   <- createProcess (shell runner) { cwd = Just (dir ++ "/res") }
+    return (Just ())
+
+  | Just client <- testClient = do
+    printf "Bad client `%s`, use one of %s" client (show (fst <$> clients))
+    return Nothing
+
+  | isNothing testClient = do
+    printf "Running without remote client"
+    return (Just ())
+
+terminateEnv :: IO ()
+terminateEnv = do
+  printf "closing screen session: %s" sessionName
+  _ <- system (printf "screen -S %s -X quit" sessionName)
+  return ()
+
+runTestSuite :: [String] -> IO ExitCode
+runTestSuite args = do
+  printf "running hspec test suite with args: %s\n" (show args)
+  catch (withArgs args hspecMain >> return ExitSuccess) return
 
 main :: IO ()
 main = do
-  args <- getArgs
-  let cmd' = do
-        cl <- listToMaybe $ reverse
-                   $ map (tail . dropWhile (/='='))
-                   $ filter (isPrefixOf "--bittorrent-client=") args
-        cmd <- (++) "screen -dm -S bittorrent-testsuite " <$> lookup cl clients
-        return cmd
-  case cmd' of
-    Just cmd -> do _ <- system "screen -S bittorrent-testsuite -X quit"
-                   dir <- getCurrentDirectory
-                   _ <- createProcess (shell cmd) { cwd = Just (dir ++ "/res") }
-                   return ()
-    Nothing -> return ()
-
-  let args' = (filter (not . isPrefixOf "--bittorrent-client=") args)
-  code <- catch (withArgs args' hspecMain >> return ExitSuccess) return
-
-  _ <- system "screen -S bittorrent-testsuite -X quit"
-  exitWith code >> return ()
+  (envOpts, suiteArgs) <- getOpts
+  running <- setupEnv     envOpts
+  code    <- runTestSuite suiteArgs
+  when (isJust running) $ do
+    terminateEnv
+  exitWith code

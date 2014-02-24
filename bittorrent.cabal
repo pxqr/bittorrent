@@ -181,6 +181,8 @@ test-suite spec
   hs-source-dirs:      tests
   main-is:             Main.hs
   other-modules:       Spec
+                       Config
+
                        Data.Torrent.BitfieldSpec
                        Data.Torrent.InfoHashSpec
                        Data.Torrent.LayoutSpec
