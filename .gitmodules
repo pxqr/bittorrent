@@ -7,3 +7,6 @@
 [submodule "sub/hspec"]
 	path = sub/hspec
 	url = https://github.com/DanielG/hspec.git
+[submodule "sub/optparse-applicative"]
+	path = sub/optparse-applicative
+	url = https://github.com/pcapriotti/optparse-applicative.git

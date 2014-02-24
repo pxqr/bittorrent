@@ -240,6 +240,7 @@ test-suite spec
                      , network
 
                        -- * System
+                     , optparse-applicative >= 0.8
                      , process
                      , directory
                      , filepath
