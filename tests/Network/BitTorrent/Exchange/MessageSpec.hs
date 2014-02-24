@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Network.BitTorrent.Exchange.MessageSpec (spec) where
 import Control.Applicative
 import Control.Exception
@@ -20,6 +21,12 @@ instance Arbitrary Extension where
   arbitrary = elements [minBound .. maxBound]
 
 instance Arbitrary Caps where
+  arbitrary = toCaps <$> arbitrary
+
+instance Arbitrary ExtendedExtension where
+  arbitrary = elements [minBound .. maxBound]
+
+instance Arbitrary ExtendedCaps where
   arbitrary = toCaps <$> arbitrary
 
 instance Arbitrary ProtocolName where
