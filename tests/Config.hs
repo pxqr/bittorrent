@@ -13,6 +13,7 @@ module Config
        , getThisOpts
        , getRemoteOpts
        , withRemote
+       , getTestTorrent
        ) where
 
 import Control.Monad
@@ -26,6 +27,9 @@ import System.Exit
 import System.Environment
 import System.IO.Unsafe
 import Test.Hspec
+
+import Data.Torrent
+
 
 type ClientName = String
 
@@ -69,16 +73,18 @@ clientOptsParser = ClientOpts
     )
 
 data EnvOpts = EnvOpts
-  { testClient :: Maybe ClientName
-  , remoteOpts :: ClientOpts
-  , thisOpts   :: ClientOpts
+  { testClient   :: Maybe ClientName
+  , testTorrents :: [FilePath]
+  , remoteOpts   :: ClientOpts
+  , thisOpts     :: ClientOpts
   }
 
 instance Default EnvOpts where
   def = EnvOpts
-    { testClient = Nothing
-    , remoteOpts = defRemoteOpts
-    , thisOpts   = defThisOpts
+    { testClient   = Just "rtorrent"
+    , testTorrents = ["testfile.torrent"]
+    , remoteOpts   = defRemoteOpts
+    , thisOpts     = defThisOpts
     }
 
 findConflicts :: EnvOpts -> [String]
@@ -96,6 +102,7 @@ envOptsParser = EnvOpts
    <> metavar "CLIENT"
    <> help    "torrent client to run"
     ))
+  <*> pure []
   <*> clientOptsParser
   <*> clientOptsParser
 
@@ -120,7 +127,9 @@ getThisOpts = thisOpts <$> getEnvOpts
 
 -- | Return 'Nothing' if remote client is not running.
 getRemoteOpts :: IO (Maybe ClientOpts)
-getRemoteOpts = return Nothing
+getRemoteOpts = do
+  EnvOpts {..} <- getEnvOpts
+  return $ const remoteOpts <$> testClient
 
 withRemote :: (ClientOpts -> Expectation) -> Expectation
 withRemote action = do
@@ -128,6 +137,13 @@ withRemote action = do
   case mopts of
     Nothing   -> pendingWith "Remote client isn't running"
     Just opts -> action opts
+
+getTestTorrent :: IO Torrent
+getTestTorrent = do
+  EnvOpts {..} <- getEnvOpts
+  if L.null testTorrents
+    then error "getTestTorrent"
+    else fromFile ("res/" ++ L.head testTorrents)
 
 -- TODO fix EnvOpts parsing
 
