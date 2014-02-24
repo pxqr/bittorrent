@@ -7,6 +7,11 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
+--   Each peer wire connection is identified by triple @(topic,
+--   remote_addr, this_addr)@. This means that connections are the
+--   same if and only if their 'ConnectionId' are the same. Of course,
+--   you /must/ avoid duplicated connections.
+--
 --   This module control /integrity/ of data send and received.
 --
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -21,6 +26,7 @@ module Network.BitTorrent.Exchange.Wire
 
          -- * Connection
        , Connection
+       , connInitiatedBy
 
          -- ** Identity
        , connRemoteAddr
@@ -44,9 +50,23 @@ module Network.BitTorrent.Exchange.Wire
        , connStats
 
          -- * Setup
-       , runWire
+       , ConnectionPrefs   (..)
+       , ConnectionSession (..)
+       , ConnectionConfig  (..)
+
+         -- ** Initiate
        , connectWire
+
+         -- ** Accept
+       , PendingConnection
+       , newPendingConnection
+       , pendingPeer
+       , pendingCaps
+       , pendingTopic
+       , closePending
        , acceptWire
+
+         -- ** Post setup actions
        , resizeBitfield
 
          -- * Messaging
@@ -143,7 +163,7 @@ data ProtocolError
 
     -- | /Remote/ peer replied with invalid 'hsInfoHash' which do not
     -- match with 'hsInfoHash' /this/ peer have sent. Can occur in
-    -- 'connectWire' only.
+    -- 'connectWire' or 'acceptWire' only.
   | UnexpectedTopic   InfoHash
 
     -- | Some trackers or DHT can return 'PeerId' of a peer. If a
@@ -470,9 +490,20 @@ data ConnectionState = ConnectionState {
 
 makeLenses ''ConnectionState
 
+instance Default ConnectionState where
+   def = ConnectionState
+     { _connExtCaps      = def
+     , _connRemoteEhs    = def
+     , _connStats        = def
+     , _connStatus       = def
+     , _connBitfield     = BF.haveNone 0
+     }
+
 -- | Connection keep various info about both peers.
 data Connection s = Connection
-  { connRemoteAddr   :: !(PeerAddr IP)
+  { connInitiatedBy  :: !ChannelSide
+
+  , connRemoteAddr   :: !(PeerAddr IP)
 
     -- | /Both/ peers handshaked with this protocol string. The only
     -- value is \"Bittorrent Protocol\" but this can be changed in
@@ -560,6 +591,29 @@ initiateHandshake :: Socket -> Handshake -> IO Handshake
 initiateHandshake sock hs = do
   sendHandshake sock hs
   recvHandshake sock
+
+data HandshakePair = HandshakePair
+  { handshakeSent :: !Handshake
+  , handshakeRecv :: !Handshake
+  } deriving (Show, Eq)
+
+validatePair :: HandshakePair -> PeerAddr IP -> IO ()
+validatePair (HandshakePair hs hs') addr = Prelude.mapM_ checkProp
+  [ (def            == hsProtocol hs', InvalidProtocol    $ hsProtocol hs')
+  , (hsProtocol hs  == hsProtocol hs', UnexpectedProtocol $ hsProtocol hs')
+  , (hsInfoHash hs  == hsInfoHash hs', UnexpectedTopic    $ hsInfoHash hs')
+  , (hsPeerId   hs' == fromMaybe (hsPeerId hs') (peerId addr)
+    , UnexpectedPeerId $ hsPeerId hs')
+  ]
+  where
+    checkProp (t, e) = unless t $ throwIO $ ProtocolError e
+
+-- | Connection state /right/ after handshaking.
+establishedStats :: HandshakePair -> ConnectionStats
+establishedStats HandshakePair {..} = ConnectionStats
+  { outcomingFlow = FlowStats 1 $ handshakeStats handshakeSent
+  , incomingFlow  = FlowStats 1 $ handshakeStats handshakeRecv
+  }
 
 {-----------------------------------------------------------------------
 --  Wire
@@ -670,53 +724,129 @@ rehandshake caps = undefined
 reconnect :: Wire s ()
 reconnect = undefined
 
--- | Initiate 'Wire' connection and handshake with a peer. This function will
--- also do the BEP10 extension protocol handshake if 'ExtExtended' is enabled on
--- both sides.
+data ConnectionId    = ConnectionId
+  { topic      :: !InfoHash
+  , remoteAddr :: !(PeerAddr IP)
+  , thisAddr   :: !(PeerAddr (Maybe IP)) -- ^ foreign address of this node.
+  }
+
+-- | /Preffered/ settings of wire. To get the real use 'ask'.
+data ConnectionPrefs = ConnectionPrefs
+  { prefOptions  :: !Options
+  , prefProtocol :: !ProtocolName
+  , prefCaps     :: !Caps
+  , prefExtCaps  :: !ExtendedCaps
+  }
+
+instance Default ConnectionPrefs where
+  def = ConnectionPrefs
+    { prefOptions  = def
+    , prefProtocol = def
+    , prefCaps     = def
+    , prefExtCaps  = def
+    }
+
+normalize :: ConnectionPrefs -> ConnectionPrefs
+normalize = undefined
+
+data ConnectionSession s = ConnectionSession
+  { sessionTopic      :: !(InfoHash)
+  , sessionPeerId     :: !(PeerId)
+  , metadataSize      :: !(Maybe Int)
+  , outputChan        :: !(Maybe (Chan Message))
+  , connectionSession :: !(s)
+  }
+
+data ConnectionConfig s = ConnectionConfig
+  { cfgPrefs   :: !(ConnectionPrefs)
+  , cfgSession :: !(ConnectionSession s)
+  , cfgWire    :: !(Wire s ())
+  }
+
+configHandshake :: ConnectionConfig s -> Handshake
+configHandshake ConnectionConfig {..} = Handshake
+  { hsProtocol = prefProtocol  cfgPrefs
+  , hsReserved = prefCaps      cfgPrefs
+  , hsInfoHash = sessionTopic  cfgSession
+  , hsPeerId   = sessionPeerId cfgSession
+  }
+
+{-----------------------------------------------------------------------
+--  Pending connections
+-----------------------------------------------------------------------}
+
+-- | Connection in half opened state. A normal usage scenario:
 --
--- This function can throw 'WireFailure' exception.
+--    * Opened using 'newPendingConnection', usually in the listener
+--    loop;
 --
-connectWire :: s -> Handshake -> PeerAddr IP -> ExtendedCaps -> Chan Message
-            -> Wire s () -> IO ()
-connectWire session hs addr extCaps chan wire = do
-  let catchRefusal m = try m >>= either (throwIO . ConnectionRefused) return
-  bracket (catchRefusal (peerSocket Stream addr)) close $ \ sock -> do
-    hs' <- initiateHandshake sock hs
+--    * Closed using 'closePending' if 'pendingPeer' is banned,
+--    'pendingCaps' is prohibited or pendingTopic is unknown;
+--
+--    * Accepted using 'acceptWire' otherwise.
+--
+data PendingConnection = PendingConnection
+  { pendingSock  :: Socket
+  , pendingPeer  :: PeerAddr IP -- ^ 'peerId' is always non empty;
+  , pendingCaps  :: Caps        -- ^ advertised by the peer;
+  , pendingTopic :: InfoHash    -- ^ possible non-existent topic.
+  }
 
-    Prelude.mapM_ (\(t,e) -> unless t $ throwIO $ ProtocolError e) [
-      (def == hsProtocol hs'
-      , InvalidProtocol $ hsProtocol hs'),
-      (hsProtocol hs == hsProtocol hs'
-      , UnexpectedProtocol $ hsProtocol hs'),
-      (hsInfoHash hs == hsInfoHash hs'
-      , UnexpectedTopic $ hsInfoHash hs'),
-      (hsPeerId hs' == fromMaybe (hsPeerId hs') (peerId addr)
-      , UnexpectedPeerId $ hsPeerId hs')
-      ]
+-- | Reconstruct handshake sent by the remote peer.
+pendingHandshake :: PendingConnection -> Handshake
+pendingHandshake PendingConnection {..} = Handshake
+  { hsProtocol = def
+  , hsReserved = pendingCaps
+  , hsInfoHash = pendingTopic
+  , hsPeerId   = fromMaybe (error "pendingHandshake: impossible")
+                           (peerId pendingPeer)
+  }
 
-    let caps = hsReserved hs <> hsReserved hs'
-        wire' = if ExtExtended `allowed` caps
-                then extendedHandshake extCaps >> wire
-                else wire
+-- |
+--
+--   This function can throw 'WireFailure' exception.
+--
+newPendingConnection :: Socket -> PeerAddr IP -> IO PendingConnection
+newPendingConnection sock addr = do
+  Handshake {..} <- recvHandshake sock
+  unless (hsProtocol == def) $ do
+    throwIO $ ProtocolError $ InvalidProtocol hsProtocol
+  return PendingConnection
+    { pendingSock  = sock
+    , pendingPeer  = addr { peerId = Just hsPeerId }
+    , pendingCaps  = hsReserved
+    , pendingTopic = hsInfoHash
+    }
 
-    cstate <- newIORef $ ConnectionState {
-        _connExtCaps      = def
-      , _connRemoteEhs    = def
-      , _connStats        = ConnectionStats {
-                             outcomingFlow = FlowStats 1 $ handshakeStats hs
-                           , incomingFlow  = FlowStats 1 $ handshakeStats hs'
-                           }
-      , _connStatus       = def
-      , _connBitfield     = BF.haveNone 0
-      }
+-- | Release all resources associated with the given connection. Note
+-- that you /must not/ 'closePending' if you 'acceptWire'.
+closePending :: PendingConnection -> IO ()
+closePending PendingConnection {..} = do
+  close pendingSock
 
-    -- TODO make KA interval configurable
-    let kaInterval = defaultKeepAliveInterval
-    bracket
-      (forkIO $ sourceChan kaInterval chan $= conduitPut S.put $$ sinkSocket sock)
-      (killThread) $ \ _ ->
-      runWire wire' sock chan $ Connection
-        { connRemoteAddr   = addr
+{-----------------------------------------------------------------------
+--  Connection setup
+-----------------------------------------------------------------------}
+
+chanToSock :: Int -> Chan Message -> Socket -> IO ()
+chanToSock ka chan sock =
+  sourceChan ka chan $= conduitPut S.put $$ sinkSocket sock
+
+afterHandshaking :: ChannelSide -> PeerAddr IP -> Socket -> HandshakePair
+                 -> ConnectionConfig s -> IO ()
+afterHandshaking initiator addr sock
+  hpair @ (HandshakePair hs hs')
+          (ConnectionConfig
+           { cfgPrefs   = ConnectionPrefs   {..}
+           , cfgSession = ConnectionSession {..}
+           , cfgWire    = wire
+           }) = do
+    let caps  = hsReserved hs <> hsReserved hs'
+    cstate <- newIORef def { _connStats = establishedStats hpair }
+    chan   <- maybe newChan return outputChan
+    let conn  = Connection {
+          connInitiatedBy  = initiator
+        , connRemoteAddr   = addr
         , connProtocol     = hsProtocol hs
         , connCaps         = caps
         , connTopic        = hsInfoHash hs
@@ -724,9 +854,35 @@ connectWire session hs addr extCaps chan wire = do
         , connThisPeerId   = hsPeerId   hs
         , connOptions      = def
         , connState        = cstate
-        , connSession      = session
+        , connSession      = connectionSession
         , connChan         = chan
         }
+
+    -- TODO make KA interval configurable
+    let kaInterval = defaultKeepAliveInterval
+        wire' = if ExtExtended `allowed` caps
+                then extendedHandshake prefExtCaps >> wire
+                else wire
+
+    bracket (forkIO (chanToSock kaInterval chan sock))
+            (killThread)
+            (\ _ -> runWire wire' sock chan conn)
+
+-- | Initiate 'Wire' connection and handshake with a peer. This function will
+-- also do the BEP10 extension protocol handshake if 'ExtExtended' is enabled on
+-- both sides.
+--
+-- This function can throw 'WireFailure' exception.
+--
+connectWire :: PeerAddr IP -> ConnectionConfig s -> IO ()
+connectWire addr cfg = do
+  let catchRefusal m = try m >>= either (throwIO . ConnectionRefused) return
+  bracket (catchRefusal (peerSocket Stream addr)) close $ \ sock -> do
+    let hs = configHandshake cfg
+    hs' <- initiateHandshake sock hs
+    let hpair = HandshakePair hs hs'
+    validatePair hpair addr
+    afterHandshaking ThisPeer addr sock hpair cfg
 
 -- | Accept 'Wire' connection using already 'Network.Socket.accept'ed
 --   socket. For peer listener loop the 'acceptSafe' should be
@@ -734,10 +890,17 @@ connectWire session hs addr extCaps chan wire = do
 --
 --   This function can throw 'WireFailure' exception.
 --
-acceptWire :: Socket -> PeerAddr IP -> Wire s () -> IO ()
-acceptWire sock peerAddr wire = do
-  bracket (return sock) close $ \ _ -> do
-    error "acceptWire: not implemented"
+acceptWire :: PendingConnection -> ConnectionConfig s -> IO ()
+acceptWire pc @ PendingConnection {..} cfg = do
+  bracket (return pendingSock) close $ \ _ -> do
+    unless (sessionTopic (cfgSession cfg) == pendingTopic) $ do
+      throwIO (ProtocolError (UnexpectedTopic pendingTopic))
+
+    let hs = configHandshake cfg
+    sendHandshake pendingSock hs
+    let hpair = HandshakePair hs (pendingHandshake pc)
+
+    afterHandshaking RemotePeer pendingPeer pendingSock hpair cfg
 
 -- | Used when size of bitfield becomes known.
 resizeBitfield :: Int -> Connected s ()

@@ -7,11 +7,16 @@ module Network.BitTorrent.Exchange.Session
        , newSession
        , closeSession
 
+         -- * Connections
        , Network.BitTorrent.Exchange.Session.insert
+       , Network.BitTorrent.Exchange.Session.attach
+       , Network.BitTorrent.Exchange.Session.delete
+       , Network.BitTorrent.Exchange.Session.deleteAll
        ) where
 
 import Control.Applicative
 import Control.Concurrent
+import Control.Concurrent.STM
 import Control.Exception hiding (Handler)
 import Control.Lens
 import Control.Monad.Logger
@@ -23,6 +28,7 @@ import Data.Conduit.List as CL (iterM)
 import Data.Maybe
 import Data.Map as M
 import Data.Monoid
+import Data.Set  as S
 import Data.Text as T
 import Data.Typeable
 import Text.PrettyPrint hiding ((<>))
@@ -70,11 +76,6 @@ data Cached a = Cached
 cache :: BEncode a => a -> Cached a
 cache s = Cached s (BE.encode s)
 
-data ConnectionEntry = ConnectionEntry
-  { initiatedBy :: !ChannelSide
-  , connection  :: !(Connection Session)
-  }
-
 data Session = Session
   { tpeerId      :: PeerId
   , infohash     :: InfoHash
@@ -82,11 +83,14 @@ data Session = Session
   , storage      :: Storage
   , status       :: MVar SessionStatus
   , unchoked     :: [PeerAddr IP]
-  , connections  :: MVar (Map (PeerAddr IP) ConnectionEntry)
+  , pendingConnections     :: TVar (Set (PeerAddr IP))
+  , establishedConnections :: TVar (Map (PeerAddr IP) (Connection Session))
   , broadcast    :: Chan Message
   , logger       :: LogFun
   , infodict     :: MVar (Cached InfoDict)
   }
+
+instance Ord IP
 
 -- | Logger function.
 type LogFun = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
@@ -97,18 +101,21 @@ newSession :: LogFun
            -> InfoDict            -- ^ torrent info dictionary;
            -> IO Session          -- ^
 newSession logFun addr rootPath dict = do
-  connVar     <- newMVar M.empty
+  pconnVar    <- newTVarIO S.empty
+  econnVar    <- newTVarIO M.empty
   store       <- openInfoDict ReadWriteEx rootPath dict
   statusVar   <- newMVar $ sessionStatus (BF.haveNone (totalPieces store))
                                          (piPieceLength (idPieceInfo dict))
   chan        <- newChan
   return Session
-    { tpeerId     = fromMaybe (error "newSession: impossible") (peerId addr)
-    , infohash    = idInfoHash dict
-    , status      = statusVar
-    , storage     = store
-    , unchoked    = []
-    , connections = connVar
+    { tpeerId                = fromMaybe (error "newSession: impossible")
+                                         (peerId addr)
+    , infohash               = idInfoHash dict
+    , status                 = statusVar
+    , storage                = store
+    , unchoked               = []
+    , pendingConnections     = pconnVar
+    , establishedConnections = econnVar
     , broadcast   = chan
     , logger      = logFun
     }
@@ -137,31 +144,79 @@ logEvent   :: MonadLogger m => Text    -> m ()
 logEvent       = logInfoN
 
 {-----------------------------------------------------------------------
+--  Connection slots
+-----------------------------------------------------------------------}
+--- pending -> established -> closed
+---    |                        /|\
+---    \-------------------------|
+
+pendingConnection :: PeerAddr IP -> Session -> IO Bool
+pendingConnection addr Session {..} = atomically $ do
+  pSet <- readTVar pendingConnections
+  eSet <- readTVar establishedConnections
+  if (addr `S.member` pSet) || (addr `M.member` eSet)
+    then return False
+    else do
+      modifyTVar' pendingConnections (S.insert addr)
+      return True
+
+establishedConnection :: Connected Session ()
+establishedConnection = undefined --atomically $ do
+--  pSet <- readTVar pendingConnections
+--  eSet <- readTVar
+  undefined
+
+finishedConnection :: Connected Session ()
+finishedConnection = return ()
+
+-- | There are no state for this connection, remove it.
+closedConnection :: PeerAddr IP -> Session -> IO ()
+closedConnection addr Session {..} = atomically $ do
+  modifyTVar pendingConnections     $ S.delete addr
+  modifyTVar establishedConnections $ M.delete addr
+
+{-----------------------------------------------------------------------
 --  Connections
 -----------------------------------------------------------------------}
 -- TODO unmap storage on zero connections
 
-insert :: PeerAddr IP
-       -> {- Maybe Socket
-       -> -} Session -> IO ()
+mainWire :: Wire Session ()
+mainWire = do
+  lift establishedConnection
+  Session {..} <- asks connSession
+  lift $ resizeBitfield (totalPieces storage)
+  logEvent "Connection established"
+  iterM logMessage =$= exchange =$= iterM logMessage
+  lift finishedConnection
+
+getConnectionConfig :: Session -> IO (ConnectionConfig Session)
+getConnectionConfig s @ Session {..} = undefined --ConnectionConfig
+--      let caps  = def
+--      let ecaps = def
+--      let hs = Handshake def caps infohash tpeerId
+--      chan <- dupChan broadcast
+
+--  { cfgPrefs   = undefined
+--  , cfgSession = ConnectionSession undefined undefined s
+--  , cfgWire    = mainWire
+--  }
+
+insert :: PeerAddr IP -> Session -> IO ()
 insert addr ses @ Session {..} = void $ forkIO (action `finally` cleanup)
   where
+    action = do
+      pendingConnection addr ses
+      cfg <- getConnectionConfig ses
+      connectWire addr cfg
+
     cleanup = do
       runStatusUpdates status (SS.resetPending addr)
       -- TODO Metata.resetPending addr
+      closedConnection addr ses
 
-    action = do
-      let caps  = def
-      let ecaps = def
-      let hs = Handshake def caps infohash tpeerId
-      chan <- dupChan broadcast
-      connectWire ses hs addr ecaps chan $ do
-        conn <- ask
---      liftIO $ modifyMVar_ connections $ pure . M.insert addr conn
-        lift $ resizeBitfield (totalPieces storage)
-        logEvent "Connection established"
-        iterM logMessage =$= exchange =$= iterM logMessage
---      liftIO $ modifyMVar_ connections $ pure . M.delete addr
+-- TODO closePending on error
+attach :: PendingConnection -> Session -> IO ()
+attach = undefined
 
 delete :: PeerAddr IP -> Session -> IO ()
 delete = undefined
