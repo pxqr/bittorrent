@@ -84,7 +84,11 @@ exchangeOptions pid Options {..} = Exchange.Options
   }
 
 connHandler :: MVar (HashMap InfoHash Handle) -> Exchange.Handler
-connHandler _tmap = undefined
+connHandler tmap ih = do
+  m <- readMVar tmap
+  case HM.lookup ih m of
+    Nothing            -> error "torrent not found"
+    Just (Handle {..}) -> return exchange
 
 initClient :: Options -> LogFun -> ResIO Client
 initClient opts @ Options {..} logFun = do

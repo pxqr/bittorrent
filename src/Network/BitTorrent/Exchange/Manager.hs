@@ -12,8 +12,10 @@ import Control.Monad
 import Data.Default
 import Network.Socket
 
+import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
-
+import Network.BitTorrent.Exchange.Session
+import Network.BitTorrent.Exchange.Wire hiding (Options)
 
 data Options = Options
   { optBacklog  :: Int
@@ -30,7 +32,13 @@ data Manager = Manager
   { listener :: !ThreadId
   }
 
-type Handler = Socket -> PeerAddr IP -> IO ()
+type Handler = InfoHash -> IO Session
+
+handleNewConn :: Socket -> PeerAddr IP -> Handler -> IO ()
+handleNewConn sock addr handler = do
+  conn <- newPendingConnection sock addr
+  ses  <- handler (pendingTopic conn) `onException` closePending conn
+  attach conn ses
 
 listenIncoming :: Options -> Handler -> IO ()
 listenIncoming Options {..} handler = do
@@ -38,12 +46,10 @@ listenIncoming Options {..} handler = do
     bind sock (toSockAddr optPeerAddr)
     listen sock optBacklog
     forever $ do
-      (conn, addr) <- accept sock
-      case fromSockAddr addr of
-        Nothing    -> return ()
-        Just paddr -> do
-          forkIO $ handler conn paddr
-          return ()
+      (conn, sockAddr) <- accept sock
+      case fromSockAddr sockAddr of
+        Nothing   -> return ()
+        Just addr -> void $ forkIO $ handleNewConn sock addr handler
 
 newManager :: Options -> Handler -> IO Manager
 newManager opts handler = do
