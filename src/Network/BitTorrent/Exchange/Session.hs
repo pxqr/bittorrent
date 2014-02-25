@@ -387,6 +387,11 @@ tryRequestMetadataBlock = do
     Nothing  -> undefined
     Just pix -> sendMessage (MetadataRequest pix)
 
+metadataCompleted :: InfoDict -> Wire Session ()
+metadataCompleted dict = do
+  Session {..} <- asks connSession
+  liftIO $ putMVar infodict (cache dict)
+
 handleMetadata :: Handler ExtendedMetadata
 handleMetadata (MetadataRequest pix) =
     lift (tryReadMetadataBlock pix) >>= sendMessage . mkResponse
@@ -395,9 +400,11 @@ handleMetadata (MetadataRequest pix) =
     mkResponse (Just (piece, total)) = MetadataData   piece total
 
 handleMetadata (MetadataData   {..}) = do
-  ih   <- asks connTopic
-  lift $ withMetadataUpdates (Metadata.pushBlock piece ih)
-  tryRequestMetadataBlock
+  ih    <- asks connTopic
+  mdict <- lift $ withMetadataUpdates (Metadata.pushBlock piece ih)
+  case mdict of
+    Nothing   -> tryRequestMetadataBlock -- not completed, need all blocks
+    Just dict -> metadataCompleted dict  -- complete, wake up payload fetch
 
 handleMetadata (MetadataReject  pix) = do
   lift $ withMetadataUpdates (Metadata.cancelPending pix)
