@@ -16,8 +16,8 @@ import Network.BitTorrent.Exchange.Wire
 import Config
 import Network.BitTorrent.Exchange.MessageSpec ()
 
-nullSession :: InfoHash -> PeerId -> ConnectionSession ()
-nullSession ih pid = ConnectionSession ih pid Nothing Nothing ()
+nullSession :: InfoHash -> PeerId -> SessionLink ()
+nullSession ih pid = SessionLink ih pid Nothing Nothing ()
 
 instance Arbitrary Options where
   arbitrary = return def

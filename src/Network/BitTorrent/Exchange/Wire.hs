@@ -50,9 +50,9 @@ module Network.BitTorrent.Exchange.Wire
        , connStats
 
          -- * Setup
-       , ConnectionPrefs   (..)
-       , ConnectionSession (..)
-       , ConnectionConfig  (..)
+       , ConnectionPrefs  (..)
+       , SessionLink      (..)
+       , ConnectionConfig (..)
 
          -- ** Initiate
        , connectWire
@@ -753,17 +753,18 @@ instance Default ConnectionPrefs where
 normalize :: ConnectionPrefs -> ConnectionPrefs
 normalize = undefined
 
-data ConnectionSession s = ConnectionSession
-  { sessionTopic      :: !(InfoHash)
-  , sessionPeerId     :: !(PeerId)
-  , metadataSize      :: !(Maybe Int)
-  , outputChan        :: !(Maybe (Chan Message))
-  , connectionSession :: !(s)
+-- | Bridge between 'Connection' and 'Network.BitTorrent.Exchange.Session'.
+data SessionLink s = SessionLink
+  { linkTopic        :: !(InfoHash)
+  , linkPeerId       :: !(PeerId)
+  , linkMetadataSize :: !(Maybe Int)
+  , linkOutputChan   :: !(Maybe (Chan Message))
+  , linkSession      :: !(s)
   }
 
 data ConnectionConfig s = ConnectionConfig
   { cfgPrefs   :: !(ConnectionPrefs)
-  , cfgSession :: !(ConnectionSession s)
+  , cfgSession :: !(SessionLink s)
   , cfgWire    :: !(Wire s ())
   }
 
@@ -771,8 +772,8 @@ configHandshake :: ConnectionConfig s -> Handshake
 configHandshake ConnectionConfig {..} = Handshake
   { hsProtocol = prefProtocol  cfgPrefs
   , hsReserved = prefCaps      cfgPrefs
-  , hsInfoHash = sessionTopic  cfgSession
-  , hsPeerId   = sessionPeerId cfgSession
+  , hsInfoHash = linkTopic     cfgSession
+  , hsPeerId   = linkPeerId    cfgSession
   }
 
 {-----------------------------------------------------------------------
@@ -841,13 +842,13 @@ afterHandshaking :: ChannelSide -> PeerAddr IP -> Socket -> HandshakePair
 afterHandshaking initiator addr sock
   hpair @ (HandshakePair hs hs')
           (ConnectionConfig
-           { cfgPrefs   = ConnectionPrefs   {..}
-           , cfgSession = ConnectionSession {..}
+           { cfgPrefs   = ConnectionPrefs {..}
+           , cfgSession = SessionLink     {..}
            , cfgWire    = wire
            }) = do
     let caps  = hsReserved hs <> hsReserved hs'
     cstate <- newIORef def { _connStats = establishedStats hpair }
-    chan   <- maybe newChan return outputChan
+    chan   <- maybe newChan return linkOutputChan
     let conn  = Connection {
           connInitiatedBy  = initiator
         , connRemoteAddr   = addr
@@ -858,7 +859,7 @@ afterHandshaking initiator addr sock
         , connThisPeerId   = hsPeerId   hs
         , connOptions      = def
         , connState        = cstate
-        , connSession      = connectionSession
+        , connSession      = linkSession
         , connChan         = chan
         }
 
@@ -897,7 +898,7 @@ connectWire addr cfg = do
 acceptWire :: PendingConnection -> ConnectionConfig s -> IO ()
 acceptWire pc @ PendingConnection {..} cfg = do
   bracket (return pendingSock) close $ \ _ -> do
-    unless (sessionTopic (cfgSession cfg) == pendingTopic) $ do
+    unless (linkTopic (cfgSession cfg) == pendingTopic) $ do
       throwIO (ProtocolError (UnexpectedTopic pendingTopic))
 
     let hs = configHandshake cfg

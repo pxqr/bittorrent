@@ -77,17 +77,23 @@ cache :: BEncode a => a -> Cached a
 cache s = Cached s (BE.encode s)
 
 data Session = Session
-  { tpeerId      :: PeerId
-  , infohash     :: InfoHash
-  , metadata     :: MVar Metadata.Status
-  , storage      :: Storage
-  , status       :: MVar SessionStatus
-  , unchoked     :: [PeerAddr IP]
-  , pendingConnections     :: TVar (Set (PeerAddr IP))
-  , establishedConnections :: TVar (Map (PeerAddr IP) (Connection Session))
-  , broadcast    :: Chan Message
-  , logger       :: LogFun
-  , infodict     :: MVar (Cached InfoDict)
+  { sessionPeerId          :: !(PeerId)
+  , sessionTopic           :: !(InfoHash)
+
+  , metadata               :: !(MVar Metadata.Status)
+  , infodict               :: !(MVar (Cached InfoDict))
+
+  , status                 :: !(MVar SessionStatus)
+  , storage                :: !(Storage)
+
+  , broadcast              :: !(Chan Message)
+
+  , unchoked               ::  [PeerAddr IP]
+  , connectionsPrefs       :: !ConnectionPrefs
+  , connectionsPending     :: !(TVar (Set (PeerAddr IP)))
+  , connectionsEstablished :: !(TVar (Map (PeerAddr IP) (Connection Session)))
+
+  , logger                 :: !(LogFun)
   }
 
 instance Ord IP
@@ -101,6 +107,7 @@ newSession :: LogFun
            -> InfoDict            -- ^ torrent info dictionary;
            -> IO Session          -- ^
 newSession logFun addr rootPath dict = do
+  pid         <- maybe genPeerId return (peerId addr)
   pconnVar    <- newTVarIO S.empty
   econnVar    <- newTVarIO M.empty
   store       <- openInfoDict ReadWriteEx rootPath dict
@@ -108,16 +115,18 @@ newSession logFun addr rootPath dict = do
                                          (piPieceLength (idPieceInfo dict))
   chan        <- newChan
   return Session
-    { tpeerId                = fromMaybe (error "newSession: impossible")
-                                         (peerId addr)
-    , infohash               = idInfoHash dict
+    { sessionPeerId          = pid
+    , sessionTopic           = idInfoHash dict
     , status                 = statusVar
     , storage                = store
     , unchoked               = []
-    , pendingConnections     = pconnVar
-    , establishedConnections = econnVar
-    , broadcast   = chan
-    , logger      = logFun
+    , connectionsPrefs       = def
+    , connectionsPending     = pconnVar
+    , connectionsEstablished = econnVar
+    , broadcast              = chan
+    , logger                 = logFun
+    , metadata               = undefined
+    , infodict               = undefined
     }
 
 closeSession :: Session -> IO ()
@@ -152,12 +161,12 @@ logEvent       = logInfoN
 
 pendingConnection :: PeerAddr IP -> Session -> IO Bool
 pendingConnection addr Session {..} = atomically $ do
-  pSet <- readTVar pendingConnections
-  eSet <- readTVar establishedConnections
+  pSet <- readTVar connectionsPending
+  eSet <- readTVar connectionsEstablished
   if (addr `S.member` pSet) || (addr `M.member` eSet)
     then return False
     else do
-      modifyTVar' pendingConnections (S.insert addr)
+      modifyTVar' connectionsPending (S.insert addr)
       return True
 
 establishedConnection :: Connected Session ()
@@ -172,8 +181,8 @@ finishedConnection = return ()
 -- | There are no state for this connection, remove it.
 closedConnection :: PeerAddr IP -> Session -> IO ()
 closedConnection addr Session {..} = atomically $ do
-  modifyTVar pendingConnections     $ S.delete addr
-  modifyTVar establishedConnections $ M.delete addr
+  modifyTVar connectionsPending     $ S.delete addr
+  modifyTVar connectionsEstablished $ M.delete addr
 
 {-----------------------------------------------------------------------
 --  Connections
@@ -190,16 +199,20 @@ mainWire = do
   lift finishedConnection
 
 getConnectionConfig :: Session -> IO (ConnectionConfig Session)
-getConnectionConfig s @ Session {..} = undefined --ConnectionConfig
---      let caps  = def
---      let ecaps = def
---      let hs = Handshake def caps infohash tpeerId
---      chan <- dupChan broadcast
-
---  { cfgPrefs   = undefined
---  , cfgSession = ConnectionSession undefined undefined s
---  , cfgWire    = mainWire
---  }
+getConnectionConfig s @ Session {..} = do
+  chan <- dupChan broadcast
+  let sessionLink = SessionLink {
+      linkTopic        = sessionTopic
+    , linkPeerId       = sessionPeerId
+    , linkMetadataSize = Nothing
+    , linkOutputChan   = Just chan
+    , linkSession      = s
+    }
+  return ConnectionConfig
+    { cfgPrefs   = connectionsPrefs
+    , cfgSession = sessionLink
+    , cfgWire    = mainWire
+    }
 
 insert :: PeerAddr IP -> Session -> IO ()
 insert addr ses @ Session {..} = void $ forkIO (action `finally` cleanup)
