@@ -38,7 +38,8 @@ data Status = Status
 
 makeLenses ''Status
 
-nullStatus :: PieceSize -> Status
+-- | Create a new scheduler for infodict of the given size.
+nullStatus :: Int -> Status
 nullStatus ps = Status [] (Block.empty ps)
 
 type Updates a = State Status a

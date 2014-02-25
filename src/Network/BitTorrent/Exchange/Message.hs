@@ -864,7 +864,7 @@ instance PeerMessage ExtendedMetadata where
 
 -- | All 'Piece's in 'MetadataData' messages MUST have size equal to
 -- this value. The last trailing piece can be shorter.
-metadataPieceSize :: Int
+metadataPieceSize :: P.PieceSize
 metadataPieceSize = 16 * 1024
 
 isLastPiece :: P.Piece a -> Int -> Bool
