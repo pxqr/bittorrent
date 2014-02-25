@@ -21,6 +21,7 @@ import Control.Monad.State
 import Data.ByteString as BS
 import Data.ByteString.Lazy as BL
 import Data.List as L
+import Data.Tuple
 
 import Data.BEncode as BE
 import Data.Torrent
@@ -45,7 +46,7 @@ nullStatus ps = Status [] (Block.empty ps)
 type Updates a = State Status a
 
 runUpdates :: MVar Status -> Updates a -> IO a
-runUpdates v m = undefined
+runUpdates v m = modifyMVar v (return . swap . runState m)
 
 scheduleBlock :: PeerAddr IP -> Updates (Maybe PieceIx)
 scheduleBlock addr = do
@@ -53,7 +54,7 @@ scheduleBlock addr = do
   case spans metadataPieceSize bkt of
     []              -> return Nothing
     ((off, _ ) : _) -> do
-      let pix = undefined
+      let pix = off `div` metadataPieceSize
       pending %= ((addr, pix) :)
       return (Just pix)
 
