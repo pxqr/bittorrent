@@ -17,6 +17,7 @@ module Network.BitTorrent.Exchange.Session.Metadata
 
 import Control.Concurrent
 import Control.Lens
+import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString as BS
 import Data.ByteString.Lazy as BL
@@ -43,14 +44,15 @@ makeLenses ''Status
 nullStatus :: Int -> Status
 nullStatus ps = Status [] (Block.empty ps)
 
-type Updates a = State Status a
+type Updates = ReaderT (PeerAddr IP) (State Status)
 
-runUpdates :: MVar Status -> Updates a -> IO a
-runUpdates v m = modifyMVar v (return . swap . runState m)
+runUpdates :: MVar Status -> PeerAddr IP -> Updates a -> IO a
+runUpdates v a m = modifyMVar v (return . swap . runState (runReaderT m a))
 
-scheduleBlock :: PeerAddr IP -> Updates (Maybe PieceIx)
-scheduleBlock addr = do
-  bkt <- use bucket
+scheduleBlock :: Updates (Maybe PieceIx)
+scheduleBlock = do
+  addr <- ask
+  bkt  <- use bucket
   case spans metadataPieceSize bkt of
     []              -> return Nothing
     ((off, _ ) : _) -> do
@@ -61,8 +63,10 @@ scheduleBlock addr = do
 cancelPending :: PieceIx -> Updates ()
 cancelPending pix = pending %= L.filter ((pix ==) . snd)
 
-resetPending :: PeerAddr IP -> Updates ()
-resetPending addr = pending %= L.filter ((addr ==) . fst)
+resetPending :: Updates ()
+resetPending = do
+  addr <- ask
+  pending %= L.filter ((addr ==) . fst)
 
 parseInfoDict :: BS.ByteString -> InfoHash -> Result InfoDict
 parseInfoDict chunk topic =
@@ -73,10 +77,10 @@ parseInfoDict chunk topic =
     Left err -> Left $ "unable to parse infodict " ++ err
 
 -- todo use incremental parsing to avoid BS.concat call
-pushBlock :: PeerAddr IP -> Torrent.Piece BS.ByteString -> InfoHash
-          -> Updates (Maybe InfoDict)
-pushBlock addr Torrent.Piece {..} topic = do
-  p <- use pending
+pushBlock :: Torrent.Piece BS.ByteString -> InfoHash -> Updates (Maybe InfoDict)
+pushBlock Torrent.Piece {..} topic = do
+  addr <- ask
+  p    <- use pending
   when ((addr, pieceIndex) `L.notElem` p) $ error "not requested"
   cancelPending pieceIndex
 

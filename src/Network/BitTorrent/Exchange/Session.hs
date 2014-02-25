@@ -259,7 +259,8 @@ withStatusUpdates m = do
 withMetadataUpdates :: Updates a -> Connected Session a
 withMetadataUpdates m = do
   Session {..} <- asks connSession
-  liftIO $ runUpdates metadata m
+  addr         <- asks connRemoteAddr
+  liftIO $ runUpdates metadata addr m
 
 getThisBitfield :: Wire Session Bitfield
 getThisBitfield = do
@@ -381,8 +382,7 @@ handleTransfer (Cancel  bix) = filterQueue (not . (transferResponse bix))
 
 tryRequestMetadataBlock :: Wire Session ()
 tryRequestMetadataBlock = do
-  addr <- asks   connRemoteAddr
-  mpix <- lift $ withMetadataUpdates (Metadata.scheduleBlock addr)
+  mpix <- lift $ withMetadataUpdates Metadata.scheduleBlock
   case mpix of
     Nothing  -> undefined
     Just pix -> sendMessage (MetadataRequest pix)
@@ -395,9 +395,8 @@ handleMetadata (MetadataRequest pix) =
     mkResponse (Just (piece, total)) = MetadataData   piece total
 
 handleMetadata (MetadataData   {..}) = do
-  addr <- asks connRemoteAddr
   ih   <- asks connTopic
-  lift $ withMetadataUpdates (Metadata.pushBlock addr piece ih)
+  lift $ withMetadataUpdates (Metadata.pushBlock piece ih)
   tryRequestMetadataBlock
 
 handleMetadata (MetadataReject  pix) = do
