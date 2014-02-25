@@ -284,9 +284,23 @@ size bkt = go bkt
     go (Span sz   xs) = sz + go xs
     go (Fill sz _ xs) = sz + go xs
 
--- | /O(n)/. List incomplete blocks to download.
+-- | /O(n)/. List incomplete blocks to download. If some block have
+-- size more than the specified 'BlockSize' then block is split into
+-- smaller blocks to satisfy given 'BlockSize'. Small (for
+-- e.g. trailing) blocks is not ignored, but returned in-order.
 spans :: BlockSize -> Bucket -> [(BlockOffset, BlockSize)]
-spans = undefined
+spans expectedSize = go 0
+  where
+    go _    Nil           = []
+    go off (Span sz   xs) = listChunks off sz ++ go (off + sz) xs
+    go off (Fill sz _ xs) = go (off + sz) xs
+
+    listChunks off restSize
+      | restSize <= 0 = []
+      |   otherwise   = (off, blkSize)
+                      : listChunks (off + blkSize) (restSize - blkSize)
+      where
+        blkSize = min expectedSize restSize
 
 {-----------------------------------------------------------------------
 --  Bucket contstruction
@@ -336,7 +350,7 @@ insertLazy pos bl = Network.BitTorrent.Exchange.Block.insert pos (BL.toStrict bl
 
 -- | /O(n)/.
 merge :: Bucket -> Bucket -> Bucket
-merge = undefined
+merge = error "Bucket.merge: not implemented"
 
 -- | /O(1)/.
 toPiece :: Bucket -> Maybe BL.ByteString
