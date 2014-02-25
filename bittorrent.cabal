@@ -210,6 +210,7 @@ test-suite spec
                        Network.BitTorrent.Tracker.RPC.UDPSpec
                        Network.BitTorrent.Tracker.SessionSpec
                        Network.BitTorrent.Exchange.MessageSpec
+                       Network.BitTorrent.Exchange.Session.MetadataSpec
                        Network.BitTorrent.Exchange.WireSpec
                        System.Torrent.StorageSpec
                        System.Torrent.FileMapSpec
