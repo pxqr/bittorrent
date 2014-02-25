@@ -299,6 +299,13 @@ sendBroadcast msg = do
 -- | Trigger is the reaction of a handler at some event.
 type Trigger = Wire Session ()
 
+interesting :: Trigger
+interesting = do
+  addr <- asks connRemoteAddr
+  sendMessage (Interested True)
+  sendMessage (Choking    False)
+  tryFillRequestQueue
+
 fillRequestQueue :: Trigger
 fillRequestQueue = do
   maxN <- lift getMaxQueueLength
@@ -314,13 +321,6 @@ tryFillRequestQueue = do
   allowed <- canDownload <$> use connStatus
   when allowed $ do
     fillRequestQueue
-
-interesting :: Trigger
-interesting = do
-  addr <- asks connRemoteAddr
-  sendMessage (Interested True)
-  sendMessage (Choking    False)
-  tryFillRequestQueue
 
 {-----------------------------------------------------------------------
 --  Incoming message handling
@@ -383,6 +383,16 @@ handleTransfer (Cancel  bix) = filterQueue (not . (transferResponse bix))
 -----------------------------------------------------------------------}
 -- TODO introduce new metadata exchange specific exceptions
 
+waitForMetadata :: Trigger
+waitForMetadata = do
+  Session {..} <- asks connSession
+  needFetch    <- liftIO (isEmptyMVar infodict)
+  when needFetch $ do
+    canFetch   <- allowed ExtMetadata <$> use connExtCaps
+    if canFetch
+      then tryRequestMetadataBlock
+      else liftIO (waitMVar infodict)
+
 tryRequestMetadataBlock :: Trigger
 tryRequestMetadataBlock = do
   mpix <- lift $ withMetadataUpdates Metadata.scheduleBlock
@@ -415,18 +425,8 @@ handleMetadata (MetadataReject  pix) = do
 handleMetadata (MetadataUnknown _  ) = do
   logInfoN "Unknown metadata message"
 
-waitForMetadata :: Trigger
-waitForMetadata = do
-  Session {..} <- asks connSession
-  needFetch    <- liftIO (isEmptyMVar infodict)
-  when needFetch $ do
-    canFetch   <- allowed ExtMetadata <$> use connExtCaps
-    if canFetch
-      then tryRequestMetadataBlock
-      else liftIO (waitMVar infodict)
-
 {-----------------------------------------------------------------------
---  Event loop
+--  Main entry point
 -----------------------------------------------------------------------}
 
 acceptRehandshake :: ExtendedHandshake -> Trigger
