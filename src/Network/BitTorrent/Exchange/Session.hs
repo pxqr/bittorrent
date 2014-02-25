@@ -296,7 +296,10 @@ sendBroadcast msg = do
 --  Triggers
 -----------------------------------------------------------------------}
 
-fillRequestQueue :: Wire Session ()
+-- | Trigger is the reaction of a handler at some event.
+type Trigger = Wire Session ()
+
+fillRequestQueue :: Trigger
 fillRequestQueue = do
   maxN <- lift getMaxQueueLength
   rbf  <- use connBitfield
@@ -306,13 +309,13 @@ fillRequestQueue = do
     scheduleBlocks addr rbf (maxN - n)
   mapM_ (sendMessage . Request) blks
 
-tryFillRequestQueue :: Wire Session ()
+tryFillRequestQueue :: Trigger
 tryFillRequestQueue = do
   allowed <- canDownload <$> use connStatus
   when allowed $ do
     fillRequestQueue
 
-interesting :: Wire Session ()
+interesting :: Trigger
 interesting = do
   addr <- asks connRemoteAddr
   sendMessage (Interested True)
@@ -380,14 +383,14 @@ handleTransfer (Cancel  bix) = filterQueue (not . (transferResponse bix))
 -----------------------------------------------------------------------}
 -- TODO introduce new metadata exchange specific exceptions
 
-tryRequestMetadataBlock :: Wire Session ()
+tryRequestMetadataBlock :: Trigger
 tryRequestMetadataBlock = do
   mpix <- lift $ withMetadataUpdates Metadata.scheduleBlock
   case mpix of
     Nothing  -> undefined
     Just pix -> sendMessage (MetadataRequest pix)
 
-metadataCompleted :: InfoDict -> Wire Session ()
+metadataCompleted :: InfoDict -> Trigger
 metadataCompleted dict = do
   Session {..} <- asks connSession
   liftIO $ putMVar infodict (cache dict)
@@ -412,7 +415,7 @@ handleMetadata (MetadataReject  pix) = do
 handleMetadata (MetadataUnknown _  ) = do
   logInfoN "Unknown metadata message"
 
-waitForMetadata :: Wire Session ()
+waitForMetadata :: Trigger
 waitForMetadata = do
   Session {..} <- asks connSession
   needFetch    <- liftIO (isEmptyMVar infodict)
@@ -426,7 +429,7 @@ waitForMetadata = do
 --  Event loop
 -----------------------------------------------------------------------}
 
-acceptRehandshake :: ExtendedHandshake -> Wire s ()
+acceptRehandshake :: ExtendedHandshake -> Trigger
 acceptRehandshake ehs = undefined
 
 handleExtended :: Handler ExtendedMessage
