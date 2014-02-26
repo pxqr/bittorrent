@@ -180,7 +180,7 @@ scrape m u q = do
 
 -- | More particular version of 'scrape', just for one torrent.
 --
---   This function can throw RpcException.
+--   This function can throw 'RpcException'.
 --
 scrapeOne :: Manager -> URI -> InfoHash -> IO ScrapeEntry
 scrapeOne m uri ih = do
