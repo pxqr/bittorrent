@@ -72,22 +72,39 @@ defMaxTimeout = 15 * 2 ^ (8 :: Int) * sec
 defMultiplier :: Int
 defMultiplier = 2
 
--- announce request packet
 defMaxPacketSize :: Int
 defMaxPacketSize = 98
 
+-- | Manager configuration.
 data Options = Options
-  { optMaxPacketSize :: {-# UNPACK #-} !Int
+  { -- | Max size of a /response/ packet.
+    --
+    --   'optMaxPacketSize' /must/ be a positive value.
+    --
+    optMaxPacketSize :: {-# UNPACK #-} !Int
 
-    -- | in seconds.
+    -- | Starting timeout interval. If a response is not received
+    -- after 'optMinTimeout' then 'Manager' repeat RPC with timeout
+    -- interval multiplied by 'optMultiplier' and so on until
+    -- timeout interval reach 'optMaxTimeout'.
+    --
+    --   'optMinTimeout' /must/ be a positive value.
+    --
   , optMinTimeout    :: {-# UNPACK #-} !Int
 
-    -- | in seconds.
+    -- | After 'optMaxTimeout' reached and tracker still not
+    -- responding both 'announce' and 'scrape' functions will throw
+    -- 'TimeoutExpired' exception.
+    --
+    --   'optMaxTimeout' /must/ be greater than 'optMinTimeout'.
+    --
   , optMaxTimeout    :: {-# UNPACK #-} !Int
 
+    -- | 'optMultiplier' must a positive value.
   , optMultiplier    :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
 
+-- | Options suitable for bittorrent client.
 instance Default Options where
   def = Options
     { optMaxPacketSize = defMaxPacketSize
