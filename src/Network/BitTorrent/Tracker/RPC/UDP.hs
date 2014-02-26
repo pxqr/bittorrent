@@ -123,9 +123,9 @@ initManager opts = Manager opts
   <*> newEmptyMVar
 
 unblockAll :: PendingQueries -> IO ()
-unblockAll m = traverse (traverse unblock) m >> return ()
+unblockAll m = traverse (traverse unblockCall) m >> return ()
   where
-    unblock ares = putMVar ares (Left ManagerClosed)
+    unblockCall ares = putMVar ares (Left ManagerClosed)
 
 resetState :: Manager -> IO ()
 resetState Manager {..} = do
