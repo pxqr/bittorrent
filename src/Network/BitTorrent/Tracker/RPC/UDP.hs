@@ -1,8 +1,8 @@
 -- |
---   Copyright   :  (c) Sam Truzjan 2013
+--   Copyright   :  (c) Sam Truzjan 2013-2014
 --   License     :  BSD3
 --   Maintainer  :  pxqr.sta@gmail.com
---   Stability   :  experimental
+--   Stability   :  provisional
 --   Portability :  portable
 --
 --   This module implement low-level UDP tracker protocol.
