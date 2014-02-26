@@ -4,11 +4,8 @@ notifications:
   email: false
 
 install:
-  - git clone https://github.com/pxqr/bencoding.git
-  - cd bencoding
-  - cabal install --force-reinstalls
-  - cd ..
-  - cabal install --enable-tests --enable-benchmark --force-reinstalls --only-dependencies
+  - cabal sandbox init
+  - ./dev/update-dependencies.sh
 
 script:
-  cabal configure --enable-tests --enable-benchmark && cabal build && cabal test
+  - cabal configure --enable-tests --enable-benchmark && cabal build && ./dist/build/spec/spec

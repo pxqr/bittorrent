@@ -10,6 +10,7 @@ import System.Environment
 import System.Process
 import System.Directory
 import Text.Printf
+import Test.Hspec
 
 import Config
 import Spec
@@ -64,7 +65,7 @@ terminateEnv = do
 runTestSuite :: [String] -> IO ExitCode
 runTestSuite args = do
   printf "running hspec test suite with args: %s\n" (show args)
-  catch (withArgs args hspecMain >> return ExitSuccess) return
+  catch (withArgs args (hspec spec) >> return ExitSuccess) return
 
 main :: IO ()
 main = do
