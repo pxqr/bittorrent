@@ -221,7 +221,7 @@ data RpcException
 
     -- | RPC manager closed while waiting for response.
   | ManagerClosed
-    deriving (Show, Typeable)
+    deriving (Eq, Show, Typeable)
 
 instance Exception RpcException
 
