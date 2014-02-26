@@ -172,7 +172,7 @@ data RpcException
     , actualMsg   :: String
     }
 
-    -- | RPC succeed, but tracker respond with error code.
+    -- | RPC succeed, but tracker responded with error code.
   | QueryFailed Text
 
     -- | RPC manager closed while waiting for response.
