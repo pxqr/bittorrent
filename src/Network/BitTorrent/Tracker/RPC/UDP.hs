@@ -105,7 +105,7 @@ data Options = Options
     --
   , optMaxTimeout    :: {-# UNPACK #-} !Int
 
-    -- | 'optMultiplier' must a positive value.
+    -- | 'optMultiplier' /must/ be a positive value.
   , optMultiplier    :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
 
