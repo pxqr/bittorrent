@@ -164,7 +164,7 @@ data RpcException
   | HostLookupFailed
 
     -- | Tracker exists but not responding for specific number of seconds.
-  | TrackerNotResponding Int
+  | TimeoutExpired Int
 
     -- | Tracker responded with unexpected message type.
   | UnexpectedResponse
@@ -517,7 +517,7 @@ retransmission :: Options -> IO a -> IO a
 retransmission Options {..} action = go optMinTimeout
   where
     go curTimeout
-      | curTimeout > optMaxTimeout = throwIO $ TrackerNotResponding curTimeout
+      | curTimeout > optMaxTimeout = throwIO $ TimeoutExpired curTimeout
       |         otherwise          = do
         r <- timeout curTimeout action
         maybe (go (2 * curTimeout)) return r
