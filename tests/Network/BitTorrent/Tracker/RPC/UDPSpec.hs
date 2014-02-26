@@ -1,25 +1,19 @@
 {-# LANGUAGE RecordWildCards #-}
-module Network.BitTorrent.Tracker.RPC.UDPSpec (spec, trackerURIs) where
+module Network.BitTorrent.Tracker.RPC.UDPSpec (spec, rpcOpts) where
 import Control.Concurrent.Async
 import Control.Monad
 import Data.Default
 import Data.List as L
 import Data.Maybe
-import Network.URI
 import Test.Hspec
-
-import Network.BitTorrent.Tracker.MessageSpec hiding (spec)
-import Network.BitTorrent.Tracker.RPC.UDP
 
 import Network.BitTorrent.Core
 import Network.BitTorrent.Tracker.Message as Message
 
+import Network.BitTorrent.Tracker.TestData
+import Network.BitTorrent.Tracker.MessageSpec hiding (spec)
+import Network.BitTorrent.Tracker.RPC.UDP
 
-trackerURIs :: [URI]
-trackerURIs =
-  [ fromJust $ parseURI "udp://tracker.openbittorrent.com:80/announce"
-  , fromJust $ parseURI "udp://tracker.publicbt.com:80/announce"
-  ]
 
 validateInfo :: AnnounceQuery -> AnnounceInfo -> Expectation
 validateInfo _ Message.Failure {..} = error "validateInfo: failure"
@@ -32,27 +26,45 @@ validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
   where
     peerList = getPeerList respPeers
 
-spec :: Spec
-spec = do
---  describe "RpcException" $
+-- | Number of concurrent calls.
+rpcCount :: Int
+rpcCount = 100
 
-  parallel $ do
-   forM_ trackerURIs $ \ uri ->
-    context (show uri) $ do
+rpcOpts :: Options
+rpcOpts = def
+  { optMinTimeout = 1
+  , optMaxTimeout = 10
+  }
+
+spec :: Spec
+spec = parallel $ do
+  forM_ (L.filter isUdpTracker trackers) $ \ TrackerEntry {..} ->
+    context trackerName $ do
+
       describe "announce" $ do
-        it "have valid response" $ do
-          withManager def $ \ mgr -> do
-            q <- arbitrarySample
-            announce mgr uri q >>= validateInfo q
+        if tryAnnounce then do
+          it "have valid response" $ do
+            withManager rpcOpts $ \ mgr -> do
+              q <- arbitrarySample
+              announce mgr trackerURI q >>= validateInfo q
+        else do
+          it "should throw TrackerNotResponding" $ do
+            pending
 
       describe "scrape" $ do
-        it "have valid response" $ do
-          withManager def $ \ mgr -> do
-            xs <- scrape mgr uri [def]
-            L.length xs `shouldSatisfy` (>= 1)
+        if tryScraping then do
+          it "have valid response" $ do
+            withManager rpcOpts $ \ mgr -> do
+              xs <- scrape mgr trackerURI [def]
+              L.length xs `shouldSatisfy` (>= 1)
+        else do
+          it "should throw TrackerNotResponding" $ do
+            pending
+
 
       describe "Manager" $ do
-        it "should handle arbitrary intermixed concurrent queries" $ do
-          withManager def $ \ mgr -> do
-            _ <- mapConcurrently (\ _ -> scrape mgr uri [def]) [1..100 :: Int]
-            return ()
+        when tryScraping $ do
+          it "should handle arbitrary intermixed concurrent queries" $ do
+            withManager rpcOpts $ \ mgr -> do
+              _ <- mapConcurrently (\ _ -> scrape mgr trackerURI [def]) [1..rpcCount]
+              return ()

@@ -1,6 +1,9 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Network.BitTorrent.Tracker.TestData
        ( TrackerEntry (..)
+       , isUdpTracker
+       , isHttpTracker
        , trackers
        ) where
 
@@ -28,6 +31,13 @@ data TrackerEntry = TrackerEntry
     -- | Some trackers allow
   , hashList    :: Maybe [InfoHash]
   }
+
+isUdpTracker :: TrackerEntry -> Bool
+isUdpTracker TrackerEntry {..} = uriScheme trackerURI == "udp:"
+
+isHttpTracker :: TrackerEntry -> Bool
+isHttpTracker TrackerEntry {..} = uriScheme trackerURI == "http:"
+                               || uriScheme trackerURI == "https:"
 
 instance IsString URI where
   fromString str = fromMaybe err $ parseURI str
