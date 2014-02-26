@@ -166,7 +166,7 @@ data RpcException
     -- | Tracker exists but not responding for specific number of seconds.
   | TrackerNotResponding Int
 
-    -- | Tracker respond with unexpected message type.
+    -- | Tracker responded with unexpected message type.
   | UnexpectedResponse
     { expectedMsg :: String
     , actualMsg   :: String
