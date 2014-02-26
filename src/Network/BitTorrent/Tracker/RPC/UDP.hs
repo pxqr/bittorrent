@@ -60,18 +60,23 @@ import Network.BitTorrent.Tracker.Message
 --  Options
 -----------------------------------------------------------------------}
 
+-- | 'System.Timeout.timeout' specific.
 sec :: Int
 sec = 1000000
 
+-- | See <http://www.bittorrent.org/beps/bep_0015.html#time-outs>
 defMinTimeout :: Int
 defMinTimeout = 15 * sec
 
+-- | See <http://www.bittorrent.org/beps/bep_0015.html#time-outs>
 defMaxTimeout :: Int
 defMaxTimeout = 15 * 2 ^ (8 :: Int) * sec
 
+-- | See: <http://www.bittorrent.org/beps/bep_0015.html#time-outs>
 defMultiplier :: Int
 defMultiplier = 2
 
+-- TODO why 98?
 defMaxPacketSize :: Int
 defMaxPacketSize = 98
 
