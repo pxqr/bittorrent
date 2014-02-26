@@ -69,6 +69,9 @@ defMinTimeout = 15 * sec
 defMaxTimeout :: Int
 defMaxTimeout = 15 * 2 ^ (8 :: Int) * sec
 
+defMultiplier :: Int
+defMultiplier = 2
+
 -- announce request packet
 defMaxPacketSize :: Int
 defMaxPacketSize = 98
@@ -81,6 +84,8 @@ data Options = Options
 
     -- | in seconds.
   , optMaxTimeout    :: {-# UNPACK #-} !Int
+
+  , optMultiplier    :: {-# UNPACK #-} !Int
   } deriving (Show, Eq)
 
 instance Default Options where
@@ -88,6 +93,7 @@ instance Default Options where
     { optMaxPacketSize = defMaxPacketSize
     , optMinTimeout    = defMinTimeout
     , optMaxTimeout    = defMaxTimeout
+    , optMultiplier    = defMultiplier
     }
 
 {-----------------------------------------------------------------------
@@ -520,7 +526,7 @@ retransmission Options {..} action = go optMinTimeout
       | curTimeout > optMaxTimeout = throwIO $ TimeoutExpired curTimeout
       |         otherwise          = do
         r <- timeout curTimeout action
-        maybe (go (2 * curTimeout)) return r
+        maybe (go (optMultiplier * curTimeout)) return r
 
 queryTracker :: Manager -> URI -> Request -> IO Response
 queryTracker mgr uri req = do
