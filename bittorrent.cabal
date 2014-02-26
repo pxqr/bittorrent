@@ -88,7 +88,6 @@ library
                        Network.BitTorrent.Tracker.RPC.HTTP
                        Network.BitTorrent.Tracker.RPC.UDP
                        Network.BitTorrent.Tracker.Session
-                       Network.BitTorrent.Tracker.Wai
                        System.Torrent.FileMap
                        System.Torrent.Storage
   other-modules:       Paths_bittorrent
@@ -158,7 +157,6 @@ library
                      , krpc         >= 0.6.1
                      , http-types   >= 0.8
                      , http-conduit >= 1.9 && < 2.0
-                     , wai          >= 1.4 && < 2.0
                      , iproute
 
                        -- RNG/PRNG
