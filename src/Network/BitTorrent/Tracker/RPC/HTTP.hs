@@ -43,8 +43,9 @@ import Data.Typeable
 import Network.URI
 import           Network.HTTP.Conduit hiding
                  (Manager, newManager, closeManager, withManager)
+import           Network.HTTP.Client (defaultManagerSettings)
+import           Network.HTTP.Client.Internal (setUri)
 import qualified Network.HTTP.Conduit as HTTP
-import           Network.HTTP.Conduit.Internal (setUri)
 import           Network.HTTP.Types.Header (hUserAgent)
 import           Network.HTTP.Types.URI    (SimpleQuery, renderSimpleQuery)
 
@@ -92,7 +93,7 @@ instance Default Options where
     { optAnnounceExt = def
     , optHttpProxy   = Nothing
     , optUserAgent   = BC.pack libUserAgent
-    , optHttpOptions = def
+    , optHttpOptions = defaultManagerSettings
     }
 
 -- | HTTP tracker manager.
@@ -114,7 +115,7 @@ withManager opts = bracket (newManager opts) closeManager
 --  Queries
 -----------------------------------------------------------------------}
 
-fillRequest :: Options -> SimpleQuery -> Request m -> Request m
+fillRequest :: Options -> SimpleQuery -> Request -> Request
 fillRequest Options {..} q r = r
   { queryString    = joinQuery (queryString r) (renderSimpleQuery False q)
   , requestHeaders = (hUserAgent, optUserAgent) : requestHeaders r

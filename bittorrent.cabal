@@ -156,7 +156,8 @@ library
                      , network      >= 2.4
                      , krpc         >= 0.6.1
                      , http-types   >= 0.8
-                     , http-conduit >= 1.9 && < 2.0
+                     , http-client  >= 0.2
+                     , http-conduit >= 2.0
                      , iproute
 
                        -- RNG/PRNG
