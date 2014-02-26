@@ -126,7 +126,7 @@ library
                        -- Data & Data structures
                      , bytestring   >= 0.10
                      , containers   >= 0.5
-                     , data-default >= 0.4
+                     , data-default >= 0.5.2
 --                     , data-dword
                      , intset       >= 0.1
                      , PSQueue      >= 1.1
