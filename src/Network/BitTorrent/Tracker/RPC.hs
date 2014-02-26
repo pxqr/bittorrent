@@ -143,9 +143,10 @@ packException f m = try m >>= either (throwIO . f) return
 
 dispatch :: URI -> IO a -> IO a -> IO a
 dispatch URI {..} http udp
-  | uriScheme == "http:" = packException HttpException http
-  | uriScheme == "udp:"  = packException UdpException  udp
-  |       otherwise      = throwIO $ UnrecognizedProtocol uriScheme
+  | uriScheme == "http:" ||
+    uriScheme == "https:" = packException HttpException http
+  | uriScheme == "udp:"   = packException UdpException  udp
+  |       otherwise       = throwIO $ UnrecognizedProtocol uriScheme
 
 announce :: Manager -> URI -> SAnnounceQuery -> IO AnnounceInfo
 announce Manager {..} uri simpleQuery
