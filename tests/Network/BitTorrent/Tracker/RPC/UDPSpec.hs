@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.Tracker.RPC.UDPSpec (spec, rpcOpts) where
 import Control.Concurrent.Async
+import Control.Exception
 import Control.Monad
 import Data.Default
 import Data.List as L
@@ -40,8 +41,32 @@ isTimeoutExpired :: RpcException -> Bool
 isTimeoutExpired (TimeoutExpired _) = True
 isTimeoutExpired  _                 = False
 
+isSomeException :: SomeException -> Bool
+isSomeException _ = True
+
 spec :: Spec
 spec = parallel $ do
+  describe "newManager" $ do
+    it "should throw exception on zero optMaxPacketSize" $ do
+      let opts = def { optMaxPacketSize = 0 }
+      newManager opts `shouldThrow` isSomeException
+
+    it "should throw exception on zero optMinTimout" $ do
+      let opts = def { optMinTimeout = 0 }
+      newManager opts `shouldThrow` isSomeException
+
+    it "should throw exception on zero optMaxTimeout" $ do
+      let opts = def { optMaxTimeout = 0 }
+      newManager opts `shouldThrow` isSomeException
+
+    it "should throw exception on maxTimeout < minTimeout" $ do
+      let opts = def { optMinTimeout = 2, optMaxTimeout = 1 }
+      newManager opts `shouldThrow` isSomeException
+
+    it "should throw exception on  optMultiplier" $ do
+      let opts = def { optMultiplier = 0 }
+      newManager opts `shouldThrow` isSomeException
+
   forM_ (L.filter isUdpTracker trackers) $ \ TrackerEntry {..} ->
     context trackerName $ do
 

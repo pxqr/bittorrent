@@ -118,6 +118,20 @@ instance Default Options where
     , optMultiplier    = defMultiplier
     }
 
+checkOptions :: Options -> IO ()
+checkOptions Options {..} = do
+  unless (optMaxPacketSize > 0) $ do
+    throwIO $ userError "optMaxPacketSize must be positive"
+
+  unless (optMinTimeout > 0) $ do
+    throwIO $ userError "optMinTimeout must be positive"
+
+  unless (optMaxTimeout > 0) $ do
+    throwIO $ userError "optMaxTimeout must be greater than optMinTimeout"
+
+  unless (optMinTimeout > 0) $ do
+    throwIO $ userError "optMinTimeout must be positive"
+
 {-----------------------------------------------------------------------
 --  Manager state
 -----------------------------------------------------------------------}
@@ -162,8 +176,10 @@ resetState Manager {..} = do
   where
     err = error "UDP tracker manager closed"
 
+-- | This function will throw 'IOException' if or
 newManager :: Options -> IO Manager
 newManager opts = do
+  checkOptions opts
   mgr <- initManager opts
   tid <- forkIO (listen mgr `finally` resetState mgr)
   putMVar (listenerThread mgr) tid
