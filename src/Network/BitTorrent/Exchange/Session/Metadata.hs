@@ -1,14 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Network.BitTorrent.Exchange.Session.Metadata
-       ( -- * Metadata transfer state
+       ( -- * Transfer state
          Status
        , nullStatus
 
-         -- * Metadata updates
+         -- * State updates
        , Updates
        , runUpdates
 
-         -- * Metadata piece control
+         -- * Piece transfer control
        , scheduleBlock
        , resetPending
        , cancelPending
@@ -33,6 +33,7 @@ import Network.BitTorrent.Exchange.Block   as Block
 import Network.BitTorrent.Exchange.Message as Message hiding (Status)
 
 
+-- | Current transfer status.
 data Status = Status
   { _pending :: [(PeerAddr IP, PieceIx)]
   , _bucket  :: Bucket

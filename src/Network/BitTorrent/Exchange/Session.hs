@@ -12,6 +12,9 @@ module Network.BitTorrent.Exchange.Session
        , Network.BitTorrent.Exchange.Session.attach
        , Network.BitTorrent.Exchange.Session.delete
        , Network.BitTorrent.Exchange.Session.deleteAll
+
+         -- * Events
+       , waitMetadata
        ) where
 
 import Control.Applicative
@@ -86,12 +89,11 @@ data Session = Session
   , status                 :: !(MVar SessionStatus)
   , storage                :: !(Storage)
 
-  , broadcast              :: !(Chan Message)
-
-  , unchoked               ::  [PeerAddr IP]
   , connectionsPrefs       :: !ConnectionPrefs
   , connectionsPending     :: !(TVar (Set (PeerAddr IP)))
   , connectionsEstablished :: !(TVar (Map (PeerAddr IP) (Connection Session)))
+  , connectionsUnchoked    ::  [PeerAddr IP]
+  , broadcast              :: !(Chan Message)
 
   , logger                 :: !(LogFun)
   }
@@ -117,22 +119,29 @@ newSession logFun addr rootPath dict = do
   return Session
     { sessionPeerId          = pid
     , sessionTopic           = idInfoHash dict
+
+    , metadata               = undefined
+    , infodict               = undefined
+
     , status                 = statusVar
     , storage                = store
-    , unchoked               = []
+
     , connectionsPrefs       = def
     , connectionsPending     = pconnVar
     , connectionsEstablished = econnVar
+    , connectionsUnchoked    = []
     , broadcast              = chan
+
     , logger                 = logFun
-    , metadata               = undefined
-    , infodict               = undefined
     }
 
 closeSession :: Session -> IO ()
 closeSession ses = do
   deleteAll ses
   undefined
+
+waitMetadata :: Session -> IO InfoDict
+waitMetadata Session {..} = cachedValue <$> readMVar infodict
 
 {-----------------------------------------------------------------------
 --  Logging
