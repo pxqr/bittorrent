@@ -7,6 +7,7 @@ import Data.BEncode as BE
 import Data.ByteString.Lazy as BL
 import Data.Default
 import Data.List as L
+import Data.Maybe
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Message
 import qualified Network.KRPC as KRPC (def)
@@ -57,12 +58,13 @@ spec :: Spec
 spec = do
  context ("you need running DHT node at " ++ show remoteAddr) $ do
   it "is running" $ do
-         _ <- retry 5 $ timeout (100 * 1000) $ do
+         running <- retry 5 $ timeout (100 * 1000) $ do
                       nid <- genNodeId
                       Response _remoteAddr Ping <-
                           rpc (query remoteAddr (Query nid Ping))
                       return ()
-         return ()
+         running `shouldSatisfy` isJust
+
   describe "ping" $ do
     it "properly bencoded" $ do
       BE.decode "d2:id20:abcdefghij0123456789e"
