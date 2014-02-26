@@ -62,6 +62,7 @@ import Text.PrettyPrint hiding ((<>))
 import Text.PrettyPrint.Class
 import Text.Read        (readMaybe)
 
+import Data.Torrent.JSON ()
 import Network.BitTorrent.Core.Fingerprint
 
 -- TODO use unpacked Word160 form (length is known statically)

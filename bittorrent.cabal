@@ -141,7 +141,7 @@ library
                      , hashable     >= 1.2
 
                        -- Codecs & Serialization
-                     , aeson             >= 0.6.2.0 && < 0.7
+                     , aeson             >= 0.7
                      , attoparsec        >= 0.10
                      , base16-bytestring >= 0.1
                      , base32-bytestring >= 0.2
