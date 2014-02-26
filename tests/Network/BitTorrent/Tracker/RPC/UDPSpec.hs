@@ -36,6 +36,10 @@ rpcOpts = def
   , optMaxTimeout = 10
   }
 
+isTimeoutExpired :: RpcException -> Bool
+isTimeoutExpired (TimeoutExpired _) = True
+isTimeoutExpired  _                 = False
+
 spec :: Spec
 spec = parallel $ do
   forM_ (L.filter isUdpTracker trackers) $ \ TrackerEntry {..} ->
@@ -48,8 +52,10 @@ spec = parallel $ do
               q <- arbitrarySample
               announce mgr trackerURI q >>= validateInfo q
         else do
-          it "should throw TrackerNotResponding" $ do
-            pending
+          it "should throw TimeoutExpired" $ do
+            withManager rpcOpts $ \ mgr -> do
+              q <- arbitrarySample
+              announce mgr trackerURI q `shouldThrow` isTimeoutExpired
 
       describe "scrape" $ do
         if tryScraping then do
@@ -58,9 +64,9 @@ spec = parallel $ do
               xs <- scrape mgr trackerURI [def]
               L.length xs `shouldSatisfy` (>= 1)
         else do
-          it "should throw TrackerNotResponding" $ do
-            pending
-
+          it "should throw TimeoutExpired" $ do
+            withManager rpcOpts $ \ mgr -> do
+              scrape mgr trackerURI [def] `shouldThrow` isTimeoutExpired
 
       describe "Manager" $ do
         when tryScraping $ do

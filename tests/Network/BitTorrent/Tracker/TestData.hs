@@ -72,7 +72,11 @@ notWorking name uri = (trackerEntry uri)
 trackers :: [TrackerEntry]
 trackers =
   [ announceOnly "LinuxTracker"
-                 "http://linuxtracker.org:2710/00000000000000000000000000000000/announce"
+    "http://linuxtracker.org:2710/00000000000000000000000000000000/announce"
+
+    -- from "http://www.linux23.com/"
+  , announceScrape "Arch" "http://tracker.archlinux.org:6969/announce"
+  , notWorking     "rarbg" "udp://9.rarbg.com:2710/announce"
 
   , announceScrape "OpenBitTorrent" "udp://tracker.openbittorrent.com:80/announce"
   , announceScrape "PublicBT"       "udp://tracker.publicbt.com:80/announce"
