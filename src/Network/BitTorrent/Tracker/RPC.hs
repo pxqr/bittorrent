@@ -6,10 +6,10 @@
 --   Portability :  portable
 --
 --   This module provides unified RPC interface to BitTorrent
---   trackers. The tracker is an UDP/HTTP/HTTPS service used to discovery
---   peers for a particular existing torrent and keep statistics about
---   the swarm. This module also provides a way to easily request
---   scrape info for a particular torrent list.
+--   trackers. The tracker is an UDP/HTTP/HTTPS service used to
+--   discovery peers for a particular existing torrent and keep
+--   statistics about the swarm. This module also provides a way to
+--   request scrape info for a particular torrent list.
 --
 {-# LANGUAGE DeriveDataTypeable #-}
 module Network.BitTorrent.Tracker.RPC
