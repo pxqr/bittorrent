@@ -158,7 +158,7 @@ library
                      , http-types   >= 0.8
                      , http-client  >= 0.2
                      , http-conduit >= 2.0
-                     , iproute
+                     , iproute      >= 1.2.12
 
                        -- RNG/PRNG
                      , entropy        >= 0.2

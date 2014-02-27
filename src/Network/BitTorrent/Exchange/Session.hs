@@ -98,8 +98,6 @@ data Session = Session
   , logger                 :: !(LogFun)
   }
 
-instance Ord IP
-
 -- | Logger function.
 type LogFun = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
