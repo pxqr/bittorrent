@@ -18,7 +18,7 @@ ghc:
 before_install:
   - sudo apt-get install rtorrent screen
   - rtorrent -h | grep version
-  - screen --version
+  - screen --version || true
 
 install:
   - cabal sandbox init
