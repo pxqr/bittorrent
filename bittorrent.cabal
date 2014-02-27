@@ -288,7 +288,7 @@ executable mktorrent
   hs-source-dirs:      examples
   main-is:             MkTorrent.hs
   other-modules:       Paths_bittorrent
-  build-depends:       base == 4.6.*
+  build-depends:       base == 4.*
                      , bytestring
                      , text
                      , pretty-class
