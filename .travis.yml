@@ -11,6 +11,11 @@ notifications:
     on_success: always
     on_failure: always
 
+before_install:
+  - sudo apt-get install rtorrent screen
+  - rtorrent -h | grep version
+  - screen --version
+
 install:
   - cabal sandbox init
   - ./dev/update-dependencies.sh
