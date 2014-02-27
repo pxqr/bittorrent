@@ -97,6 +97,19 @@ spec = parallel $ do
       scrape mgr (trackerURI badTracker) [def] `shouldThrow` isSomeException
 
   describe "RPC" $ do
+    describe "announce" $ do
+      it "must fail on bad scheme" $ do
+        withManager rpcOpts $ \ mgr -> do
+          q <- arbitrarySample
+          announce mgr "magnet://a.com" q
+            `shouldThrow` (== UnrecognizedScheme "magnet:")
+
+    describe "scrape" $ do
+      it "must fail on bad scheme" $ do
+        withManager rpcOpts $ \ mgr -> do
+          scrape mgr "magnet://a.com" []
+            `shouldThrow` (== UnrecognizedScheme "magnet:")
+
     forM_ (L.filter isUdpTracker trackers) $ \ TrackerEntry {..} ->
       context trackerName $ do
 

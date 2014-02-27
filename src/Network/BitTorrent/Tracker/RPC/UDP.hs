@@ -212,6 +212,9 @@ data RpcException
     -- | Unable to lookup hostname;
   | HostLookupFailed
 
+    -- | Expecting 'udp:', but some other scheme provided.
+  | UnrecognizedScheme String
+
     -- | Tracker exists but not responding for specific number of seconds.
   | TimeoutExpired Int
 
@@ -250,7 +253,9 @@ resolveURI _       = throwIO HostUnknown
 
 -- TODO caching?
 getTrackerAddr :: Manager -> URI -> IO SockAddr
-getTrackerAddr _ = resolveURI
+getTrackerAddr _ uri
+  | uriScheme uri == "udp:" = resolveURI uri
+  |        otherwise        = throwIO (UnrecognizedScheme (uriScheme uri))
 
 {-----------------------------------------------------------------------
   Tokens
