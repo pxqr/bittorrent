@@ -11,6 +11,10 @@ notifications:
     on_success: always
     on_failure: always
 
+ghc:
+  - 7.4
+  - 7.6
+
 before_install:
   - sudo apt-get install rtorrent screen
   - rtorrent -h | grep version
