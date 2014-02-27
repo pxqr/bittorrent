@@ -25,26 +25,45 @@ rpcOpts = def
 
 spec :: Spec
 spec = do
-  forM_ trackers $ \ TrackerEntry {..} ->
-    context trackerName $ do
+  describe "Manager" $ do
+    describe "newManager" $ do
+      it "" $ pending
 
-      describe "announce" $ do
-        if tryAnnounce then do
-          it "have valid response" $ do
-            withManager rpcOpts def $ \ mgr -> do
-              q    <- arbitrarySample
-              _    <- announce mgr trackerURI q
-              return ()
-        else do
-          it "should throw exception" $ do
-            pending
+    describe "closeManager" $ do
+      it "" $ pending
 
-      describe "scrape" $ do
-        if tryScraping then do
-          it "have valid response" $ do
-            withManager rpcOpts def $ \ mgr -> do
-              xs <- scrape mgr trackerURI [def]
-              L.length xs `shouldSatisfy` (>= 1)
-        else do
-          it "should throw exception" $ do
-            pending
+    describe "withManager" $ do
+      it "" $ pending
+
+  describe "RPC" $ do
+    describe "announce" $ do
+      it "must fail on bad uri scheme" $ do
+        pending
+
+    describe "scrape" $ do
+      it "must fail on bad uri scheme" $ do
+        pending
+
+    forM_ trackers $ \ TrackerEntry {..} ->
+      context trackerName $ do
+
+        describe "announce" $ do
+          if tryAnnounce then do
+            it "have valid response" $ do
+              withManager rpcOpts def $ \ mgr -> do
+                q    <- arbitrarySample
+                _    <- announce mgr trackerURI q
+                return ()
+          else do
+            it "should throw exception" $ do
+              pending
+
+        describe "scrape" $ do
+          if tryScraping then do
+            it "have valid response" $ do
+              withManager rpcOpts def $ \ mgr -> do
+                xs <- scrape mgr trackerURI [def]
+                L.length xs `shouldSatisfy` (>= 1)
+          else do
+            it "should throw exception" $ do
+              pending
