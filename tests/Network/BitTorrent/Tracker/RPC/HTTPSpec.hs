@@ -23,7 +23,25 @@ validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
 
 spec :: Spec
 spec = parallel $ do
+  describe "Manager" $ do
+    describe "newManager" $ do
+      it "" $ pending
+
+    describe "closeManager" $ do
+      it "" $ pending
+
+    describe "withManager" $ do
+      it "" $ pending
+
   describe "RPC" $ do
+    describe "announce" $ do
+      it "must fail on bad uri scheme" $ do
+        pending
+
+    describe "scrape" $ do
+      it "fail on bad uri scheme" $ do
+        pending
+
     forM_ (L.filter isHttpTracker trackers) $ \ TrackerEntry {..} ->
       context trackerName $ do
 
