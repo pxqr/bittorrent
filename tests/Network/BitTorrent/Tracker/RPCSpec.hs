@@ -29,7 +29,7 @@ isUnrecognizedProtocol x (UnrecognizedProtocol scheme) = x == scheme
 isUnrecognizedProtocol _  _                            = False
 
 spec :: Spec
-spec = do
+spec = parallel $ do
   describe "Manager" $ do
     describe "newManager" $ do
       it "" $ pending
