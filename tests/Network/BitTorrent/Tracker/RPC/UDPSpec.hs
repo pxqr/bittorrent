@@ -97,35 +97,35 @@ spec = parallel $ do
       scrape mgr (trackerURI badTracker) [def] `shouldThrow` isSomeException
 
   describe "RPC" $ do
-   forM_ (L.filter isUdpTracker trackers) $ \ TrackerEntry {..} ->
-    context trackerName $ do
+    forM_ (L.filter isUdpTracker trackers) $ \ TrackerEntry {..} ->
+      context trackerName $ do
 
-      describe "announce" $ do
-        if tryAnnounce then do
-          it "have valid response" $ do
-            withManager rpcOpts $ \ mgr -> do
-              q <- arbitrarySample
-              announce mgr trackerURI q >>= validateInfo q
-        else do
-          it "should throw TimeoutExpired" $ do
-            withManager rpcOpts $ \ mgr -> do
-              q <- arbitrarySample
-              announce mgr trackerURI q `shouldThrow` isTimeoutExpired
+        describe "announce" $ do
+          if tryAnnounce then do
+            it "have valid response" $ do
+              withManager rpcOpts $ \ mgr -> do
+                q <- arbitrarySample
+                announce mgr trackerURI q >>= validateInfo q
+          else do
+            it "should throw TimeoutExpired" $ do
+              withManager rpcOpts $ \ mgr -> do
+                q <- arbitrarySample
+                announce mgr trackerURI q `shouldThrow` isTimeoutExpired
 
-      describe "scrape" $ do
-        if tryScraping then do
-          it "have valid response" $ do
-            withManager rpcOpts $ \ mgr -> do
-              xs <- scrape mgr trackerURI [def]
-              L.length xs `shouldSatisfy` (>= 1)
-        else do
-          it "should throw TimeoutExpired" $ do
-            withManager rpcOpts $ \ mgr -> do
-              scrape mgr trackerURI [def] `shouldThrow` isTimeoutExpired
+        describe "scrape" $ do
+          if tryScraping then do
+            it "have valid response" $ do
+              withManager rpcOpts $ \ mgr -> do
+                xs <- scrape mgr trackerURI [def]
+                L.length xs `shouldSatisfy` (>= 1)
+          else do
+            it "should throw TimeoutExpired" $ do
+              withManager rpcOpts $ \ mgr -> do
+                scrape mgr trackerURI [def] `shouldThrow` isTimeoutExpired
 
-      describe "Manager" $ do
-        when tryScraping $ do
-          it "should handle arbitrary intermixed concurrent queries" $ do
-            withManager rpcOpts $ \ mgr -> do
-              _ <- mapConcurrently (\ _ -> scrape mgr trackerURI [def]) [1..rpcCount]
-              return ()
+        describe "Manager" $ do
+          when tryScraping $ do
+            it "should handle arbitrary intermixed concurrent queries" $ do
+              withManager rpcOpts $ \ mgr -> do
+                _ <- mapConcurrently (\ _ -> scrape mgr trackerURI [def]) [1..rpcCount]
+                return ()
