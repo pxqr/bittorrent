@@ -5,6 +5,7 @@ module Network.BitTorrent.Tracker.TestData
        , isUdpTracker
        , isHttpTracker
        , trackers
+       , badTracker
        ) where
 
 import Data.Maybe
@@ -83,3 +84,6 @@ trackers =
   , notWorking     "OpenBitTorrent" "http://tracker.openbittorrent.com:80/announce"
   , notWorking     "PublicBT"       "http://tracker.publicbt.com:80/announce"
   ]
+
+badTracker :: TrackerEntry
+badTracker = notWorking "rarbg" "udp://9.rarbg.com:2710/announce"

@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent.Tracker.RPC.UDPSpec (spec, rpcOpts) where
+import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Exception
 import Control.Monad
@@ -44,6 +45,9 @@ isTimeoutExpired  _                 = False
 isSomeException :: SomeException -> Bool
 isSomeException _ = True
 
+isIOException :: IOException -> Bool
+isIOException _ = True
+
 spec :: Spec
 spec = parallel $ do
   describe "newManager" $ do
@@ -67,7 +71,33 @@ spec = parallel $ do
       let opts = def { optMultiplier = 0 }
       newManager opts `shouldThrow` isSomeException
 
-  forM_ (L.filter isUdpTracker trackers) $ \ TrackerEntry {..} ->
+  describe "closeManager" $ do
+    it "unblock rpc calls" $ do
+      mgr <- newManager rpcOpts
+      _   <- forkIO $ do
+        threadDelay 10000000
+        closeManager mgr
+      q <- arbitrarySample
+      announce mgr (trackerURI badTracker) q `shouldThrow` (== ManagerClosed)
+
+    it "announce throw exception after manager closed" $ do
+      mgr <- newManager rpcOpts
+      closeManager mgr
+      q <- arbitrarySample
+      announce mgr (trackerURI badTracker) q `shouldThrow` isIOException
+
+    it "scrape throw exception after manager closed" $ do
+      mgr <- newManager rpcOpts
+      closeManager mgr
+      scrape mgr (trackerURI badTracker) [def] `shouldThrow` isIOException
+
+  describe "withManager" $ do
+    it "closesManager at exit" $ do
+      mgr <- withManager rpcOpts return
+      scrape mgr (trackerURI badTracker) [def] `shouldThrow` isSomeException
+
+  describe "RPC" $ do
+   forM_ (L.filter isUdpTracker trackers) $ \ TrackerEntry {..} ->
     context trackerName $ do
 
       describe "announce" $ do
