@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Network.BitTorrent.Tracker.RPCSpec (spec) where
 import Control.Applicative
 import Control.Monad
