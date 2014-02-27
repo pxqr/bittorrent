@@ -12,6 +12,7 @@ import Network.BitTorrent.Tracker.Message as Message
 import Network.BitTorrent.Tracker.RPC.HTTP
 
 import Network.BitTorrent.Tracker.TestData
+import Network.BitTorrent.Tracker.MessageSpec hiding (spec)
 
 
 validateInfo :: AnnounceQuery -> AnnounceInfo -> Expectation
@@ -20,6 +21,10 @@ validateInfo AnnounceQuery {..}  AnnounceInfo {..} = do
   case respComplete <|> respIncomplete of
     Nothing -> return ()
     Just n  -> n  `shouldBe` L.length (getPeerList respPeers)
+
+isUnrecognizedScheme :: RpcException -> Bool
+isUnrecognizedScheme (RequestFailed _) = True
+isUnrecognizedScheme  _                = False
 
 spec :: Spec
 spec = parallel $ do
@@ -36,11 +41,16 @@ spec = parallel $ do
   describe "RPC" $ do
     describe "announce" $ do
       it "must fail on bad uri scheme" $ do
-        pending
+        withManager def $ \ mgr -> do
+          q    <- arbitrarySample
+          announce mgr "magnet://foo.bar" q
+            `shouldThrow` isUnrecognizedScheme
 
     describe "scrape" $ do
-      it "fail on bad uri scheme" $ do
-        pending
+      it "must fail on bad uri scheme" $ do
+        withManager def $ \ mgr -> do
+          scrape mgr "magnet://foo.bar" []
+            `shouldThrow` isUnrecognizedScheme
 
     forM_ (L.filter isHttpTracker trackers) $ \ TrackerEntry {..} ->
       context trackerName $ do
