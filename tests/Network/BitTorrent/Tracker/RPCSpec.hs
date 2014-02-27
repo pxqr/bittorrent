@@ -24,6 +24,10 @@ rpcOpts = def
   { optUdpRPC = UDP.rpcOpts
   }
 
+isUnrecognizedProtocol :: String -> RpcException -> Bool
+isUnrecognizedProtocol x (UnrecognizedProtocol scheme) = x == scheme
+isUnrecognizedProtocol _  _                            = False
+
 spec :: Spec
 spec = do
   describe "Manager" $ do
@@ -39,11 +43,16 @@ spec = do
   describe "RPC" $ do
     describe "announce" $ do
       it "must fail on bad uri scheme" $ do
-        pending
+        withManager rpcOpts def $ \ mgr -> do
+          q    <- arbitrarySample
+          announce mgr "magnet://foo.bar" q
+            `shouldThrow` isUnrecognizedProtocol "magnet:"
 
     describe "scrape" $ do
       it "must fail on bad uri scheme" $ do
-        pending
+        withManager rpcOpts def $ \ mgr -> do
+          scrape mgr "magnet://foo.bar" []
+            `shouldThrow` isUnrecognizedProtocol "magnet:"
 
     forM_ trackers $ \ TrackerEntry {..} ->
       context trackerName $ do
