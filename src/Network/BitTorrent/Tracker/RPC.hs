@@ -139,7 +139,7 @@ withManager opts info = bracket (newManager opts info) closeManager
 data RpcException
   = UdpException    UDP.RpcException  -- ^ UDP RPC driver failure;
   | HttpException   HTTP.RpcException -- ^ HTTP RPC driver failure;
-  | UnrecognizedProtocol String       -- ^ unsupported scheme in announce URI;
+  | UnrecognizedScheme   String       -- ^ unsupported scheme in announce URI;
   | GenericException     String       -- ^ for furter extensibility.
     deriving (Show, Typeable)
 
@@ -158,7 +158,7 @@ dispatch URI {..} http udp
   | uriScheme == "http:" ||
     uriScheme == "https:" = packException HttpException http
   | uriScheme == "udp:"   = packException UdpException  udp
-  |       otherwise       = throwIO $ UnrecognizedProtocol uriScheme
+  |       otherwise       = throwIO $ UnrecognizedScheme uriScheme
 
 announce :: Manager -> URI -> SAnnounceQuery -> IO AnnounceInfo
 announce Manager {..} uri simpleQuery
