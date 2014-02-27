@@ -5,10 +5,7 @@
 --   Stability   :  provisional
 --   Portability :  portable
 --
---   The tracker is an HTTP/HTTPS service used to discovery peers for
---   a particular existing torrent and keep statistics about the
---   swarm. This module also provides a way to easily request scrape
---   info for a particular torrent list.
+--   This module implement HTTP tracker protocol.
 --
 --   For more information see:
 --   <https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol>
@@ -102,12 +99,15 @@ data Manager = Manager
   , httpMgr :: !HTTP.Manager
   }
 
+-- |
 newManager :: Options -> IO Manager
 newManager opts = Manager opts <$> HTTP.newManager (optHttpOptions opts)
 
+-- |
 closeManager :: Manager -> IO ()
 closeManager Manager {..} = HTTP.closeManager httpMgr
 
+-- | Normally you need to use 'Control.Monad.Trans.Resource.allocate'.
 withManager :: Options -> (Manager -> IO a) -> IO a
 withManager opts = bracket (newManager opts) closeManager
 

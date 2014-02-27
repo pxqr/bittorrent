@@ -5,7 +5,8 @@
 --   Stability   :  provisional
 --   Portability :  portable
 --
---   This module implement low-level UDP tracker protocol.
+--   This module implement UDP tracker protocol.
+--
 --   For more info see:
 --   <http://www.bittorrent.org/beps/bep_0015.html>
 --
@@ -142,6 +143,7 @@ type PendingResponse     = MVar (Either RpcException Response)
 type PendingTransactions = Map TransactionId PendingResponse
 type PendingQueries      = Map SockAddr      PendingTransactions
 
+-- | UDP tracker manager.
 data Manager = Manager
   { options         :: !Options
   , sock            :: !Socket
@@ -176,7 +178,7 @@ resetState Manager {..} = do
   where
     err = error "UDP tracker manager closed"
 
--- | This function will throw 'IOException' if or
+-- | This function will throw 'IOException' on invalid 'Options'.
 newManager :: Options -> IO Manager
 newManager opts = do
   checkOptions opts
@@ -185,6 +187,8 @@ newManager opts = do
   putMVar (listenerThread mgr) tid
   return mgr
 
+-- | Unblock all RPCs by throwing 'ManagerClosed' exception. No rpc
+-- calls should be performed after manager becomes closed.
 closeManager :: Manager -> IO ()
 closeManager Manager {..} = do
   close sock
@@ -193,6 +197,7 @@ closeManager Manager {..} = do
     Nothing  -> return ()
     Just tid -> killThread tid
 
+-- | Normally you need to use 'Control.Monad.Trans.Resource.allocate'.
 withManager :: Options -> (Manager -> IO a) -> IO a
 withManager opts = bracket (newManager opts) closeManager
 

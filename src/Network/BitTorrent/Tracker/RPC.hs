@@ -5,7 +5,11 @@
 --   Stability   :  experimental
 --   Portability :  portable
 --
---   Protocol independent bittorrent tracker API.
+--   This module provides unified RPC interface to BitTorrent
+--   trackers. The tracker is an UDP/HTTP/HTTPS service used to discovery
+--   peers for a particular existing torrent and keep statistics about
+--   the swarm. This module also provides a way to easily request
+--   scrape info for a particular torrent list.
 --
 {-# LANGUAGE DeriveDataTypeable #-}
 module Network.BitTorrent.Tracker.RPC
@@ -104,18 +108,26 @@ data Manager  = Manager
   , udpMgr   :: !UDP.Manager
   }
 
--- | Normally a bittorrent client session need a single RPC manager
--- only.
+-- | Create a new 'Manager'. You /must/ manually 'closeManager'
+-- otherwise resource leakage is possible. Normally, a bittorrent
+-- client need a single RPC manager only.
+--
+--   This function can throw 'IOException' on invalid 'Options'.
+--
 newManager :: Options -> PeerInfo -> IO Manager
 newManager opts info = do
   h <- HTTP.newManager (optHttpRPC opts)
   u <-  UDP.newManager (optUdpRPC  opts) `onException` HTTP.closeManager h
   return $ Manager opts info h u
 
+-- | Close all pending RPCs. Behaviour of currently in-flight RPCs can
+-- differ depending on underlying protocol used. No rpc calls should
+-- be performed after manager becomes closed.
 closeManager :: Manager -> IO ()
 closeManager Manager {..} = do
   UDP.closeManager udpMgr `finally` HTTP.closeManager httpMgr
 
+-- | Normally you need to use 'Control.Monad.Trans.Resource.allocate'.
 withManager :: Options -> PeerInfo -> (Manager -> IO a) -> IO a
 withManager opts info = bracket (newManager opts info) closeManager
 
