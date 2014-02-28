@@ -24,8 +24,8 @@ notifications:
   irc:
     channels:
       - "chat.freenode.net#haskell-bittorrent"
-    on_success: always
-    on_failure: always
+    on_success: change
+    on_failure: change
 
     use_notice: true
     template:
