@@ -7,8 +7,9 @@
 --
 --   This module implement UDP tracker protocol.
 --
---   For more info see:
---   <http://www.bittorrent.org/beps/bep_0015.html>
+--   For protocol details and uri scheme see:
+--   <http://www.bittorrent.org/beps/bep_0015.html>,
+--   <https://www.iana.org/assignments/uri-schemes/prov/udp>
 --
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
