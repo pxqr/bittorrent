@@ -4,10 +4,11 @@ import Control.Exception
 import Control.Monad
 import Data.Functor
 import Data.Maybe
+import System.Directory
 import System.Exit
 import System.Environment
+import System.FilePath
 import System.Process
-import System.Directory
 import Text.Printf
 import Test.Hspec
 
@@ -25,26 +26,37 @@ torrents =
     , "testfile.torrent"
     ]
 
+rtorrentSessionDir :: String
+rtorrentSessionDir = "rtorrent-sessiondir"
+
+sessionName :: String -- screen session name
+sessionName = "bittorrent-testsuite"
+
 clients :: [Descr]
 clients =
   [ ("rtorrent"
     , \ ClientOpts {..} tfile -> printf
-     "rtorrent -p %i-%i -O dht=on -O dht_port=%i -O session=rtorrent-sessiondir %s"
-     (fromEnum peerPort) (fromEnum peerPort) (fromEnum nodePort) tfile
+     "rtorrent -p %i-%i -O dht=on -O dht_port=%i -O session=%s %s"
+     (fromEnum peerPort) (fromEnum peerPort) (fromEnum nodePort)
+      rtorrentSessionDir tfile
     )
   ]
-
-sessionName :: String -- screen session name
-sessionName = "bittorrent-testsuite"
 
 setupEnv :: EnvOpts -> IO (Maybe ())
 setupEnv EnvOpts {..}
   | Just client <- testClient
   , Just mkCmd  <- lookup client clients = do
+    _ <- printf "Setting up %s\n" client
+
+    let torrentPath = "testfile.torrent"
+    let tmpDir = "res"
     let runner = printf "screen -dm -S %s %s" sessionName
-                 (mkCmd remoteOpts "testfile.torrent")
-    dir <- getCurrentDirectory
-    _   <- createProcess (shell runner) { cwd = Just (dir ++ "/res") }
+                 (mkCmd remoteOpts torrentPath)
+
+    wd <- getCurrentDirectory
+    createDirectoryIfMissing True (wd </> tmpDir </> rtorrentSessionDir)
+    _ <- createProcess (shell runner) { cwd = Just (wd </> tmpDir) }
+
     return (Just ())
 
   | Just client <- testClient = do
