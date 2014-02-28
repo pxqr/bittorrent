@@ -26,6 +26,10 @@ isUnrecognizedScheme :: RpcException -> Bool
 isUnrecognizedScheme (RequestFailed _) = True
 isUnrecognizedScheme  _                = False
 
+isNotResponding :: RpcException -> Bool
+isNotResponding (RequestFailed _) = True
+isNotResponding  _                = False
+
 spec :: Spec
 spec = parallel $ do
   describe "Manager" $ do
@@ -68,7 +72,10 @@ spec = parallel $ do
                   validateInfo q info
             else do
               it "should fail with RequestFailed" $ do
-                 pending
+                withManager def $ \ mgr -> do
+                  q <- arbitrarySample
+                  announce mgr trackerURI q
+                    `shouldThrow` isNotResponding
 
         describe "scrape" $ do
           if tryScraping
@@ -80,3 +87,9 @@ spec = parallel $ do
             else do
               it "should fail with ScrapelessTracker" $ do
                 pending
+
+          when (not tryAnnounce) $ do
+            it "should fail with RequestFailed" $ do
+              withManager def $ \ mgr -> do
+                scrape mgr trackerURI [def]
+                  `shouldThrow` isNotResponding
