@@ -8,8 +8,7 @@ copyright:             (c) 2013, Sam Truzjan
 category:              Network
 build-type:            Simple
 cabal-version:         >= 1.10
-tested-with:           GHC == 7.4.1
-                     , GHC == 7.6.3
+tested-with:           GHC == 7.6.3
 homepage:              https://github.com/cobit/bittorrent
 bug-reports:           https://github.com/cobit/bittorrent/issues
 synopsis:              BitTorrent protocol implementation.
