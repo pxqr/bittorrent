@@ -31,7 +31,9 @@ runSimulation e m = evalState (runRouting ping closest timestamp m) e
     timestamp    = gets currentTime
 
 instance Arbitrary ip => Arbitrary (Env ip) where
-  arbitrary = Env <$> arbitrary <*> arbitrary
+  arbitrary = Env <$> arbitrary <*> (L.take nodeLimit <$> arbitrary)
+    where
+      nodeLimit = 1000
 
 instance (Arbitrary ip, Eq ip) => Arbitrary (Table ip) where
   arbitrary = do
