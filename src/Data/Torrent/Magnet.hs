@@ -13,10 +13,11 @@
 --   This module provides bittorrent specific implementation of magnet
 --   links.
 --
---   For more info see:
---   <http://magnet-uri.sourceforge.net/magnet-draft-overview.txt>
+--   For generic magnet uri scheme see:
+--   <http://magnet-uri.sourceforge.net/magnet-draft-overview.txt>,
+--   <http://www.iana.org/assignments/uri-schemes/prov/magnet>
 --
---   Bittorrent specific info:
+--   Bittorrent specific details:
 --   <http://www.bittorrent.org/beps/bep_0009.html>
 --
 {-# LANGUAGE NamedFieldPuns        #-}
