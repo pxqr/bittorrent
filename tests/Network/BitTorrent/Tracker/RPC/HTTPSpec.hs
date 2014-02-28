@@ -61,7 +61,8 @@ spec = parallel $ do
               it "have valid response" $ do
                 withManager def $ \ mgr -> do
 --                  q    <- arbitrarySample
-                  let q = AnnounceQuery def "-HS0003-203534.37420" 6000
+                  let ih = maybe def L.head hashList
+                  let q = AnnounceQuery ih "-HS0003-203534.37420" 6000
                           (Progress 0 0 0) Nothing Nothing (Just Started)
                   info <- announce mgr trackerURI q
                   validateInfo q info

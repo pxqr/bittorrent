@@ -72,11 +72,15 @@ notWorking name uri = (trackerEntry uri)
 
 trackers :: [TrackerEntry]
 trackers =
-  [ announceOnly "LinuxTracker"
-    "http://linuxtracker.org:2710/00000000000000000000000000000000/announce"
+  [ (announceOnly "LinuxTracker"
+    "http://linuxtracker.org:2710/00000000000000000000000000000000/announce")
+    { hashList = Just ["1c82a95b9e02bf3db4183da072ad3ef656aacf0e"] -- debian 7
+    }
 
-    -- from "http://www.linux23.com/"
-  , announceScrape "Arch" "http://tracker.archlinux.org:6969/announce"
+  , (announceScrape "Arch" "http://tracker.archlinux.org:6969/announce")
+    { hashList = Just ["bc9ae647a3e6c3636de58535dd3f6360ce9f4621"]
+    }
+
   , notWorking     "rarbg" "udp://9.rarbg.com:2710/announce"
 
   , announceScrape "OpenBitTorrent" "udp://tracker.openbittorrent.com:80/announce"
