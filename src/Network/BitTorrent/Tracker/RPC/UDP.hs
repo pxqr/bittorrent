@@ -68,11 +68,11 @@ sec = 1000000
 
 -- | See <http://www.bittorrent.org/beps/bep_0015.html#time-outs>
 defMinTimeout :: Int
-defMinTimeout = 15 * sec
+defMinTimeout = 15
 
 -- | See <http://www.bittorrent.org/beps/bep_0015.html#time-outs>
 defMaxTimeout :: Int
-defMaxTimeout = 15 * 2 ^ (8 :: Int) * sec
+defMaxTimeout = 15 * 2 ^ (8 :: Int)
 
 -- | See: <http://www.bittorrent.org/beps/bep_0015.html#time-outs>
 defMultiplier :: Int
@@ -90,18 +90,18 @@ data Options = Options
     --
     optMaxPacketSize :: {-# UNPACK #-} !Int
 
-    -- | Starting timeout interval. If a response is not received
-    -- after 'optMinTimeout' then 'Manager' repeat RPC with timeout
-    -- interval multiplied by 'optMultiplier' and so on until
+    -- | Starting timeout interval in seconds. If a response is not
+    -- received after 'optMinTimeout' then 'Manager' repeat RPC with
+    -- timeout interval multiplied by 'optMultiplier' and so on until
     -- timeout interval reach 'optMaxTimeout'.
     --
     --   'optMinTimeout' /must/ be a positive value.
     --
   , optMinTimeout    :: {-# UNPACK #-} !Int
 
-    -- | After 'optMaxTimeout' reached and tracker still not
-    -- responding both 'announce' and 'scrape' functions will throw
-    -- 'TimeoutExpired' exception.
+    -- | Final timeout interval in seconds. After 'optMaxTimeout'
+    -- reached and tracker still not responding both 'announce' and
+    -- 'scrape' functions will throw 'TimeoutExpired' exception.
     --
     --   'optMaxTimeout' /must/ be greater than 'optMinTimeout'.
     --
@@ -574,7 +574,7 @@ retransmission Options {..} action = go optMinTimeout
     go curTimeout
       | curTimeout > optMaxTimeout = throwIO $ TimeoutExpired curTimeout
       |         otherwise          = do
-        r <- timeout curTimeout action
+        r <- timeout (curTimeout * sec) action
         maybe (go (optMultiplier * curTimeout)) return r
 
 queryTracker :: Manager -> URI -> Request -> IO Response
