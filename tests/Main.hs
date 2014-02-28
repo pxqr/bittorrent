@@ -32,6 +32,9 @@ rtorrentSessionDir = "rtorrent-sessiondir"
 sessionName :: String -- screen session name
 sessionName = "bittorrent-testsuite"
 
+tmpDir :: FilePath
+tmpDir = "res"
+
 clients :: [Descr]
 clients =
   [ ("rtorrent"
@@ -49,7 +52,6 @@ setupEnv EnvOpts {..}
     _ <- printf "Setting up %s\n" client
 
     let torrentPath = "testfile.torrent"
-    let tmpDir = "res"
     let runner = printf "screen -dm -S %s %s" sessionName
                  (mkCmd remoteOpts torrentPath)
 
@@ -69,6 +71,8 @@ setupEnv EnvOpts {..}
 
 terminateEnv :: IO ()
 terminateEnv = do
+  wd <- getCurrentDirectory
+  removeDirectoryRecursive (wd </> tmpDir </> rtorrentSessionDir)
   _ <- printf "closing screen session: %s\n" sessionName
   _ <- system (printf "screen -S %s -X quit" sessionName)
   return ()
@@ -78,11 +82,16 @@ runTestSuite args = do
   _ <- printf "running hspec test suite with args: %s\n" (show args)
   catch (withArgs args (hspec spec) >> return ExitSuccess) return
 
+withEnv :: EnvOpts -> IO a -> IO a
+withEnv opts action = bracket (setupEnv opts) terminate (const action)
+  where
+    terminate running = do
+      when (isJust running) $ do
+        terminateEnv
+
 main :: IO ()
 main = do
   (envOpts, suiteArgs) <- getOpts
-  running <- setupEnv     envOpts
-  code    <- runTestSuite suiteArgs
-  when (isJust running) $ do
-    terminateEnv
-  exitWith code
+  withEnv envOpts $ do
+    code    <- runTestSuite suiteArgs
+    exitWith code
