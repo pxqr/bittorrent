@@ -3,7 +3,6 @@ module Main where
 import Control.Exception
 import Control.Monad
 import Data.Functor
-import Data.List
 import Data.Maybe
 import System.Exit
 import System.Environment
@@ -49,22 +48,22 @@ setupEnv EnvOpts {..}
     return (Just ())
 
   | Just client <- testClient = do
-    printf "Bad client `%s`, use one of %s" client (show (fst <$> clients))
+    _ <- printf "Bad client `%s`, use one of %s\n" client (show (fst <$> clients))
     return Nothing
 
-  | isNothing testClient = do
-    printf "Running without remote client"
+  | otherwise = do
+    _ <- printf "Running without remote client\n"
     return (Just ())
 
 terminateEnv :: IO ()
 terminateEnv = do
-  printf "closing screen session: %s" sessionName
+  _ <- printf "closing screen session: %s\n" sessionName
   _ <- system (printf "screen -S %s -X quit" sessionName)
   return ()
 
 runTestSuite :: [String] -> IO ExitCode
 runTestSuite args = do
-  printf "running hspec test suite with args: %s\n" (show args)
+  _ <- printf "running hspec test suite with args: %s\n" (show args)
   catch (withArgs args (hspec spec) >> return ExitSuccess) return
 
 main :: IO ()
