@@ -127,9 +127,9 @@ fillRequest Options {..} q r = r
       | otherwise = a <> "&" <> b
 
 httpTracker :: BEncode a => Manager -> URI -> SimpleQuery -> IO a
-httpTracker Manager {..} uri q = do
+httpTracker Manager {..} uri q = packHttpException $ do
   request  <- fillRequest options q <$> setUri def uri
-  response <- packHttpException $ runResourceT $ httpLbs request httpMgr
+  response <- runResourceT $ httpLbs request httpMgr
   case BE.decode $ BL.toStrict $ responseBody response of
     Left  msg  -> throwIO (ParserFailure msg)
     Right info -> return info
