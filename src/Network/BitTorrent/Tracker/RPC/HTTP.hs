@@ -28,6 +28,7 @@ module Network.BitTorrent.Tracker.RPC.HTTP
 
 import Control.Applicative
 import Control.Exception
+import Control.Monad
 import Control.Monad.Trans.Resource
 import Data.BEncode as BE
 import Data.ByteString as BS
@@ -159,12 +160,12 @@ scrapeURL uri = do
     newPath <- replace (BC.pack (uriPath uri))
     return uri { uriPath = BC.unpack newPath }
   where
-    replace p
-      | ps <- BC.splitWith (== '/') p
-      , "announce" `BS.isPrefixOf` L.last ps
-      = let newSuff = "scrape" <> BS.drop (BS.length "announce") (L.last ps)
-        in Just (BS.intercalate "/" (L.init ps ++ [newSuff]))
-      | otherwise = Nothing
+    replace p = do
+      let ps = BC.splitWith (== '/') p
+      guard (not (L.null ps))
+      guard ("announce" `BS.isPrefixOf` L.last ps)
+      let newSuff = "scrape" <> BS.drop (BS.length "announce") (L.last ps)
+      return (BS.intercalate "/" (L.init ps ++ [newSuff]))
 
 -- | For each 'InfoHash' of torrents request scrape info from the tracker.
 --   However if the info hash list is 'null', the tracker should list
