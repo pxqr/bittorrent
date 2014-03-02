@@ -113,13 +113,15 @@ newSession logFun addr rootPath dict = do
   store       <- openInfoDict ReadWriteEx rootPath dict
   statusVar   <- newMVar $ sessionStatus (BF.haveNone (totalPieces store))
                                          (piPieceLength (idPieceInfo dict))
+  metadataVar <- newMVar undefined
+  infodictVar <- newMVar (cache dict)
   chan        <- newChan
   return Session
     { sessionPeerId          = pid
     , sessionTopic           = idInfoHash dict
 
-    , metadata               = undefined
-    , infodict               = undefined
+    , metadata               = metadataVar
+    , infodict               = infodictVar
 
     , status                 = statusVar
     , storage                = store
@@ -136,7 +138,7 @@ newSession logFun addr rootPath dict = do
 closeSession :: Session -> IO ()
 closeSession ses = do
   deleteAll ses
-  undefined
+  error "closeSession"
 
 waitMetadata :: Session -> IO InfoDict
 waitMetadata Session {..} = cachedValue <$> readMVar infodict
