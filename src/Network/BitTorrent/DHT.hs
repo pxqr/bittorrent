@@ -136,6 +136,7 @@ bootstrap startNodes = do
   $(logInfoS) "bootstrap" "Start node bootstrapping"
   nid <- asks thisNodeId
   -- TODO filter duplicated in startNodes list
+  -- TODO retransmissions for startNodes
   aliveNodes <- queryParallel (pingQ <$> startNodes)
   _ <- sourceList [aliveNodes] $= search nid (findNodeQ nid) $$ C.consume
   $(logInfoS) "bootstrap" "Node bootstrapping finished"
