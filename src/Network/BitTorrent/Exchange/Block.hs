@@ -46,6 +46,7 @@ module Network.BitTorrent.Exchange.Block
        , Network.BitTorrent.Exchange.Block.insert
        , Network.BitTorrent.Exchange.Block.insertLazy
        , Network.BitTorrent.Exchange.Block.merge
+       , Network.BitTorrent.Exchange.Block.fromList
 
          -- ** Rendering
        , Network.BitTorrent.Exchange.Block.toPiece
@@ -62,9 +63,10 @@ import Data.ByteString.Lazy as BL hiding (span)
 import Data.ByteString.Lazy.Builder as BS
 import Data.Default
 import Data.Monoid
-import Data.List hiding (span)
+import Data.List as L hiding (span)
 import Data.Serialize as S
 import Data.Typeable
+import Numeric
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
@@ -217,6 +219,13 @@ data Bucket
   | Span {-# UNPACK #-} !ChunkSize          !Bucket
   | Fill {-# UNPACK #-} !ChunkSize !Builder !Bucket
 
+instance Show Bucket where
+  showsPrec i  Nil          = showString ""
+  showsPrec i (Span s   xs) = showString "Span " <> showInt s
+                           <> showString " "     <> showsPrec i xs
+  showsPrec i (Fill s _ xs) = showString "Fill " <> showInt s
+                           <> showString " "     <> showsPrec i xs
+
 -- | INVARIANT: 'Nil' should appear only after 'Span' of 'Fill'.
 nilInvFailed :: a
 nilInvFailed = error "Nil: bucket invariant failed"
@@ -343,6 +352,10 @@ insert dstPos bs bucket = go 0 bucket
     go curPos bkt @ (Fill sz br xs)
       | intersects curPos sz = bkt
       |       otherwise      = fill sz br (go (curPos + sz) xs)
+
+fromList :: PieceSize -> [(Pos, BS.ByteString)] -> Bucket
+fromList s = L.foldr (uncurry Network.BitTorrent.Exchange.Block.insert)
+                     (Network.BitTorrent.Exchange.Block.empty s)
 
 -- TODO zero-copy
 insertLazy :: Pos -> BL.ByteString -> Bucket -> Bucket
