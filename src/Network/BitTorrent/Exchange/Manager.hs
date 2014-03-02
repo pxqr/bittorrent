@@ -14,8 +14,9 @@ import Network.Socket
 
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
+import Network.BitTorrent.Exchange.Connection hiding (Options)
 import Network.BitTorrent.Exchange.Session
-import Network.BitTorrent.Exchange.Wire hiding (Options)
+
 
 data Options = Options
   { optBacklog  :: Int

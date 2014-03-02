@@ -46,11 +46,11 @@ import Data.Torrent.Piece
 import qualified Data.Torrent.Piece as Torrent (Piece ())
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block   as Block
+import Network.BitTorrent.Exchange.Connection
+import Network.BitTorrent.Exchange.Connection.Status
 import Network.BitTorrent.Exchange.Message as Message
 import Network.BitTorrent.Exchange.Session.Metadata as Metadata
 import Network.BitTorrent.Exchange.Session.Status   as SS
-import Network.BitTorrent.Exchange.Wire
-import Network.BitTorrent.Exchange.Wire.Status
 import System.Torrent.Storage
 
 {-----------------------------------------------------------------------

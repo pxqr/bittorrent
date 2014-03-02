@@ -71,14 +71,14 @@ library
                        Network.BitTorrent.Exchange
                        Network.BitTorrent.Exchange.Assembler
                        Network.BitTorrent.Exchange.Block
+                       Network.BitTorrent.Exchange.Connection
+                       Network.BitTorrent.Exchange.Connection.Status
                        Network.BitTorrent.Exchange.Manager
                        Network.BitTorrent.Exchange.Message
                        Network.BitTorrent.Exchange.Selection
                        Network.BitTorrent.Exchange.Session
                        Network.BitTorrent.Exchange.Session.Metadata
                        Network.BitTorrent.Exchange.Session.Status
-                       Network.BitTorrent.Exchange.Wire
-                       Network.BitTorrent.Exchange.Wire.Status
                        Network.BitTorrent.Tracker
                        Network.BitTorrent.Tracker.Cache
                        Network.BitTorrent.Tracker.List
@@ -209,10 +209,10 @@ test-suite spec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
                        Network.BitTorrent.Tracker.RPC.UDPSpec
                        Network.BitTorrent.Tracker.SessionSpec
+                       Network.BitTorrent.Exchange.ConnectionSpec
                        Network.BitTorrent.Exchange.MessageSpec
                        Network.BitTorrent.Exchange.SessionSpec
                        Network.BitTorrent.Exchange.Session.MetadataSpec
-                       Network.BitTorrent.Exchange.WireSpec
                        System.Torrent.StorageSpec
                        System.Torrent.FileMapSpec
   build-depends:       base == 4.*

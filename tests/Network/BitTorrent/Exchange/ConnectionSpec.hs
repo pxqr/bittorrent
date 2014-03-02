@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards      #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Network.BitTorrent.Exchange.WireSpec (spec) where
+module Network.BitTorrent.Exchange.ConnectionSpec (spec) where
 import Control.Applicative
 import Control.Monad.Trans
 import Data.Default
@@ -10,8 +10,8 @@ import Test.QuickCheck
 import Data.Torrent
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
+import Network.BitTorrent.Exchange.Connection
 import Network.BitTorrent.Exchange.Message
-import Network.BitTorrent.Exchange.Wire
 
 import Config
 import Network.BitTorrent.Exchange.MessageSpec ()

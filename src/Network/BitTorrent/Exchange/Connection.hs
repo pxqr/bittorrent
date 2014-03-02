@@ -18,7 +18,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Network.BitTorrent.Exchange.Wire
+module Network.BitTorrent.Exchange.Connection
        ( -- * Wire
          Connected
        , Wire
@@ -125,8 +125,8 @@ import System.Timeout
 import Data.Torrent.Bitfield as BF
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
+import Network.BitTorrent.Exchange.Connection.Status
 import Network.BitTorrent.Exchange.Message as Msg
-import Network.BitTorrent.Exchange.Wire.Status
 
 -- TODO handle port message?
 -- TODO handle limits?
