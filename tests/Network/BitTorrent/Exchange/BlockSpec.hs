@@ -4,7 +4,7 @@ import Data.Maybe
 import Test.Hspec
 import Test.QuickCheck
 
-import Network.BitTorrent.Exchange.Block
+import Network.BitTorrent.Exchange.Block as Block
 
 
 instance Arbitrary a => Arbitrary (Block a) where
@@ -14,10 +14,7 @@ instance Arbitrary BlockIx where
   arbitrary = BlockIx <$> arbitrary <*> arbitrary <*> arbitrary
 
 instance Arbitrary Bucket where
-  arbitrary = error "arbitrary: block bucket"
-
-instance Show Bucket where
-  show = error "show: bucket"
+  arbitrary = Block.fromList <$> arbitrary <*> arbitrary
 
 spec :: Spec
 spec = do
