@@ -3,6 +3,7 @@ import Control.Applicative
 import Data.Maybe
 import Test.Hspec
 import Test.QuickCheck
+import Test.QuickCheck.Instances ()
 
 import Network.BitTorrent.Exchange.Block as Block
 
