@@ -11,8 +11,12 @@ module Config
          -- * For item specs
        , getEnvOpts
        , getThisOpts
+       , getMyAddr
+
        , getRemoteOpts
        , withRemote
+       , withRemoteAddr
+
        , getTestTorrent
        ) where
 
@@ -29,6 +33,7 @@ import System.IO.Unsafe
 import Test.Hspec
 
 import Data.Torrent
+import Network.BitTorrent.Core (IP, PeerAddr (PeerAddr), genPeerId)
 
 
 type ClientName = String
@@ -137,6 +142,17 @@ withRemote action = do
   case mopts of
     Nothing   -> pendingWith "Remote client isn't running"
     Just opts -> action opts
+
+withRemoteAddr :: (PeerAddr IP -> Expectation) -> Expectation
+withRemoteAddr action = do
+  withRemote $ \ ClientOpts {..} ->
+    action (PeerAddr Nothing "0.0.0.0" peerPort)
+
+getMyAddr :: IO (PeerAddr (Maybe IP))
+getMyAddr = do
+  ClientOpts {..} <- getThisOpts
+  pid <- genPeerId
+  return $ PeerAddr (Just pid) Nothing peerPort
 
 getTestTorrent :: IO Torrent
 getTestTorrent = do
