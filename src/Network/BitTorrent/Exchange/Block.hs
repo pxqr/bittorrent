@@ -317,8 +317,9 @@ spans expectedSize = go 0
 
 -- | /O(1)/. A new empty bucket capable to alloof specified size.
 empty :: PieceSize -> Bucket
-empty 0  = error "empty: Bucket size is zero"
-empty sz = Span sz Nil
+empty sz
+  |   sz < 0  = error "empty: Bucket size must be a non-negative value"
+  | otherwise = Span sz Nil
 {-# INLINE empty #-}
 
 insertSpan :: Pos -> BS.ByteString -> ChunkSize -> Bucket -> Bucket
