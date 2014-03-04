@@ -27,7 +27,7 @@ runSimulation :: Eq ip => Env ip -> Routing ip a -> Maybe a
 runSimulation e m = evalState (runRouting ping closest timestamp m) e
   where
     ping    addr = gets (L.elem addr . network)
-    closest nid  = undefined
+    closest nid  = error "runSimulation"
     timestamp    = gets currentTime
 
 instance Arbitrary ip => Arbitrary (Env ip) where

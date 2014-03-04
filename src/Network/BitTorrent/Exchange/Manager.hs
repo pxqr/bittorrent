@@ -39,7 +39,7 @@ handleNewConn :: Socket -> PeerAddr IP -> Handler -> IO ()
 handleNewConn sock addr handler = do
   conn <- newPendingConnection sock addr
   ses  <- handler (pendingTopic conn) `onException` closePending conn
-  attach conn ses
+  establish conn ses
 
 listenIncoming :: Options -> Handler -> IO ()
 listenIncoming Options {..} handler = do

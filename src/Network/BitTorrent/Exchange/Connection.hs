@@ -723,10 +723,10 @@ extendedHandshake caps = do
     _ -> protocolError HandshakeRefused
 
 rehandshake :: ExtendedCaps -> Wire s ()
-rehandshake caps = undefined
+rehandshake caps = error "rehandshake"
 
 reconnect :: Wire s ()
-reconnect = undefined
+reconnect = error "reconnect"
 
 data ConnectionId    = ConnectionId
   { topic      :: !InfoHash
@@ -751,7 +751,7 @@ instance Default ConnectionPrefs where
     }
 
 normalize :: ConnectionPrefs -> ConnectionPrefs
-normalize = undefined
+normalize = error "normalize"
 
 -- | Bridge between 'Connection' and 'Network.BitTorrent.Exchange.Session'.
 data SessionLink s = SessionLink

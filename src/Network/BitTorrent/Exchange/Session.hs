@@ -2,16 +2,19 @@
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
 module Network.BitTorrent.Exchange.Session
-       ( Session
+       ( -- * Session
+         Session
        , LogFun
+       , sessionLogger
+
+         -- * Construction
        , newSession
        , closeSession
+       , withSession
 
-         -- * Connections
-       , Network.BitTorrent.Exchange.Session.insert
-       , Network.BitTorrent.Exchange.Session.attach
-       , Network.BitTorrent.Exchange.Session.delete
-       , Network.BitTorrent.Exchange.Session.deleteAll
+         -- * Connection Set
+       , connect
+       , establish
 
          -- * Events
        , waitMetadata
@@ -70,6 +73,7 @@ packException f m = try m >>= either (throwIO . f) return
 {-----------------------------------------------------------------------
 --  Session
 -----------------------------------------------------------------------}
+-- TODO unmap storage on zero connections
 
 data Cached a = Cached
   { cachedValue :: !a
@@ -79,9 +83,13 @@ data Cached a = Cached
 cache :: BEncode a => a -> Cached a
 cache s = Cached s (BE.encode s)
 
+-- | Logger function.
+type LogFun = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+
 data Session = Session
   { sessionPeerId          :: !(PeerId)
   , sessionTopic           :: !(InfoHash)
+  , sessionLogger          :: !(LogFun)
 
   , metadata               :: !(MVar Metadata.Status)
   , infodict               :: !(MVar (Cached InfoDict))
@@ -90,16 +98,27 @@ data Session = Session
   , storage                :: !(Storage)
 
   , connectionsPrefs       :: !ConnectionPrefs
-  , connectionsPending     :: !(TVar (Set (PeerAddr IP)))
-  , connectionsEstablished :: !(TVar (Map (PeerAddr IP) (Connection Session)))
-  , connectionsUnchoked    ::  [PeerAddr IP]
-  , broadcast              :: !(Chan Message)
 
-  , logger                 :: !(LogFun)
+    -- | Connections either waiting for TCP/uTP 'connect' or waiting
+    -- for BT handshake.
+  , connectionsPending     :: !(TVar (Set (PeerAddr IP)))
+
+    -- | Connections successfully handshaked and data transfer can
+    -- take place.
+  , connectionsEstablished :: !(TVar (Map (PeerAddr IP) (Connection Session)))
+
+    -- | TODO implement choking mechanism
+  , connectionsUnchoked    ::  [PeerAddr IP]
+
+    -- | Messages written to this channel will be sent to the all
+    -- connections, including pending connections (but right after
+    -- handshake).
+  , connectionsBroadcast   :: !(Chan Message)
   }
 
--- | Logger function.
-type LogFun = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+{-----------------------------------------------------------------------
+--  Session construction
+-----------------------------------------------------------------------}
 
 newSession :: LogFun
            -> PeerAddr (Maybe IP) -- ^ /external/ address of this peer;
@@ -108,17 +127,20 @@ newSession :: LogFun
            -> IO Session          -- ^
 newSession logFun addr rootPath dict = do
   pid         <- maybe genPeerId return (peerId addr)
-  pconnVar    <- newTVarIO S.empty
-  econnVar    <- newTVarIO M.empty
   store       <- openInfoDict ReadWriteEx rootPath dict
   statusVar   <- newMVar $ sessionStatus (BF.haveNone (totalPieces store))
                                          (piPieceLength (idPieceInfo dict))
-  metadataVar <- newMVar undefined
+  metadataVar <- newMVar (error "sessionMetadata")
   infodictVar <- newMVar (cache dict)
+
+  pSetVar     <- newTVarIO S.empty
+  eSetVar     <- newTVarIO M.empty
   chan        <- newChan
+
   return Session
     { sessionPeerId          = pid
     , sessionTopic           = idInfoHash dict
+    , sessionLogger          = logFun
 
     , metadata               = metadataVar
     , infodict               = infodictVar
@@ -127,21 +149,25 @@ newSession logFun addr rootPath dict = do
     , storage                = store
 
     , connectionsPrefs       = def
-    , connectionsPending     = pconnVar
-    , connectionsEstablished = econnVar
+    , connectionsPending     = pSetVar
+    , connectionsEstablished = eSetVar
     , connectionsUnchoked    = []
-    , broadcast              = chan
-
-    , logger                 = logFun
+    , connectionsBroadcast   = chan
     }
 
 closeSession :: Session -> IO ()
-closeSession ses = do
-  deleteAll ses
-  error "closeSession"
+closeSession Session {..} = do
+  close storage
+{-
+  hSet <- atomically $ do
+    pSet <- swapTVar connectionsPending     S.empty
+    eSet <- swapTVar connectionsEstablished S.empty
+    return pSet
+  mapM_ kill hSet
+-}
 
-waitMetadata :: Session -> IO InfoDict
-waitMetadata Session {..} = cachedValue <$> readMVar infodict
+withSession :: ()
+withSession = error "withSession"
 
 {-----------------------------------------------------------------------
 --  Logging
@@ -153,7 +179,7 @@ instance MonadLogger (Connected Session) where
     ses  <- asks connSession
     addr <- asks connRemoteAddr
     let addrSrc = src <> " @ " <> T.pack (render (pretty addr))
-    liftIO $ logger ses loc addrSrc lvl (toLogStr msg)
+    liftIO $ sessionLogger ses loc addrSrc lvl (toLogStr msg)
 
 logMessage :: MonadLogger m => Message -> m ()
 logMessage msg = logDebugN $ T.pack (render (pretty msg))
@@ -162,14 +188,22 @@ logEvent   :: MonadLogger m => Text    -> m ()
 logEvent       = logInfoN
 
 {-----------------------------------------------------------------------
---  Connection slots
+--  Connection set
 -----------------------------------------------------------------------}
---- pending -> established -> closed
----    |                        /|\
----    \-------------------------|
+--- Connection status transition:
+---
+--- pending -> established -> finished -> closed
+---    |           \|/                      /|\
+---    \-------------------------------------|
+---
+--- Purpose of slots:
+---   1) to avoid duplicates
+---   2) connect concurrently
+---
 
-pendingConnection :: PeerAddr IP -> Session -> IO Bool
-pendingConnection addr Session {..} = atomically $ do
+-- | Add connection to the pending set.
+pendingConnection :: PeerAddr IP -> Session -> STM Bool
+pendingConnection addr Session {..} = do
   pSet <- readTVar connectionsPending
   eSet <- readTVar connectionsEstablished
   if (addr `S.member` pSet) || (addr `M.member` eSet)
@@ -178,38 +212,37 @@ pendingConnection addr Session {..} = atomically $ do
       modifyTVar' connectionsPending (S.insert addr)
       return True
 
+-- | Pending connection successfully established, add it to the
+-- established set.
 establishedConnection :: Connected Session ()
-establishedConnection = undefined --atomically $ do
---  pSet <- readTVar pendingConnections
---  eSet <- readTVar
-  undefined
+establishedConnection = do
+  conn         <- ask
+  addr         <- asks connRemoteAddr
+  Session {..} <- asks connSession
+  liftIO $ atomically $ do
+    modifyTVar connectionsPending     (S.delete addr)
+    modifyTVar connectionsEstablished (M.insert addr conn)
 
+-- | Either this or remote peer decided to finish conversation
+-- (conversation is alread /established/ connection), remote it from
+-- the established set.
 finishedConnection :: Connected Session ()
-finishedConnection = return ()
+finishedConnection = do
+  Session {..} <- asks connSession
+  addr         <- asks connRemoteAddr
+  liftIO $ atomically $ do
+    modifyTVar connectionsEstablished $ M.delete addr
 
--- | There are no state for this connection, remove it.
-closedConnection :: PeerAddr IP -> Session -> IO ()
-closedConnection addr Session {..} = atomically $ do
+-- | There are no state for this connection, remove it from the all
+-- sets.
+closedConnection :: PeerAddr IP -> Session -> STM ()
+closedConnection addr Session {..} = do
   modifyTVar connectionsPending     $ S.delete addr
   modifyTVar connectionsEstablished $ M.delete addr
 
-{-----------------------------------------------------------------------
---  Connections
------------------------------------------------------------------------}
--- TODO unmap storage on zero connections
-
-mainWire :: Wire Session ()
-mainWire = do
-  lift establishedConnection
-  Session {..} <- asks connSession
-  lift $ resizeBitfield (totalPieces storage)
-  logEvent "Connection established"
-  iterM logMessage =$= exchange =$= iterM logMessage
-  lift finishedConnection
-
 getConnectionConfig :: Session -> IO (ConnectionConfig Session)
 getConnectionConfig s @ Session {..} = do
-  chan <- dupChan broadcast
+  chan <- dupChan connectionsBroadcast
   let sessionLink = SessionLink {
       linkTopic        = sessionTopic
     , linkPeerId       = sessionPeerId
@@ -223,28 +256,46 @@ getConnectionConfig s @ Session {..} = do
     , cfgWire    = mainWire
     }
 
-insert :: PeerAddr IP -> Session -> IO ()
-insert addr ses @ Session {..} = void $ forkIO (action `finally` cleanup)
+type Finalizer      = IO ()
+type Runner = (ConnectionConfig Session -> IO ())
+
+runConnection :: Runner -> Finalizer -> PeerAddr IP -> Session -> IO ()
+runConnection runner finalize addr set @ Session {..} = do
+    _ <- forkIO (action `finally` cleanup)
+    return ()
   where
     action = do
-      pendingConnection addr ses
-      cfg <- getConnectionConfig ses
-      connectWire addr cfg
+      notExist <- atomically $ pendingConnection addr set
+      when notExist $ do
+        cfg <- getConnectionConfig set
+        runner cfg
 
     cleanup = do
-      runStatusUpdates status (SS.resetPending addr)
+      finalize
+--      runStatusUpdates status (SS.resetPending addr)
       -- TODO Metata.resetPending addr
-      closedConnection addr ses
+      atomically $ closedConnection addr set
 
--- TODO closePending on error
-attach :: PendingConnection -> Session -> IO ()
-attach = undefined
+-- | Establish connection from scratch. If this endpoint is already
+-- connected, no new connections is created. This function do not block.
+connect :: PeerAddr IP -> Session -> IO ()
+connect addr = runConnection (connectWire addr) (return ()) addr
 
-delete :: PeerAddr IP -> Session -> IO ()
-delete = undefined
+-- | Establish connection with already pre-connected endpoint. If this
+-- endpoint is already connected, no new connections is created. This
+-- function do not block.
+--
+--  'PendingConnection' will be closed automatically, you do not need
+--  to call 'closePending'.
+establish :: PendingConnection -> Session -> IO ()
+establish conn = runConnection (acceptWire conn) (closePending conn)
+                 (pendingPeer conn)
 
-deleteAll :: Session -> IO ()
-deleteAll = undefined
+-- | Why do we need this message?
+type BroadcastMessage = ExtendedCaps -> Message
+
+broadcast :: BroadcastMessage -> Session -> IO ()
+broadcast = error "broadcast"
 
 {-----------------------------------------------------------------------
 --  Helpers
@@ -292,14 +343,17 @@ tryReadMetadataBlock pix = do
   Session {..} <- asks connSession
   mcached      <- liftIO (tryReadMVar infodict)
   case mcached of
-    Nothing            -> undefined
-    Just (Cached {..}) -> undefined
+    Nothing            -> error "tryReadMetadataBlock"
+    Just (Cached {..}) -> error "tryReadMetadataBlock"
 
 sendBroadcast :: PeerMessage msg => msg -> Wire Session ()
 sendBroadcast msg = do
   Session {..} <- asks connSession
-  ecaps <- use connExtCaps
-  liftIO $ writeChan broadcast (envelop ecaps msg)
+  error "sendBroadcast"
+--  liftIO $ msg `broadcast` sessionConnections
+
+waitMetadata :: Session -> IO InfoDict
+waitMetadata Session {..} = cachedValue <$> readMVar infodict
 
 {-----------------------------------------------------------------------
 --  Triggers
@@ -406,7 +460,7 @@ tryRequestMetadataBlock :: Trigger
 tryRequestMetadataBlock = do
   mpix <- lift $ withMetadataUpdates Metadata.scheduleBlock
   case mpix of
-    Nothing  -> undefined
+    Nothing  -> error "tryRequestMetadataBlock"
     Just pix -> sendMessage (MetadataRequest pix)
 
 metadataCompleted :: InfoDict -> Trigger
@@ -439,7 +493,7 @@ handleMetadata (MetadataUnknown _  ) = do
 -----------------------------------------------------------------------}
 
 acceptRehandshake :: ExtendedHandshake -> Trigger
-acceptRehandshake ehs = undefined
+acceptRehandshake ehs = error "acceptRehandshake"
 
 handleExtended :: Handler ExtendedMessage
 handleExtended (EHandshake     ehs) = acceptRehandshake ehs
@@ -451,8 +505,8 @@ handleMessage KeepAlive       = return ()
 handleMessage (Status s)      = handleStatus s
 handleMessage (Available msg) = handleAvailable msg
 handleMessage (Transfer  msg) = handleTransfer msg
-handleMessage (Port      n)   = undefined
-handleMessage (Fast      _)   = undefined
+handleMessage (Port      n)   = error "handleMessage"
+handleMessage (Fast      _)   = error "handleMessage"
 handleMessage (Extended  msg) = handleExtended msg
 
 exchange :: Wire Session ()
@@ -462,13 +516,22 @@ exchange = do
   sendMessage (Bitfield bf)
   awaitForever handleMessage
 
+mainWire :: Wire Session ()
+mainWire = do
+  lift establishedConnection
+  Session {..} <- asks connSession
+  lift $ resizeBitfield (totalPieces storage)
+  logEvent "Connection established"
+  iterM logMessage =$= exchange =$= iterM logMessage
+  lift finishedConnection
+
 data Event = NewMessage (PeerAddr IP) Message
            | Timeout -- for scheduling
 
 type Exchange a = Wire Session a
 
 awaitEvent :: Exchange Event
-awaitEvent = undefined
+awaitEvent = error "awaitEvent"
 
 yieldEvent :: Exchange Event
-yieldEvent = undefined
+yieldEvent = error "yieldEvent"

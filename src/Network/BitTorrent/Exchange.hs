@@ -6,25 +6,23 @@
 --   Portability :  portable
 --
 module Network.BitTorrent.Exchange
-       ( -- * Options
+       ( -- * Manager
          Options (..)
-       , Caps
-       , Extension
-       , toCaps
-
-         -- * Manager
        , Manager
        , Handler
        , newManager
        , closeManager
 
          -- * Session
+       , Caps
+       , Extension
+       , toCaps
        , Session
        , newSession
        , closeSession
 
-         -- * Session control
-       , insert
+         -- * Connections
+       , connect
        ) where
 
 import Network.BitTorrent.Exchange.Manager

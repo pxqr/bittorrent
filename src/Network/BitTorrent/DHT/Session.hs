@@ -434,15 +434,20 @@ insertNode info = fork $ do
 
 -- TODO limit dht peer store in size (probably by removing oldest peers)
 
+refreshContacts :: DHT ip ()
+refreshContacts = undefined
+
 -- | Insert peer to peer store. Used to handle announce requests.
 insertPeer :: Eq ip => InfoHash -> PeerAddr ip -> DHT ip ()
 insertPeer ih addr = do
+  refreshContacts
   var <- asks contactInfo
   liftIO $ atomically $ modifyTVar' var (P.insert ih addr)
 
 -- | Get peer set for specific swarm.
 lookupPeers :: InfoHash -> DHT ip [PeerAddr ip]
 lookupPeers ih = do
+  refreshContacts
   var <- asks contactInfo
   liftIO $ P.lookup ih <$> readTVarIO var
 

@@ -40,7 +40,7 @@ type ClientName = String
 
 
 instance Read PortNumber where
-  readsPrec = undefined
+  readsPrec = error "readsPrec"
 
 data ClientOpts = ClientOpts
   { peerPort   :: PortNumber  -- tcp port

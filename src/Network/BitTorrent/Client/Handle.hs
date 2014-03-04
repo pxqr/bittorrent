@@ -110,12 +110,12 @@ start Handle {..} = do
   Client {..} <- getClient
   liftIO $ Tracker.notify trackerManager trackers Tracker.Started
   unless private $ do
-    liftDHT $ DHT.insert topic undefined
+    liftDHT $ DHT.insert topic (error "start")
   liftIO $ do
     peers <- askPeers trackerManager trackers
     print $ "got: " ++ show (L.length peers) ++ " peers"
     forM_ peers $ \ peer -> do
-      Exchange.insert peer exchange
+      Exchange.connect peer exchange
 
 -- | Stop downloading this torrent.
 pause :: Handle -> BitTorrent ()
@@ -126,7 +126,7 @@ stop :: Handle -> BitTorrent ()
 stop Handle {..} = do
   Client {..} <- getClient
   unless private $ do
-    liftDHT $ DHT.delete topic undefined
+    liftDHT $ DHT.delete topic (error "stop")
   liftIO  $ Tracker.notify trackerManager trackers Tracker.Stopped
 
 {-----------------------------------------------------------------------

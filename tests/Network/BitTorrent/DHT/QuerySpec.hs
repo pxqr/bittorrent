@@ -18,7 +18,7 @@ import Network.BitTorrent.DHT.TestData
 
 
 myAddr :: NodeAddr IPv4
-myAddr = "0.0.0.0:8000"
+myAddr = "0.0.0.0:0"
 
 nullLogger :: LogFun
 nullLogger _ _ _ _ = return ()
@@ -37,7 +37,7 @@ getBootInfo = do
   simpleDHT [] $ pingQ startAddr
 
 spec :: Spec
-spec = do
+spec = parallel $ do
   describe "environment" $ do
     describe "test node" $ do
       it "is alive" $ do

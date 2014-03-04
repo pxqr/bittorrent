@@ -4,7 +4,7 @@ import Test.Hspec
 
 import Data.Torrent
 import Network.BitTorrent.Core
-import Network.BitTorrent.Exchange.Session as S
+import Network.BitTorrent.Exchange.Session
 
 import Config
 
@@ -20,7 +20,7 @@ spec = do
         Torrent {..} <- getTestTorrent
         myAddr <- getMyAddr
         ses  <- newSession nullLogger myAddr "" tInfoDict
-        S.insert addr ses
+        connect addr ses
         dict <- waitMetadata ses
         closeSession ses
         dict `shouldBe` tInfoDict
