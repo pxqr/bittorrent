@@ -41,7 +41,7 @@ import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Session hiding (Options, options)
 import Network.BitTorrent.DHT as DHT  hiding (Options)
 import Network.BitTorrent.Exchange.Message
-import Network.BitTorrent.Exchange.Wire hiding (Options)
+import Network.BitTorrent.Exchange.Connection hiding (Options)
 import System.Torrent.Storage
 
 
