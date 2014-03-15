@@ -74,24 +74,24 @@ packHttpException m = try m >>= either (throwIO . RequestFailed) return
 -- | HTTP tracker specific RPC options.
 data Options = Options
   { -- | Global HTTP announce query preferences.
-    optAnnounceExt  :: !AnnounceQueryExt
+    optAnnouncePrefs :: !AnnouncePrefs
 
     -- | Whether to use HTTP proxy for HTTP tracker requests.
-  , optHttpProxy    :: !(Maybe Proxy)
+  , optHttpProxy     :: !(Maybe Proxy)
 
     -- | Value to put in HTTP user agent header.
-  , optUserAgent    :: !BS.ByteString
+  , optUserAgent     :: !BS.ByteString
 
     -- | HTTP manager options.
-  , optHttpOptions  :: !ManagerSettings
+  , optHttpOptions   :: !ManagerSettings
   }
 
 instance Default Options where
   def = Options
-    { optAnnounceExt = def
-    , optHttpProxy   = Nothing
-    , optUserAgent   = BC.pack libUserAgent
-    , optHttpOptions = defaultManagerSettings
+    { optAnnouncePrefs = def
+    , optHttpProxy     = Nothing
+    , optUserAgent     = BC.pack libUserAgent
+    , optHttpOptions   = defaultManagerSettings
     }
 
 -- | HTTP tracker manager.
@@ -148,8 +148,8 @@ announce :: Manager -> URI -> AnnounceQuery -> IO AnnounceInfo
 announce mgr uri q = httpTracker mgr uri (renderAnnounceRequest uriQ)
   where
     uriQ = AnnounceRequest
-      { announceQuery   = q
-      , announceAdvises = optAnnounceExt (options mgr)
+      { announceQuery = q
+      , announcePrefs = optAnnouncePrefs (options mgr)
       }
 
 -- | Trying to convert /announce/ URL to /scrape/ URL. If 'scrapeURL'

@@ -59,11 +59,12 @@ module Network.BitTorrent.Tracker.Message
        , defaultAnnouncePath
        , defaultScrapePath
 
-         -- ** Request
-       , AnnounceQueryExt (..)
-       , renderAnnounceQueryExt
-       , parseAnnounceQueryExt
+         -- ** Preferences
+       , AnnouncePrefs (..)
+       , renderAnnouncePrefs
+       , parseAnnouncePrefs
 
+         -- ** Request
        , AnnounceRequest  (..)
        , parseAnnounceRequest
        , renderAnnounceRequest
@@ -654,8 +655,10 @@ type ScrapeInfo = [(InfoHash, ScrapeEntry)]
 --  HTTP specific
 -----------------------------------------------------------------------}
 
--- | Extensions for HTTP tracker protocol.
-data AnnounceQueryExt = AnnounceQueryExt
+-- | Some HTTP trackers allow to choose prefered representation of the
+-- 'AnnounceInfo'. It's optional for trackers to honor any of this
+-- options.
+data AnnouncePrefs = AnnouncePrefs
   { -- | If specified, "compact" parameter is used to advise the
     --   tracker to send peer id list as:
     --
@@ -680,11 +683,11 @@ data AnnounceQueryExt = AnnounceQueryExt
   , extNoPeerId :: !(Maybe Bool)
   } deriving (Show, Eq, Typeable)
 
-instance Default AnnounceQueryExt where
-  def = AnnounceQueryExt Nothing Nothing
+instance Default AnnouncePrefs where
+  def = AnnouncePrefs Nothing Nothing
 
-instance QueryLike AnnounceQueryExt where
-  toQuery AnnounceQueryExt {..} =
+instance QueryLike AnnouncePrefs where
+  toQuery AnnouncePrefs {..} =
       [ ("compact",    toQueryFlag <$> extCompact) -- TODO use 'paramName'
       , ("no_peer_id", toQueryFlag <$> extNoPeerId)
       ]
@@ -693,32 +696,32 @@ instance QueryLike AnnounceQueryExt where
       toQueryFlag True  = "1"
 
 -- | Parse announce query extended part from query string.
-parseAnnounceQueryExt :: SimpleQuery -> AnnounceQueryExt
-parseAnnounceQueryExt params = either (const def) id $
-  AnnounceQueryExt
+parseAnnouncePrefs :: SimpleQuery -> AnnouncePrefs
+parseAnnouncePrefs params = either (const def) id $
+  AnnouncePrefs
     <$> optParam ParamCompact  params
     <*> optParam ParamNoPeerId params
 
--- | Render announce query extended part to query string.
-renderAnnounceQueryExt :: AnnounceQueryExt -> SimpleQuery
-renderAnnounceQueryExt = queryToSimpleQuery . toQuery
+-- | Render announce preferences to query string.
+renderAnnouncePrefs :: AnnouncePrefs -> SimpleQuery
+renderAnnouncePrefs = queryToSimpleQuery . toQuery
 
--- | HTTP tracker request with extensions.
+-- | HTTP tracker request with preferences.
 data AnnounceRequest = AnnounceRequest
-  { announceQuery   :: AnnounceQuery    -- ^ Request query params.
-  , announceAdvises :: AnnounceQueryExt -- ^ Optional advises to the tracker.
+  { announceQuery :: AnnounceQuery -- ^ Request query params.
+  , announcePrefs :: AnnouncePrefs -- ^ Optional advises to the tracker.
   } deriving (Show, Eq, Typeable)
 
 instance QueryLike AnnounceRequest where
   toQuery AnnounceRequest{..} =
-    toQuery announceAdvises <>
+    toQuery announcePrefs <>
     toQuery announceQuery
 
 -- | Parse announce request from query string.
 parseAnnounceRequest :: SimpleQuery -> ParseResult AnnounceRequest
 parseAnnounceRequest params = AnnounceRequest
   <$> parseAnnounceQuery params
-  <*> pure (parseAnnounceQueryExt params)
+  <*> pure (parseAnnouncePrefs params)
 
 -- | Render announce request to query string.
 renderAnnounceRequest :: AnnounceRequest -> SimpleQuery
