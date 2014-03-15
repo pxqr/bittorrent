@@ -38,21 +38,17 @@ import Data.IORef
 import Data.List as L
 import Data.Map  as M
 import Data.Maybe
-import Data.Monoid
 import Data.Serialize
 import Data.Text as T
-import Data.Text.Encoding
 import Data.Time
 import Data.Time.Clock.POSIX
 import Data.Traversable
 import Data.Typeable
-import Data.Word
 import Text.Read (readMaybe)
 import Network.Socket hiding (Connected, connect, listen)
 import Network.Socket.ByteString as BS
 import Network.URI
 import System.Timeout
-import Numeric
 
 import Network.BitTorrent.Tracker.Message
 

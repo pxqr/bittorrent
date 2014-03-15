@@ -23,22 +23,15 @@ module Network.BitTorrent.Tracker.Session
 
 import Control.Applicative
 import Control.Concurrent
-import Control.Concurrent.STM
-import Control.Exception
-import Control.Monad
 import Data.Default
 import Data.Fixed
 import Data.Foldable
 import Data.List as L
 import Data.Maybe
-import Data.IORef
-import Data.Text as T
 import Data.Time
 import Data.Traversable
-import Network
 import Network.URI
 
-import Data.Torrent
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 import Network.BitTorrent.Tracker.Cache
