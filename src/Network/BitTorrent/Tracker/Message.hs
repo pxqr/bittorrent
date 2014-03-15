@@ -73,7 +73,7 @@ module Network.BitTorrent.Tracker.Message
        , scrapeType
        , parseFailureStatus
 
-         -- * Extra
+         -- ** Extra
        , queryToSimpleQuery
        )
        where
@@ -309,6 +309,11 @@ paramName ParamNoPeerId   = "no_peer_id"
 class FromParam a where
   fromParam :: BS.ByteString -> Maybe a
 
+instance FromParam Bool where
+  fromParam "0" = Just False
+  fromParam "1" = Just True
+  fromParam _   = Nothing
+
 instance FromParam InfoHash where
   fromParam = either (const Nothing) pure . safeConvert
 
@@ -375,83 +380,8 @@ parseAnnounceQuery params = AnnounceQuery
   <*> optParam ParamNumWant  params
   <*> optParam ParamEvent    params
 
--- | Extensions for HTTP tracker protocol.
-data AnnounceQueryExt = AnnounceQueryExt
-  { -- | If specified, "compact" parameter is used to advise the
-    --   tracker to send peer id list as:
-    --
-    --   * bencoded list                 (extCompact = Just False);
-    --   * or more compact binary string (extCompact = Just True).
-    --
-    --   The later is prefered since compact peer list will reduce the
-    --   size of tracker responses. Hovewer, if tracker do not support
-    --   this extension then it can return peer list in either form.
-    --
-    --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
-    --
-    extCompact  :: !(Maybe Bool)
-
-    -- | If specified, "no_peer_id" parameter is used advise tracker
-    --   to either send or not to send peer id in tracker response.
-    --   Tracker may not support this extension as well.
-    --
-    --   For more info see:
-    --  <http://permalink.gmane.org/gmane.network.bit-torrent.general/4030>
-    --
-  , extNoPeerId :: !(Maybe Bool)
-  } deriving (Show, Eq, Typeable)
-
-instance Default AnnounceQueryExt where
-  def = AnnounceQueryExt Nothing Nothing
-
-instance QueryLike AnnounceQueryExt where
-  toQuery AnnounceQueryExt {..} =
-      [ ("compact",    toQueryFlag <$> extCompact) -- TODO use 'paramName'
-      , ("no_peer_id", toQueryFlag <$> extNoPeerId)
-      ]
-    where
-      toQueryFlag False = "0"
-      toQueryFlag True  = "1"
-
-instance FromParam Bool where
-  fromParam "0" = Just False
-  fromParam "1" = Just True
-  fromParam _   = Nothing
-
--- | Parse announce query extended part from query string.
-parseAnnounceQueryExt :: SimpleQuery -> AnnounceQueryExt
-parseAnnounceQueryExt params = either (const def) id $
-  AnnounceQueryExt
-    <$> optParam ParamCompact  params
-    <*> optParam ParamNoPeerId params
-
--- | Render announce query extended part to query string.
-renderAnnounceQueryExt :: AnnounceQueryExt -> SimpleQuery
-renderAnnounceQueryExt = queryToSimpleQuery . toQuery
-
--- | HTTP tracker request with extensions.
-data AnnounceRequest = AnnounceRequest
-  { announceQuery   :: AnnounceQuery    -- ^ Request query params.
-  , announceAdvises :: AnnounceQueryExt -- ^ Optional advises to the tracker.
-  } deriving (Show, Eq, Typeable)
-
-instance QueryLike AnnounceRequest where
-  toQuery AnnounceRequest{..} =
-    toQuery announceAdvises <>
-    toQuery announceQuery
-
--- | Parse announce request from query string.
-parseAnnounceRequest :: SimpleQuery -> ParseResult AnnounceRequest
-parseAnnounceRequest params = AnnounceRequest
-  <$> parseAnnounceQuery params
-  <*> pure (parseAnnounceQueryExt params)
-
--- | Render announce request to query string.
-renderAnnounceRequest :: AnnounceRequest -> SimpleQuery
-renderAnnounceRequest = queryToSimpleQuery . toQuery
-
 {-----------------------------------------------------------------------
---  Announce response
+--  Announce Info
 -----------------------------------------------------------------------}
 -- TODO check if announceinterval/complete/incomplete is positive ints
 
@@ -632,45 +562,6 @@ defaultMaxNumWant = 200
 defaultReannounceInterval :: Int
 defaultReannounceInterval = 30 * 60
 
-type PathPiece = BS.ByteString
-
-defaultAnnouncePath :: PathPiece
-defaultAnnouncePath = "announce"
-
-defaultScrapePath :: PathPiece
-defaultScrapePath = "scrape"
-
-missingOffset :: Int
-missingOffset = 101
-
-invalidOffset :: Int
-invalidOffset = 150
-
-parseFailureCode :: ParamParseFailure -> Int
-parseFailureCode (Missing param  ) = missingOffset + fromEnum param
-parseFailureCode (Invalid param _) = invalidOffset + fromEnum param
-
-parseFailureMessage :: ParamParseFailure -> BS.ByteString
-parseFailureMessage e = BS.concat $ case e of
-  Missing p   -> ["Missing parameter: ", paramName p]
-  Invalid p v -> ["Invalid parameter: ", paramName p, " = ", v]
-
--- | HTTP response /content type/ for announce info.
-announceType :: ByteString
-announceType = "text/plain"
-
--- | HTTP response /content type/ for scrape info.
-scrapeType :: ByteString
-scrapeType = "text/plain"
-
--- | Get HTTP response status from a announce params parse failure.
---
---   For more info see:
---   <https://wiki.theory.org/BitTorrent_Tracker_Protocol#Response_Codes>
---
-parseFailureStatus :: ParamParseFailure -> Status
-parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
-
 {-----------------------------------------------------------------------
   Scrape message
 -----------------------------------------------------------------------}
@@ -758,3 +649,116 @@ instance Serialize ScrapeEntry where
 
 -- | Scrape info about a set of torrents.
 type ScrapeInfo = [(InfoHash, ScrapeEntry)]
+
+{-----------------------------------------------------------------------
+--  HTTP specific
+-----------------------------------------------------------------------}
+
+-- | Extensions for HTTP tracker protocol.
+data AnnounceQueryExt = AnnounceQueryExt
+  { -- | If specified, "compact" parameter is used to advise the
+    --   tracker to send peer id list as:
+    --
+    --   * bencoded list                 (extCompact = Just False);
+    --   * or more compact binary string (extCompact = Just True).
+    --
+    --   The later is prefered since compact peer list will reduce the
+    --   size of tracker responses. Hovewer, if tracker do not support
+    --   this extension then it can return peer list in either form.
+    --
+    --   For more info see: <http://www.bittorrent.org/beps/bep_0023.html>
+    --
+    extCompact  :: !(Maybe Bool)
+
+    -- | If specified, "no_peer_id" parameter is used advise tracker
+    --   to either send or not to send peer id in tracker response.
+    --   Tracker may not support this extension as well.
+    --
+    --   For more info see:
+    --  <http://permalink.gmane.org/gmane.network.bit-torrent.general/4030>
+    --
+  , extNoPeerId :: !(Maybe Bool)
+  } deriving (Show, Eq, Typeable)
+
+instance Default AnnounceQueryExt where
+  def = AnnounceQueryExt Nothing Nothing
+
+instance QueryLike AnnounceQueryExt where
+  toQuery AnnounceQueryExt {..} =
+      [ ("compact",    toQueryFlag <$> extCompact) -- TODO use 'paramName'
+      , ("no_peer_id", toQueryFlag <$> extNoPeerId)
+      ]
+    where
+      toQueryFlag False = "0"
+      toQueryFlag True  = "1"
+
+-- | Parse announce query extended part from query string.
+parseAnnounceQueryExt :: SimpleQuery -> AnnounceQueryExt
+parseAnnounceQueryExt params = either (const def) id $
+  AnnounceQueryExt
+    <$> optParam ParamCompact  params
+    <*> optParam ParamNoPeerId params
+
+-- | Render announce query extended part to query string.
+renderAnnounceQueryExt :: AnnounceQueryExt -> SimpleQuery
+renderAnnounceQueryExt = queryToSimpleQuery . toQuery
+
+-- | HTTP tracker request with extensions.
+data AnnounceRequest = AnnounceRequest
+  { announceQuery   :: AnnounceQuery    -- ^ Request query params.
+  , announceAdvises :: AnnounceQueryExt -- ^ Optional advises to the tracker.
+  } deriving (Show, Eq, Typeable)
+
+instance QueryLike AnnounceRequest where
+  toQuery AnnounceRequest{..} =
+    toQuery announceAdvises <>
+    toQuery announceQuery
+
+-- | Parse announce request from query string.
+parseAnnounceRequest :: SimpleQuery -> ParseResult AnnounceRequest
+parseAnnounceRequest params = AnnounceRequest
+  <$> parseAnnounceQuery params
+  <*> pure (parseAnnounceQueryExt params)
+
+-- | Render announce request to query string.
+renderAnnounceRequest :: AnnounceRequest -> SimpleQuery
+renderAnnounceRequest = queryToSimpleQuery . toQuery
+
+type PathPiece = BS.ByteString
+
+defaultAnnouncePath :: PathPiece
+defaultAnnouncePath = "announce"
+
+defaultScrapePath :: PathPiece
+defaultScrapePath = "scrape"
+
+missingOffset :: Int
+missingOffset = 101
+
+invalidOffset :: Int
+invalidOffset = 150
+
+parseFailureCode :: ParamParseFailure -> Int
+parseFailureCode (Missing param  ) = missingOffset + fromEnum param
+parseFailureCode (Invalid param _) = invalidOffset + fromEnum param
+
+parseFailureMessage :: ParamParseFailure -> BS.ByteString
+parseFailureMessage e = BS.concat $ case e of
+  Missing p   -> ["Missing parameter: ", paramName p]
+  Invalid p v -> ["Invalid parameter: ", paramName p, " = ", v]
+
+-- | HTTP response /content type/ for announce info.
+announceType :: ByteString
+announceType = "text/plain"
+
+-- | HTTP response /content type/ for scrape info.
+scrapeType :: ByteString
+scrapeType = "text/plain"
+
+-- | Get HTTP response status from a announce params parse failure.
+--
+--   For more info see:
+--   <https://wiki.theory.org/BitTorrent_Tracker_Protocol#Response_Codes>
+--
+parseFailureStatus :: ParamParseFailure -> Status
+parseFailureStatus = mkStatus <$> parseFailureCode <*> parseFailureMessage
