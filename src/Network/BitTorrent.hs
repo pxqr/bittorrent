@@ -7,7 +7,42 @@
 --
 {-# LANGUAGE RecordWildCards #-}
 module Network.BitTorrent
-       ( module BT
+       ( -- * Client
+         Options (..)
+
+         -- ** Session
+       , Client
+       , clientPeerId
+       , clientListenerPort
+       , allowedExtensions
+
+         -- ** Initialization
+       , newClient
+       , closeClient
+       , withClient
+
+         -- ** Monadic
+       , MonadBitTorrent (..)
+       , BitTorrent
+       , runBitTorrent
+       , getClient
+       , simpleClient
+
+         -- * Torrent
+         -- ** Source
+       , InfoHash
+       , Magnet
+       , InfoDict
+       , Torrent
+
+         -- ** Handle
+       , TorrentSource(openHandle)
+       , closeHandle
+
+         -- ** Control
+       , start
+       , pause
+       , stop
        ) where
 
 import Data.Torrent as BT
