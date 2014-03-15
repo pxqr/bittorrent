@@ -15,7 +15,6 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE TypeFamilies               #-}
 module Network.BitTorrent.Tracker.RPC.UDP
        ( -- * Manager
          Options (..)
@@ -52,7 +51,6 @@ import Text.Read (readMaybe)
 import Network.Socket hiding (Connected, connect, listen)
 import Network.Socket.ByteString as BS
 import Network.URI
-import System.Entropy
 import System.Timeout
 import Numeric
 
@@ -257,151 +255,6 @@ getTrackerAddr :: Manager -> URI -> IO SockAddr
 getTrackerAddr _ uri
   | uriScheme uri == "udp:" = resolveURI uri
   |        otherwise        = throwIO (UnrecognizedScheme (uriScheme uri))
-
-{-----------------------------------------------------------------------
-  Tokens
------------------------------------------------------------------------}
-
-genToken :: IO Word64
-genToken = do
-    bs <- getEntropy 8
-    either err return $ runGet getWord64be bs
-  where
-    err = error "genToken: impossible happen"
-
--- | Connection Id is used for entire tracker session.
-newtype ConnectionId  = ConnectionId Word64
-                        deriving (Eq, Serialize)
-
-instance Show ConnectionId where
-  showsPrec _ (ConnectionId cid) = showString "0x" <> showHex cid
-
-initialConnectionId :: ConnectionId
-initialConnectionId =  ConnectionId 0x41727101980
-
--- | Transaction Id is used within a UDP RPC.
-newtype TransactionId = TransactionId Word32
-  deriving (Eq, Ord, Enum, Bounded, Serialize)
-
-instance Show TransactionId where
-  showsPrec _ (TransactionId tid) = showString "0x" <> showHex tid
-
-genTransactionId :: IO TransactionId
-genTransactionId = (TransactionId . fromIntegral) <$> genToken
-
-{-----------------------------------------------------------------------
-  Transactions
------------------------------------------------------------------------}
-
-data Request  = Connect
-              | Announce  AnnounceQuery
-              | Scrape    ScrapeQuery
-                deriving Show
-
-data Response = Connected ConnectionId
-              | Announced AnnounceInfo
-              | Scraped   [ScrapeEntry]
-              | Failed    Text
-                deriving Show
-
-responseName :: Response -> String
-responseName (Connected _) = "connected"
-responseName (Announced _) = "announced"
-responseName (Scraped   _) = "scraped"
-responseName (Failed    _) = "failed"
-
-data family Transaction a
-data instance Transaction Request  = TransactionQ
-    { connIdQ  :: {-# UNPACK #-} !ConnectionId
-    , transIdQ :: {-# UNPACK #-} !TransactionId
-    , request  :: !Request
-    } deriving Show
-data instance Transaction Response = TransactionR
-    { transIdR :: {-# UNPACK #-} !TransactionId
-    , response :: !Response
-    } deriving Show
-
--- TODO newtype
-newtype MessageId = MessageId Word32
-                    deriving (Show, Eq, Num, Serialize)
-
-connectId, announceId, scrapeId, errorId :: MessageId
-connectId  = 0
-announceId = 1
-scrapeId   = 2
-errorId    = 3
-
-instance Serialize (Transaction Request) where
-  put TransactionQ {..} = do
-    case request of
-      Connect        -> do
-        put initialConnectionId
-        put connectId
-        put transIdQ
-
-      Announce ann -> do
-        put connIdQ
-        put announceId
-        put transIdQ
-        put ann
-
-      Scrape   hashes -> do
-        put connIdQ
-        put scrapeId
-        put transIdQ
-        forM_ hashes put
-
-  get = do
-      cid <- get
-      mid <- get
-      TransactionQ cid <$> get <*> getBody mid
-    where
-      getBody :: MessageId -> Get Request
-      getBody msgId
-        | msgId == connectId  = pure Connect
-        | msgId == announceId = Announce <$> get
-        | msgId == scrapeId   = Scrape   <$> many get
-        |       otherwise     = fail errMsg
-        where
-          errMsg = "unknown request: " ++ show msgId
-
-instance Serialize (Transaction Response) where
-  put TransactionR {..} = do
-    case response of
-      Connected conn -> do
-        put connectId
-        put transIdR
-        put conn
-
-      Announced info -> do
-        put announceId
-        put transIdR
-        put info
-
-      Scraped infos -> do
-        put scrapeId
-        put transIdR
-        forM_ infos put
-
-      Failed info -> do
-        put errorId
-        put transIdR
-        put (encodeUtf8 info)
-
-
-  get = do
-      mid <- get
-      TransactionR <$> get <*> getBody mid
-    where
-      getBody :: MessageId -> Get Response
-      getBody msgId
-        | msgId == connectId  = Connected <$> get
-        | msgId == announceId = Announced <$> get
-        | msgId == scrapeId   = Scraped   <$> many get
-        | msgId == errorId    = (Failed . decodeUtf8) <$> get
-        |       otherwise     = fail msg
-        where
-          msg = "unknown response: " ++ show msgId
 
 {-----------------------------------------------------------------------
   Connection

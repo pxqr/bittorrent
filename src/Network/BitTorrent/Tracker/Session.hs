@@ -50,13 +50,13 @@ import Network.BitTorrent.Tracker.RPC as RPC
 --  Tracker entry
 -----------------------------------------------------------------------}
 
-data Scrape = Scrape
+data LastScrape = LastScrape
   { leechersCount :: Maybe Int
   , seedersCount  :: Maybe Int
   } deriving (Show, Eq)
 
-instance Default Scrape where
-  def = Scrape Nothing Nothing
+instance Default LastScrape where
+  def = LastScrape Nothing Nothing
 
 
 data Status
@@ -102,7 +102,7 @@ data TrackerEntry = TrackerEntry
   , peersCache    :: Cached [PeerAddr IP]
 
     -- | May be used to show brief swarm stats in client GUI.
-  , scrapeCache   :: Cached Scrape
+  , scrapeCache   :: Cached LastScrape
   }
 
 nullEntry :: URI -> TrackerEntry
@@ -140,11 +140,11 @@ cachePeers AnnounceInfo {..} =
             (seconds (fromMaybe respInterval respMinInterval))
             (getPeerList respPeers)
 
-cacheScrape :: AnnounceInfo -> IO (Cached Scrape)
+cacheScrape :: AnnounceInfo -> IO (Cached LastScrape)
 cacheScrape AnnounceInfo {..} =
   newCached (seconds respInterval)
             (seconds (fromMaybe respInterval respMinInterval))
-    Scrape
+    LastScrape
       { seedersCount  = respComplete
       , leechersCount = respIncomplete
       }
