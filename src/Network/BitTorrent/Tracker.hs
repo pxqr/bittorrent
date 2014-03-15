@@ -11,9 +11,8 @@
 --
 {-# LANGUAGE TemplateHaskell   #-}
 module Network.BitTorrent.Tracker
-       ( PeerInfo (..)
-
-         -- * RPC Manager
+       ( -- * RPC Manager
+         PeerInfo (..)
        , Options
        , Manager
        , newManager
@@ -35,6 +34,7 @@ module Network.BitTorrent.Tracker
 --       , getSessionState
        ) where
 
+import Network.BitTorrent.Tracker.Message
 import Network.BitTorrent.Tracker.List
 import Network.BitTorrent.Tracker.RPC
 import Network.BitTorrent.Tracker.Session

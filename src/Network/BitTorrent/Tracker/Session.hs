@@ -13,12 +13,16 @@ module Network.BitTorrent.Tracker.Session
        , newSession
        , closeSession
 
-         -- * Events
-       , Event (..)
+         -- * Trackers
        , notify
-
-         -- * Query
        , askPeers
+
+         -- * Tracker Exchange
+         -- | BEP28: <http://www.bittorrent.org/beps/bep_0028.html>
+       , addTracker
+       , removeTracker
+       , getTrackers
+       , getTrustedTrackers
        ) where
 
 import Control.Applicative
@@ -194,6 +198,32 @@ data TrackerInfo = TrackerInfo
 --instance ToJSON TrackerInfo where
 --  toJSON = undefined
 
--- |
 --getSessionState :: Session -> IO (TrackerList TrackerInfo)
 --getSessionState = undefined
+
+{-----------------------------------------------------------------------
+--  Tracker exchange
+-----------------------------------------------------------------------}
+
+-- Trackers discovered through this protocol SHOULD be treated with a
+-- certain amount of suspicion. Since the source of a tracker exchange
+-- message cannot be trusted, an implementation SHOULD have a lower
+-- number of retries before giving up entirely.
+
+addTracker :: Session -> URI -> IO ()
+addTracker = undefined
+
+removeTracker :: Session -> URI -> IO ()
+removeTracker = undefined
+
+-- Also, as specified under the definitions section, a tracker that
+-- has not worked should never be propagated to other peers over the
+-- tracker exchange protocol.
+
+-- | Return all known trackers.
+getTrackers :: Session -> IO [URI]
+getTrackers = undefined
+
+-- | Return trackers from torrent file and
+getTrustedTrackers :: Session -> IO [URI]
+getTrustedTrackers = undefined

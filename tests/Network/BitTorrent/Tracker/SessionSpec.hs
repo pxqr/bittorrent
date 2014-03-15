@@ -5,6 +5,7 @@ import Network.URI
 import Test.Hspec
 
 import Data.Torrent
+import Network.BitTorrent.Tracker.Message
 import Network.BitTorrent.Tracker.List
 import Network.BitTorrent.Tracker.RPC
 import Network.BitTorrent.Tracker.Session
