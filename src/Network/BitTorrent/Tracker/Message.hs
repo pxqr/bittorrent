@@ -35,15 +35,6 @@ module Network.BitTorrent.Tracker.Message
        , ParamParseFailure
        , parseAnnounceQuery
 
-         -- ** Request
-       , AnnounceQueryExt (..)
-       , renderAnnounceQueryExt
-       , parseAnnounceQueryExt
-
-       , AnnounceRequest  (..)
-       , parseAnnounceRequest
-       , renderAnnounceRequest
-
          -- ** Info
        , PeerList (..)
        , getPeerList
@@ -63,9 +54,21 @@ module Network.BitTorrent.Tracker.Message
        , ScrapeInfo
 
          -- * HTTP specific
-       , RawPath
+         -- ** Routes
+       , PathPiece
        , defaultAnnouncePath
        , defaultScrapePath
+
+         -- ** Request
+       , AnnounceQueryExt (..)
+       , renderAnnounceQueryExt
+       , parseAnnounceQueryExt
+
+       , AnnounceRequest  (..)
+       , parseAnnounceRequest
+       , renderAnnounceRequest
+
+         -- ** Response
        , announceType
        , scrapeType
        , parseFailureStatus
@@ -113,14 +116,20 @@ import Network.BitTorrent.Core
 --  Events
 -----------------------------------------------------------------------}
 
--- | Events used to specify which kind of announce query is performed.
-data Event = Started
-             -- ^ For the first request: when a peer join the swarm.
-           | Stopped
-             -- ^ Sent when the peer is shutting down.
-           | Completed
-             -- ^ To be sent when the peer completes a download.
-             deriving (Show, Read, Eq, Ord, Enum, Bounded, Typeable)
+-- | Events are used to specify which kind of announce query is performed.
+data Event
+    -- | For the first request: when download first begins.
+  = Started
+
+    -- | This peer stopped downloading /and/ uploading the torrent or
+    -- just shutting down.
+  | Stopped
+
+    -- | This peer completed downloading the torrent. This only happen
+    -- right after last piece have been verified. No 'Completed' is
+    -- sent if the file was completed when 'Started'.
+  | Completed
+    deriving (Show, Read, Eq, Ord, Enum, Bounded, Typeable)
 
 $(deriveJSON omitRecordPrefix ''Event)
 
@@ -186,11 +195,13 @@ data AnnounceQuery = AnnounceQuery
      -- tracker throught a proxy.
    , reqIP         :: Maybe HostAddress
 
-     -- | Number of peers that the peers wants to receive from. See
-     -- note for 'defaultNumWant'.
+     -- | Number of peers that the peers wants to receive from. It is
+     -- optional for trackers to honor this limit. See note for
+     -- 'defaultNumWant'.
    , reqNumWant    :: Maybe Int
 
-     -- | If not specified, the request is regular periodic request.
+     -- | If not specified, the request is regular periodic
+     -- request. Regular request should be sent
    , reqEvent      :: Maybe Event
    } deriving (Show, Eq, Typeable)
 
@@ -621,12 +632,12 @@ defaultMaxNumWant = 200
 defaultReannounceInterval :: Int
 defaultReannounceInterval = 30 * 60
 
-type RawPath = BS.ByteString
+type PathPiece = BS.ByteString
 
-defaultAnnouncePath :: RawPath
+defaultAnnouncePath :: PathPiece
 defaultAnnouncePath = "announce"
 
-defaultScrapePath :: RawPath
+defaultScrapePath :: PathPiece
 defaultScrapePath = "scrape"
 
 missingOffset :: Int
