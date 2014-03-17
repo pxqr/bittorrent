@@ -85,7 +85,7 @@ data TrackerEntry = TrackerEntry
     -- | Can be used to retrieve peer set.
   , peersCache    :: Cached [PeerAddr IP]
 
-    -- | Cay be used to show brief swarm stats in client GUI.
+    -- | Can be used to show brief swarm stats in client GUI.
   , scrapeCache   :: Cached LastScrape
   }
 
