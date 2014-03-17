@@ -33,7 +33,7 @@ module Network.BitTorrent.Tracker.Session
 import Control.Applicative
 import Control.Exception
 import Control.Concurrent
-
+import Control.Monad
 import Data.Default
 import Data.Fixed
 import Data.Foldable
@@ -189,7 +189,7 @@ withSession ih uris = bracket (newSession ih uris) closeSession
 -- | Get last announced status. The only action can alter this status
 -- is 'notify'.
 getStatus :: Session -> IO Status
-getStatus Session {..} = takeMVar currentStatus
+getStatus Session {..} = readMVar currentStatus
 
 -- | Do we need to sent this event to a first working tracker or to
 -- the all known good trackers?
@@ -208,12 +208,14 @@ announceAll mgr Session {..} mevent = do
       |    otherwise     = traverseTiers
 
 -- TODO send notifications to tracker periodically.
--- TODO change 'currentStatus'
 -- |
 --
 -- This function /may/ block until tracker query proceed.
 notify :: Manager -> Session -> Event -> IO ()
-notify mgr ses event = announceAll mgr ses (Just event)
+notify mgr ses event = do
+  prevStatus <- swapMVar (currentStatus ses) (nextStatus (Just event))
+  when (needNotify (Just event) (Just prevStatus) == Just True) $ do
+    announceAll mgr ses (Just event)
 
 -- TODO fork thread for reannounces
 -- |
@@ -221,7 +223,8 @@ announce :: Manager -> Session -> IO ()
 announce mgr ses = announceAll mgr ses Nothing
 
 -- TODO run announce if sesion have no peers
--- | This function /may/ block. Use async if needed.
+-- | The returned list of peers can have duplicates.
+--   This function /may/ block. Use async if needed.
 askPeers :: Manager -> Session -> IO [PeerAddr IP]
 askPeers mgr ses = do
   list    <- readMVar (trackers ses)
