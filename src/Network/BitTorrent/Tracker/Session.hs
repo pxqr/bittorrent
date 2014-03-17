@@ -59,26 +59,30 @@ data LastScrape = LastScrape
   , seedersCount  :: Maybe Int
   } deriving (Show, Eq)
 
+-- | Tracker session starts with scrape unknown.
 instance Default LastScrape where
   def = LastScrape Nothing Nothing
 
-
+-- | Status of this client.
 data Status
-  = Running
-  | Paused
-    deriving (Show, Eq)
+  = Running -- ^ This client is announced and listenning for incoming
+            -- connections.
+  | Paused  -- ^ This client does not expecting incoming connections.
+    deriving (Show, Eq, Bounded, Enum)
 
+-- | Client starting in the paused state.
 instance Default Status where
   def = Paused
 
+-- | Client status after event announce succeed.
 nextStatus :: Maybe Event -> Status
 nextStatus Nothing          = Running
 nextStatus (Just Started  ) = Running
 nextStatus (Just Stopped  ) = Paused
 nextStatus (Just Completed) = Running
 
+-- | Do we need to notify this /specific/ tracker?
 needNotify :: Maybe Event -> Maybe Status -> Bool
--- we always send _regular_ announce requests (for e.g. to get more peers);
 needNotify  Nothing          _             = True
 needNotify (Just Started)    Nothing       = True
 needNotify (Just Stopped)    Nothing       = False
@@ -102,10 +106,10 @@ data TrackerEntry = TrackerEntry
     -- | Used to notify 'Stopped' and 'Completed' events.
   , statusSent    :: !(Maybe Status)
 
-    -- |
+    -- | Can be used to retrieve peer set.
   , peersCache    :: Cached [PeerAddr IP]
 
-    -- | May be used to show brief swarm stats in client GUI.
+    -- | Cay be used to show brief swarm stats in client GUI.
   , scrapeCache   :: Cached LastScrape
   }
 
@@ -118,12 +122,21 @@ nullEntry uri = TrackerEntry uri Nothing def def
 
 -- | Multitracker session.
 data Session = Session
-  { infohash  :: !InfoHash
+  { -- | Infohash to announce at each 'announce' request.
+    infohash  :: !InfoHash
+
+    -- | Status of this client is used to filter duplicated
+    -- notifications, for e.g. we don't want to notify a tracker with
+    -- ['Stopped', 'Stopped'], the last should be ignored.
   , currentStatus :: !(MVar Status)
+
+    -- | A set of single-tracker sessions. Any request to a tracker
+    -- must take a lock.
   , trackers  :: !(MVar (TrackerList TrackerEntry))
   }
 
--- Just Started
+-- | Create a new multitracker session in paused state. To start
+-- announcing client presence use 'notify'.
 newSession :: InfoHash -> TrackerList URI -> IO Session
 newSession ih origUris = do
   uris    <- shuffleTiers origUris
@@ -131,7 +144,7 @@ newSession ih origUris = do
   entries <- newMVar (fmap nullEntry uris)
   return (Session ih status entries)
 
--- Just Stopped
+-- | Release scarce resources associated with the given session.
 closeSession :: Session -> IO ()
 closeSession _ = return ()
 
