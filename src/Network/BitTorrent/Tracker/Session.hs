@@ -51,17 +51,8 @@ import Network.BitTorrent.Tracker.Message
 import Network.BitTorrent.Tracker.RPC as RPC
 
 {-----------------------------------------------------------------------
---  Tracker entry
+--  Single tracker session
 -----------------------------------------------------------------------}
-
-data LastScrape = LastScrape
-  { leechersCount :: Maybe Int
-  , seedersCount  :: Maybe Int
-  } deriving (Show, Eq)
-
--- | Tracker session starts with scrape unknown.
-instance Default LastScrape where
-  def = LastScrape Nothing Nothing
 
 -- | Status of this client.
 data Status
@@ -74,29 +65,14 @@ data Status
 instance Default Status where
   def = Paused
 
--- | Client status after event announce succeed.
-nextStatus :: Maybe Event -> Status
-nextStatus Nothing          = Running
-nextStatus (Just Started  ) = Running
-nextStatus (Just Stopped  ) = Paused
-nextStatus (Just Completed) = Running
+-- | Tracker session starts with scrape unknown.
+instance Default LastScrape where
+  def = LastScrape Nothing Nothing
 
--- | Do we need to notify this /specific/ tracker?
-needNotify :: Maybe Event -> Maybe Status -> Bool
-needNotify  Nothing          _             = True
-needNotify (Just Started)    Nothing       = True
-needNotify (Just Stopped)    Nothing       = False
-needNotify (Just Completed)  Nothing       = False
-needNotify  Nothing         (Just Running) = True
-needNotify  Nothing         (Just Paused ) = True
-
--- | Do we need to sent this event to a first working tracker or to
--- the all known good trackers?
-allNotify :: Maybe Event -> Bool
-allNotify  Nothing         = False
-allNotify (Just Started)   = False
-allNotify (Just Stopped)   = True
-allNotify (Just Completed) = True
+data LastScrape = LastScrape
+  { leechersCount :: Maybe Int
+  , seedersCount  :: Maybe Int
+  } deriving (Show, Eq)
 
 -- | Single tracker session.
 data TrackerEntry = TrackerEntry
@@ -113,8 +89,54 @@ data TrackerEntry = TrackerEntry
   , scrapeCache   :: Cached LastScrape
   }
 
+-- | Single tracker session with empty state.
 nullEntry :: URI -> TrackerEntry
 nullEntry uri = TrackerEntry uri Nothing def def
+
+-- | Do we need to notify this /specific/ tracker?
+needNotify :: Maybe Event -> Maybe Status -> Bool
+needNotify  Nothing          _             = True
+needNotify (Just Started)    Nothing       = True
+needNotify (Just Stopped)    Nothing       = False
+needNotify (Just Completed)  Nothing       = False
+needNotify  Nothing         (Just Running) = True
+needNotify  Nothing         (Just Paused ) = True
+
+-- | Client status after event announce succeed.
+nextStatus :: Maybe Event -> Status
+nextStatus Nothing          = Running
+nextStatus (Just Started  ) = Running
+nextStatus (Just Stopped  ) = Paused
+nextStatus (Just Completed) = Running
+
+seconds :: Int -> NominalDiffTime
+seconds n = realToFrac (toEnum n :: Uni)
+
+cachePeers :: AnnounceInfo -> IO (Cached [PeerAddr IP])
+cachePeers AnnounceInfo {..} =
+  newCached (seconds respInterval)
+            (seconds (fromMaybe respInterval respMinInterval))
+            (getPeerList respPeers)
+
+cacheScrape :: AnnounceInfo -> IO (Cached LastScrape)
+cacheScrape AnnounceInfo {..} =
+  newCached (seconds respInterval)
+            (seconds (fromMaybe respInterval respMinInterval))
+    LastScrape
+      { seedersCount  = respComplete
+      , leechersCount = respIncomplete
+      }
+
+-- | Make announce request to specific tracker returning new state.
+announceTo :: Manager -> InfoHash -> Maybe Event
+           -> TrackerEntry -> IO TrackerEntry
+announceTo mgr ih mevent entry @ TrackerEntry {..}
+  | mevent `needNotify` statusSent = do
+    let q = SAnnounceQuery ih def Nothing mevent
+    res <- RPC.announce mgr trackerURI q
+    TrackerEntry trackerURI (Just (nextStatus mevent))
+      <$> cachePeers res <*> cacheScrape res
+  | otherwise = return entry
 
 {-----------------------------------------------------------------------
 --  Multitracker Session
@@ -157,41 +179,24 @@ withSession ih uris = bracket (newSession ih uris) closeSession
 getStatus :: Session -> IO Status
 getStatus Session {..} = takeMVar currentStatus
 
-seconds :: Int -> NominalDiffTime
-seconds n = realToFrac (toEnum n :: Uni)
-
-cachePeers :: AnnounceInfo -> IO (Cached [PeerAddr IP])
-cachePeers AnnounceInfo {..} =
-  newCached (seconds respInterval)
-            (seconds (fromMaybe respInterval respMinInterval))
-            (getPeerList respPeers)
-
-cacheScrape :: AnnounceInfo -> IO (Cached LastScrape)
-cacheScrape AnnounceInfo {..} =
-  newCached (seconds respInterval)
-            (seconds (fromMaybe respInterval respMinInterval))
-    LastScrape
-      { seedersCount  = respComplete
-      , leechersCount = respIncomplete
-      }
+-- | Do we need to sent this event to a first working tracker or to
+-- the all known good trackers?
+allNotify :: Maybe Event -> Bool
+allNotify  Nothing         = False
+allNotify (Just Started)   = False
+allNotify (Just Stopped)   = True
+allNotify (Just Completed) = True
 
 announceAll :: Manager -> Session -> Maybe Event -> IO ()
 announceAll mgr Session {..} mevent = do
-    modifyMVar_ trackers (traversal announceTo)
+    modifyMVar_ trackers (traversal (announceTo mgr infohash mevent))
   where
     traversal
       | allNotify mevent = traverseAll
       |    otherwise     = traverseTiers
 
-    announceTo entry @ TrackerEntry {..}
-      | mevent `needNotify` statusSent = do
-        let q = SAnnounceQuery infohash def Nothing mevent
-        res <- RPC.announce mgr trackerURI q
-        TrackerEntry trackerURI (Just (nextStatus mevent))
-                     <$> cachePeers res <*> cacheScrape res
-      | otherwise = return entry
-
 -- TODO send notifications to tracker periodically.
+-- TODO change 'currentStatus'
 -- |
 --
 -- This function /may/ block until tracker query proceed.
