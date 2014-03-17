@@ -94,13 +94,21 @@ nullEntry :: URI -> TrackerEntry
 nullEntry uri = TrackerEntry uri Nothing def def
 
 -- | Do we need to notify this /specific/ tracker?
-needNotify :: Maybe Event -> Maybe Status -> Bool
-needNotify  Nothing          _             = True
-needNotify (Just Started)    Nothing       = True
-needNotify (Just Stopped)    Nothing       = False
-needNotify (Just Completed)  Nothing       = False
-needNotify  Nothing         (Just Running) = True
-needNotify  Nothing         (Just Paused ) = True
+needNotify :: Maybe Event -> Maybe Status -> Maybe Bool
+needNotify  Nothing          Nothing       = Just True
+needNotify (Just Started)    Nothing       = Just True
+needNotify (Just Stopped)    Nothing       = Just False
+needNotify (Just Completed)  Nothing       = Just False
+
+needNotify  Nothing         (Just Running) = Nothing
+needNotify (Just Started)   (Just Running) = Nothing
+needNotify (Just Stopped)   (Just Running) = Just True
+needNotify (Just Completed) (Just Running) = Just True
+
+needNotify  Nothing         (Just Paused ) = Just False
+needNotify (Just Started)   (Just Paused ) = Just True
+needNotify (Just Stopped)   (Just Paused ) = Just False
+needNotify (Just Completed) (Just Paused ) = Just True
 
 -- | Client status after event announce succeed.
 nextStatus :: Maybe Event -> Status
@@ -130,13 +138,16 @@ cacheScrape AnnounceInfo {..} =
 -- | Make announce request to specific tracker returning new state.
 announceTo :: Manager -> InfoHash -> Maybe Event
            -> TrackerEntry -> IO TrackerEntry
-announceTo mgr ih mevent entry @ TrackerEntry {..}
-  | mevent `needNotify` statusSent = do
-    let q = SAnnounceQuery ih def Nothing mevent
-    res <- RPC.announce mgr trackerURI q
-    TrackerEntry trackerURI (Just (nextStatus mevent))
-      <$> cachePeers res <*> cacheScrape res
-  | otherwise = return entry
+announceTo mgr ih mevent entry @ TrackerEntry {..} = do
+  let shouldNotify = needNotify mevent statusSent
+  mustNotify <- maybe (isExpired peersCache) return shouldNotify
+  if not mustNotify
+    then return entry
+    else do
+      let q = SAnnounceQuery ih def Nothing mevent
+      res <- RPC.announce mgr trackerURI q
+      TrackerEntry trackerURI (Just (nextStatus mevent))
+        <$> cachePeers res <*> cacheScrape res
 
 {-----------------------------------------------------------------------
 --  Multitracker Session
