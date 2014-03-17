@@ -168,8 +168,9 @@ data Session = Session
   , trackers  :: !(MVar (TrackerList TrackerEntry))
   }
 
--- | Create a new multitracker session in paused state. To start
--- announcing client presence use 'notify'.
+-- | Create a new multitracker session in paused state. Tracker list
+-- must contant only /trusted/ tracker uris. To start announcing
+-- client presence use 'notify'.
 newSession :: InfoHash -> TrackerList URI -> IO Session
 newSession ih origUris = do
   uris    <- shuffleTiers origUris
