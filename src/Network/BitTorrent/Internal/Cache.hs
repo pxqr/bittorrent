@@ -7,7 +7,7 @@
 --
 --   Cached data for tracker responses.
 --
-module Network.BitTorrent.Tracker.Cache
+module Network.BitTorrent.Internal.Cache
        ( -- * Cache
          Cached
        , lastUpdated

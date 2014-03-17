@@ -45,7 +45,7 @@ import Network.URI
 
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
-import Network.BitTorrent.Tracker.Cache
+import Network.BitTorrent.Internal.Cache
 import Network.BitTorrent.Tracker.List
 import Network.BitTorrent.Tracker.Message
 import Network.BitTorrent.Tracker.RPC as RPC

@@ -1,4 +1,4 @@
-module Network.BitTorrent.Tracker.CacheSpec (spec) where
+module Network.BitTorrent.Internal.CacheSpec (spec) where
 import Test.Hspec
 
 spec :: Spec

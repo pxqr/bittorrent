@@ -79,8 +79,8 @@ library
                        Network.BitTorrent.Exchange.Session
                        Network.BitTorrent.Exchange.Session.Metadata
                        Network.BitTorrent.Exchange.Session.Status
+                       Network.BitTorrent.Internal.Cache
                        Network.BitTorrent.Tracker
-                       Network.BitTorrent.Tracker.Cache
                        Network.BitTorrent.Tracker.List
                        Network.BitTorrent.Tracker.Message
                        Network.BitTorrent.Tracker.RPC
@@ -201,8 +201,8 @@ test-suite spec
                        Network.BitTorrent.DHT.RoutingSpec
                        Network.BitTorrent.DHT.SessionSpec
                        Network.BitTorrent.DHT.TokenSpec
+                       Network.BitTorrent.Internal.CacheSpec
                        Network.BitTorrent.Tracker.TestData
-                       Network.BitTorrent.Tracker.CacheSpec
                        Network.BitTorrent.Tracker.ListSpec
                        Network.BitTorrent.Tracker.MessageSpec
                        Network.BitTorrent.Tracker.RPCSpec
