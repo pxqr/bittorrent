@@ -12,21 +12,28 @@ module Network.BitTorrent.Tracker.Session
          Session
        , newSession
        , closeSession
+       , withSession
 
-         -- * Trackers
-       , notify
+         -- * Query
+       , Status (..)
+       , getStatus
        , askPeers
+
+         -- * Events
+       , Event (..)
+       , notify
 
          -- * Tracker Exchange
          -- | BEP28: <http://www.bittorrent.org/beps/bep_0028.html>
        , addTracker
        , removeTracker
-       , getTrackers
        , getTrustedTrackers
        ) where
 
 import Control.Applicative
+import Control.Exception
 import Control.Concurrent
+
 import Data.Default
 import Data.Fixed
 import Data.Foldable
@@ -127,6 +134,15 @@ newSession ih origUris = do
 -- Just Stopped
 closeSession :: Session -> IO ()
 closeSession _ = return ()
+
+-- | Normally you need to use 'Control.Monad.Trans.Resource.alloc'.
+withSession :: InfoHash -> TrackerList URI -> (Session -> IO ()) -> IO ()
+withSession ih uris = bracket (newSession ih uris) closeSession
+
+-- | Get last announced status. The only action can alter this status
+-- is 'notify'.
+getStatus :: Session -> IO Status
+getStatus Session {..} = takeMVar currentStatus
 
 seconds :: Int -> NominalDiffTime
 seconds n = realToFrac (toEnum n :: Uni)
