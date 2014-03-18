@@ -1,4 +1,5 @@
 module Network.BitTorrent.Tracker.SessionSpec (spec) where
+import Control.Monad
 import Data.Default
 import Data.List as L
 import Test.Hspec
@@ -11,24 +12,28 @@ import Network.BitTorrent.Tracker.Session
 
 import Config
 
-testSession :: (Manager -> Session -> IO ()) -> IO ()
-testSession action = do
+testSession :: Bool -> (Manager -> Session -> IO ()) -> IO ()
+testSession runEmpty action = do
   t <- getTestTorrent
-  withManager def def $ \ m ->
+  withManager def def $ \ m -> do
     withSession (idInfoHash (tInfoDict t)) (trackerList t) $ \ s ->
       action m s
+
+    when runEmpty $ do
+      withSession (idInfoHash (tInfoDict t)) def $ \ s ->
+        action m s
 
 spec :: Spec
 spec = do
   describe "Session" $ do
     it "start new session in paused state" $ do
-      testSession $ \ _ s -> do
+      testSession True $ \ _ s -> do
         status <- getStatus s
         status `shouldBe` Paused
 
   describe "Query" $ do
     it "change status after notify" $ do
-      testSession $ \ m s -> do
+      testSession True $ \ m s -> do
         notify m s Started
         status <- getStatus s
         status `shouldBe` Running
@@ -38,7 +43,7 @@ spec = do
         stopped `shouldBe` Paused
 
     it "return non-empty list of peers" $ do
-      testSession $ \ m s -> do
+      testSession False $ \ m s -> do
         notify m s Started
         peers <- askPeers m s
         peers `shouldSatisfy` (not . L.null)
