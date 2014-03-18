@@ -22,6 +22,7 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Trans
+import Data.Default
 import Data.List as L
 import Data.HashMap.Strict as HM
 
@@ -89,7 +90,18 @@ openTorrent rootPath t @ Torrent {..} = do
 
 -- | Use 'nullMagnet' to open handle from 'InfoHash'.
 openMagnet :: FilePath -> Magnet -> BitTorrent Handle
-openMagnet rootPath uri @ Magnet {..} = error "openMagnet: not implemnted"
+openMagnet rootPath uri @ Magnet {..} = do
+  allocHandle exactTopic $ do
+    c @ Client {..} <- getClient
+    tses <- liftIO $ Tracker.newSession exactTopic def
+    eses <- liftIO $ Exchange.newSession clientLogger (externalAddr c)
+                     rootPath (error "openMagnet" exactTopic)
+    return $ Handle
+      { topic    = exactTopic
+      , private  = False
+      , trackers = tses
+      , exchange = eses
+      }
 
 -- | Stop torrent and destroy all sessions. You don't need to close
 -- handles at application exit, all handles will be automatically
