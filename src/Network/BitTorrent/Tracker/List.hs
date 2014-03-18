@@ -9,6 +9,7 @@
 --
 --   For more info see: <http://www.bittorrent.org/beps/bep_0012.html>
 --
+{-# LANGUAGE FlexibleInstances #-}
 module Network.BitTorrent.Tracker.List
        ( -- * Tracker list
          TrackerList
@@ -25,6 +26,7 @@ module Network.BitTorrent.Tracker.List
 import Prelude hiding (mapM, foldr)
 import Control.Applicative
 import Control.Exception
+import Data.Default
 import Data.List as L (elem, any, filter, null)
 import Data.Maybe
 import Data.Foldable
@@ -48,6 +50,10 @@ data TrackerList a
   = Announce a           -- ^ torrent file 'announce'      field only
   | TierList [Tier a]    -- ^ torrent file 'announce-list' field only
     deriving (Show, Eq)
+
+-- | Empty tracker list. Can be used for trackerless torrents.
+instance Default (TrackerList URI) where
+  def = TierList []
 
 instance Functor TrackerList where
   fmap f (Announce a) = Announce (f a)
