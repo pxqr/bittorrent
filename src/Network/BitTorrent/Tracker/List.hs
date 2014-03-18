@@ -135,11 +135,14 @@ traverseAll action = traverse (action $?)
 
 -- | Like 'traverse' but put working trackers to the head of tiers.
 -- This can help to avoid exceessive requests to not available
--- trackers at each reannounce.
+-- trackers at each reannounce. If no one action succeed then original
+-- list is returned.
 traverseTiers :: (a -> IO a) -> TrackerList a -> IO (TrackerList a)
-traverseTiers action (Announce a)     = Announce <$> action a
-traverseTiers action (TierList tiers) = TierList <$> goTiers (goTier []) tiers
+traverseTiers action ts = catchRPC (goList ts) (return ts)
   where
+    goList (Announce a)     = Announce <$> action a
+    goList (TierList tiers) = TierList <$> goTiers (goTier []) tiers
+
     goTiers _ []       = throwRPC "traverseTiers: no tiers"
     goTiers f (x : xs) = catchRPC shortcut failback
       where
