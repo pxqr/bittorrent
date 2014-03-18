@@ -94,28 +94,22 @@ nullEntry :: URI -> TrackerEntry
 nullEntry uri = TrackerEntry uri Nothing def def
 
 -- | Do we need to notify this /specific/ tracker?
-needNotify :: Maybe Event -> Maybe Status -> Maybe Bool
-needNotify  Nothing          Nothing       = Just True
-needNotify (Just Started)    Nothing       = Just True
-needNotify (Just Stopped)    Nothing       = Just False
-needNotify (Just Completed)  Nothing       = Just False
-
-needNotify  Nothing         (Just Running) = Nothing
-needNotify (Just Started)   (Just Running) = Nothing
-needNotify (Just Stopped)   (Just Running) = Just True
-needNotify (Just Completed) (Just Running) = Just True
-
-needNotify  Nothing         (Just Paused ) = Just False
-needNotify (Just Started)   (Just Paused ) = Just True
-needNotify (Just Stopped)   (Just Paused ) = Just False
-needNotify (Just Completed) (Just Paused ) = Just True
+needNotify :: Event -> Maybe Status -> Maybe Bool
+needNotify Started    Nothing       = Just True
+needNotify Stopped    Nothing       = Just False
+needNotify Completed  Nothing       = Just False
+needNotify Started   (Just Running) = Nothing
+needNotify Stopped   (Just Running) = Just True
+needNotify Completed (Just Running) = Just True
+needNotify Started   (Just Paused ) = Just True
+needNotify Stopped   (Just Paused ) = Just False
+needNotify Completed (Just Paused ) = Just True
 
 -- | Client status after event announce succeed.
-nextStatus :: Maybe Event -> Status
-nextStatus Nothing          = Running
-nextStatus (Just Started  ) = Running
-nextStatus (Just Stopped  ) = Paused
-nextStatus (Just Completed) = Running
+nextStatus :: Event -> Status
+nextStatus Started   = Running
+nextStatus Stopped   = Paused
+nextStatus Completed = Running
 
 seconds :: Int -> NominalDiffTime
 seconds n = realToFrac (toEnum n :: Uni)
@@ -136,17 +130,18 @@ cacheScrape AnnounceInfo {..} =
       }
 
 -- | Make announce request to specific tracker returning new state.
-announceTo :: Manager -> InfoHash -> Maybe Event
+notifyTo :: Manager -> InfoHash -> Event
            -> TrackerEntry -> IO TrackerEntry
-announceTo mgr ih mevent entry @ TrackerEntry {..} = do
-  let shouldNotify = needNotify mevent statusSent
+notifyTo mgr ih event entry @ TrackerEntry {..} = do
+
+  let shouldNotify = needNotify event statusSent
   mustNotify <- maybe (isExpired peersCache) return shouldNotify
   if not mustNotify
     then return entry
     else do
-      let q = SAnnounceQuery ih def Nothing mevent
+      let q = SAnnounceQuery ih def Nothing (Just event)
       res <- RPC.announce mgr trackerURI q
-      TrackerEntry trackerURI (Just (nextStatus mevent))
+      TrackerEntry trackerURI (Just (nextStatus event))
         <$> cachePeers res <*> cacheScrape res
 
 {-----------------------------------------------------------------------
@@ -193,18 +188,17 @@ getStatus Session {..} = readMVar currentStatus
 
 -- | Do we need to sent this event to a first working tracker or to
 -- the all known good trackers?
-allNotify :: Maybe Event -> Bool
-allNotify  Nothing         = False
-allNotify (Just Started)   = False
-allNotify (Just Stopped)   = True
-allNotify (Just Completed) = True
+allNotify :: Event -> Bool
+allNotify Started   = False
+allNotify Stopped   = True
+allNotify Completed = True
 
-announceAll :: Manager -> Session -> Maybe Event -> IO ()
-announceAll mgr Session {..} mevent = do
-    modifyMVar_ trackers (traversal (announceTo mgr infohash mevent))
+notifyAll :: Manager -> Session -> Event -> IO ()
+notifyAll mgr Session {..} event = do
+    modifyMVar_ trackers (traversal (notifyTo mgr infohash event))
   where
     traversal
-      | allNotify mevent = traverseAll
+      | allNotify event = traverseAll
       |    otherwise     = traverseTiers
 
 -- TODO send notifications to tracker periodically.
@@ -213,14 +207,9 @@ announceAll mgr Session {..} mevent = do
 -- This function /may/ block until tracker query proceed.
 notify :: Manager -> Session -> Event -> IO ()
 notify mgr ses event = do
-  prevStatus <- swapMVar (currentStatus ses) (nextStatus (Just event))
-  when (needNotify (Just event) (Just prevStatus) == Just True) $ do
-    announceAll mgr ses (Just event)
-
--- TODO fork thread for reannounces
--- |
-announce :: Manager -> Session -> IO ()
-announce mgr ses = announceAll mgr ses Nothing
+  prevStatus <- swapMVar (currentStatus ses) (nextStatus event)
+  when (needNotify event (Just prevStatus) == Just True) $ do
+    notifyAll mgr ses event
 
 -- TODO run announce if sesion have no peers
 -- | The returned list of peers can have duplicates.
