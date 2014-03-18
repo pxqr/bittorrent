@@ -110,3 +110,4 @@ runBitTorrent client action = runReaderT (unBitTorrent action) client
 
 getClient :: BitTorrent Client
 getClient = BitTorrent ask
+{-# INLINE getClient #-}
