@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Network.BitTorrent.Client.Types
        ( -- * Core types
@@ -81,6 +82,9 @@ class MonadBitTorrent m where
 -- | NOP.
 instance MonadBitTorrent BitTorrent where
   liftBT = id
+
+instance MonadTrans t => MonadBitTorrent (t BitTorrent) where
+  liftBT = lift
 
 -- | Registered but not closed manually resources will be
 -- automatically closed at 'Network.BitTorrent.Client.closeClient'
