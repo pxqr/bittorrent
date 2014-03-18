@@ -154,16 +154,16 @@ notifyTo mgr ih event entry @ TrackerEntry {..} = do
 -- | Multitracker session.
 data Session = Session
   { -- | Infohash to announce at each 'announce' request.
-    infohash  :: !InfoHash
+    sessionTopic    :: !InfoHash
 
-    -- | Status of this client is used to filter duplicated
+    -- | Current status of this client is used to filter duplicated
     -- notifications, for e.g. we don't want to notify a tracker with
     -- ['Stopped', 'Stopped'], the last should be ignored.
-  , currentStatus :: !(IORef Status)
+  , sessionStatus   :: !(IORef Status)
 
     -- | A set of single-tracker sessions. Any request to a tracker
     -- must take a lock.
-  , trackers  :: !(MVar (TrackerList TrackerEntry))
+  , sessionTrackers :: !(MVar (TrackerList TrackerEntry))
   }
 
 -- | Create a new multitracker session in paused state. Tracker list
@@ -171,10 +171,14 @@ data Session = Session
 -- client presence use 'notify'.
 newSession :: InfoHash -> TrackerList URI -> IO Session
 newSession ih origUris = do
-  uris    <- shuffleTiers origUris
-  status  <- newIORef def
-  entries <- newMVar (fmap nullEntry uris)
-  return (Session ih status entries)
+  urisList   <- shuffleTiers origUris
+  statusRef  <- newIORef def
+  entriesVar <- newMVar (fmap nullEntry urisList)
+  return Session
+    { sessionTopic    = ih
+    , sessionStatus   = statusRef
+    , sessionTrackers = entriesVar
+    }
 
 -- | Release scarce resources associated with the given session.
 closeSession :: Session -> IO ()
@@ -187,7 +191,7 @@ withSession ih uris = bracket (newSession ih uris) closeSession
 -- | Get last announced status. The only action can alter this status
 -- is 'notify'.
 getStatus :: Session -> IO Status
-getStatus Session {..} = readIORef currentStatus
+getStatus Session {..} = readIORef sessionStatus
 
 -- | Do we need to sent this event to a first working tracker or to
 -- the all known good trackers?
@@ -198,7 +202,8 @@ allNotify Completed = True
 
 notifyAll :: Manager -> Session -> Event -> IO ()
 notifyAll mgr Session {..} event = do
-    modifyMVar_ trackers (traversal (notifyTo mgr infohash event))
+    modifyMVar_ sessionTrackers $
+      (traversal (notifyTo mgr sessionTopic event))
   where
     traversal
       | allNotify event = traverseAll
@@ -210,7 +215,7 @@ notifyAll mgr Session {..} event = do
 -- This function /may/ block until tracker query proceed.
 notify :: Manager -> Session -> Event -> IO ()
 notify mgr ses event = do
-  prevStatus <- atomicModifyIORef (currentStatus ses) $ \ s ->
+  prevStatus <- atomicModifyIORef (sessionStatus ses) $ \ s ->
                   (fromMaybe s (nextStatus event), s)
   when (needNotify event (Just prevStatus) == Just True) $ do
     notifyAll mgr ses event
@@ -219,8 +224,8 @@ notify mgr ses event = do
 -- | The returned list of peers can have duplicates.
 --   This function /may/ block. Use async if needed.
 askPeers :: Manager -> Session -> IO [PeerAddr IP]
-askPeers mgr ses = do
-  list    <- readMVar (trackers ses)
+askPeers _mgr ses = do
+  list    <- readMVar (sessionTrackers ses)
   L.concat <$> collect (tryTakeData . peersCache) list
 
 collect :: (a -> IO (Maybe b)) -> TrackerList a -> IO [b]
