@@ -37,6 +37,7 @@ import Control.Monad
 import Data.Default
 import Data.Fixed
 import Data.Foldable
+import Data.IORef
 import Data.List as L
 import Data.Maybe
 import Data.Time
@@ -158,7 +159,7 @@ data Session = Session
     -- | Status of this client is used to filter duplicated
     -- notifications, for e.g. we don't want to notify a tracker with
     -- ['Stopped', 'Stopped'], the last should be ignored.
-  , currentStatus :: !(MVar Status)
+  , currentStatus :: !(IORef Status)
 
     -- | A set of single-tracker sessions. Any request to a tracker
     -- must take a lock.
@@ -171,7 +172,7 @@ data Session = Session
 newSession :: InfoHash -> TrackerList URI -> IO Session
 newSession ih origUris = do
   uris    <- shuffleTiers origUris
-  status  <- newMVar def
+  status  <- newIORef def
   entries <- newMVar (fmap nullEntry uris)
   return (Session ih status entries)
 
@@ -186,7 +187,7 @@ withSession ih uris = bracket (newSession ih uris) closeSession
 -- | Get last announced status. The only action can alter this status
 -- is 'notify'.
 getStatus :: Session -> IO Status
-getStatus Session {..} = readMVar currentStatus
+getStatus Session {..} = readIORef currentStatus
 
 -- | Do we need to sent this event to a first working tracker or to
 -- the all known good trackers?
@@ -209,8 +210,8 @@ notifyAll mgr Session {..} event = do
 -- This function /may/ block until tracker query proceed.
 notify :: Manager -> Session -> Event -> IO ()
 notify mgr ses event = do
-  prevStatus <- modifyMVar (currentStatus ses) $ \ s ->
-    return (fromMaybe s (nextStatus event), s)
+  prevStatus <- atomicModifyIORef (currentStatus ses) $ \ s ->
+                  (fromMaybe s (nextStatus event), s)
   when (needNotify event (Just prevStatus) == Just True) $ do
     notifyAll mgr ses event
 
