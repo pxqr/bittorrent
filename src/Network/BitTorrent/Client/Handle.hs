@@ -78,9 +78,14 @@ openTorrent rootPath t @ Torrent {..} = do
   allocHandle ih $ do
     c @ Client {..} <- getClient
     tses <- liftIO $ Tracker.newSession ih (trackerList t)
-    eses <- liftIO $ Exchange.newSession clientLogger (externalAddr c) rootPath
-                                         tInfoDict
-    return $ Handle ih (idPrivate tInfoDict) tses eses
+    eses <- liftIO $ Exchange.newSession clientLogger (externalAddr c)
+                       rootPath tInfoDict
+    return $ Handle
+      { topic    = ih
+      , private  = idPrivate tInfoDict
+      , trackers = tses
+      , exchange = eses
+      }
 
 -- | Use 'nullMagnet' to open handle from 'InfoHash'.
 openMagnet :: FilePath -> Magnet -> BitTorrent Handle
