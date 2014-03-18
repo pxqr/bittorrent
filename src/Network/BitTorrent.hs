@@ -36,8 +36,11 @@ module Network.BitTorrent
        , Torrent
 
          -- ** Handle
+       , Handle
+       , topic
        , TorrentSource(openHandle)
        , closeHandle
+       , getIndex
 
          -- ** Control
        , start

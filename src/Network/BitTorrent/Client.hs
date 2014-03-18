@@ -27,14 +27,18 @@ module Network.BitTorrent.Client
        , getClient
 
          -- * Handle
+       , Handle
+       , topic
        , TorrentSource (..)
        , closeHandle
+       , getIndex
 
        , start
        , pause
        , stop
        ) where
 
+import Control.Applicative
 import Control.Exception
 import Control.Concurrent
 import Control.Monad.Logger
@@ -173,3 +177,8 @@ instance TorrentSource FilePath where
     t <- liftIO $ fromFile torrentPath
     openTorrent contentDir t
   {-# INLINE openHandle #-}
+
+getIndex :: BitTorrent [Handle]
+getIndex = do
+  Client {..} <- getClient
+  elems <$> liftIO (readMVar clientTorrents)
