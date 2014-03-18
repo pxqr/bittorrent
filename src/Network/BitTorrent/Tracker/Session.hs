@@ -106,10 +106,10 @@ needNotify Stopped   (Just Paused ) = Just False
 needNotify Completed (Just Paused ) = Just True
 
 -- | Client status after event announce succeed.
-nextStatus :: Event -> Status
-nextStatus Started   = Running
-nextStatus Stopped   = Paused
-nextStatus Completed = Running
+nextStatus :: Event -> Maybe Status
+nextStatus Started   = Just Running
+nextStatus Stopped   = Just Paused
+nextStatus Completed = Nothing -- must keep previous status
 
 seconds :: Int -> NominalDiffTime
 seconds n = realToFrac (toEnum n :: Uni)
@@ -141,8 +141,10 @@ notifyTo mgr ih event entry @ TrackerEntry {..} = do
     else do
       let q = SAnnounceQuery ih def Nothing (Just event)
       res <- RPC.announce mgr trackerURI q
-      TrackerEntry trackerURI (Just (nextStatus event))
-        <$> cachePeers res <*> cacheScrape res
+      let status' = nextStatus event <|> statusSent
+      TrackerEntry trackerURI status'
+        <$> cachePeers res
+        <*> cacheScrape res
 
 {-----------------------------------------------------------------------
 --  Multitracker Session
@@ -207,7 +209,8 @@ notifyAll mgr Session {..} event = do
 -- This function /may/ block until tracker query proceed.
 notify :: Manager -> Session -> Event -> IO ()
 notify mgr ses event = do
-  prevStatus <- swapMVar (currentStatus ses) (nextStatus event)
+  prevStatus <- modifyMVar (currentStatus ses) $ \ s ->
+    return (fromMaybe s (nextStatus event), s)
   when (needNotify event (Just prevStatus) == Just True) $ do
     notifyAll mgr ses event
 

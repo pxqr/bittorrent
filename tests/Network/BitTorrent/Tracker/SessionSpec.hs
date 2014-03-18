@@ -42,6 +42,18 @@ spec = do
         stopped <- getStatus s
         stopped `shouldBe` Paused
 
+    it "completed event do not change status" $ do
+      testSession True $ \ m s -> do
+        notify m s Completed
+        status <- getStatus s
+        status `shouldBe` Paused
+
+      testSession True $ \ m s -> do
+        notify m s Started
+        notify m s Completed
+        status <- getStatus s
+        status `shouldBe` Running
+
     it "return non-empty list of peers" $ do
       testSession False $ \ m s -> do
         notify m s Started
