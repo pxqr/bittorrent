@@ -25,15 +25,24 @@ module Network.BitTorrent.Tracker
        , newSession
        , closeSession
 
-         -- * Events
+         -- ** Events
        , Event (..)
        , notify
        , askPeers
 
-         -- * Query
---       , getSessionState
+         -- ** Session state
+       , TrackerEntry
+       , trackerURI
+       , trackerPeers
+       , trackerScrape
+
+       , tryTakeData
+       , unsafeTryTakeData
+
+       , getSessionState
        ) where
 
+import Network.BitTorrent.Internal.Cache (tryTakeData, unsafeTryTakeData)
 import Network.BitTorrent.Tracker.Message
 import Network.BitTorrent.Tracker.List
 import Network.BitTorrent.Tracker.RPC

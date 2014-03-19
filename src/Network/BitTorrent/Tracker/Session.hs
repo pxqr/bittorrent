@@ -14,14 +14,22 @@ module Network.BitTorrent.Tracker.Session
        , closeSession
        , withSession
 
-         -- * Query
-       , Status (..)
-       , getStatus
-       , askPeers
-
-         -- * Events
+         -- * Client send notifications
        , Event (..)
        , notify
+       , askPeers
+
+         -- * Session state
+         -- ** Status
+       , Status (..)
+       , getStatus
+
+         -- ** Single tracker sessions
+       , TrackerEntry
+       , trackerURI
+       , trackerPeers
+       , trackerScrape
+       , getSessionState
 
          -- * Tracker Exchange
          -- | BEP28: <http://www.bittorrent.org/beps/bep_0028.html>
@@ -36,7 +44,7 @@ import Control.Concurrent
 import Control.Monad
 import Data.Default
 import Data.Fixed
-import Data.Foldable
+import Data.Foldable as F
 import Data.IORef
 import Data.List as L
 import Data.Maybe
@@ -84,10 +92,10 @@ data TrackerEntry = TrackerEntry
   , statusSent    :: !(Maybe Status)
 
     -- | Can be used to retrieve peer set.
-  , peersCache    :: Cached [PeerAddr IP]
+  , trackerPeers  :: Cached [PeerAddr IP]
 
     -- | Can be used to show brief swarm stats in client GUI.
-  , scrapeCache   :: Cached LastScrape
+  , trackerScrape :: Cached LastScrape
   }
 
 -- | Single tracker session with empty state.
@@ -136,7 +144,7 @@ notifyTo :: Manager -> InfoHash -> Event
 notifyTo mgr ih event entry @ TrackerEntry {..} = do
 
   let shouldNotify = needNotify event statusSent
-  mustNotify <- maybe (isExpired peersCache) return shouldNotify
+  mustNotify <- maybe (isExpired trackerPeers) return shouldNotify
   if not mustNotify
     then return entry
     else do
@@ -193,6 +201,9 @@ withSession ih uris = bracket (newSession ih uris) closeSession
 getStatus :: Session -> IO Status
 getStatus Session {..} = readIORef sessionStatus
 
+getSessionState :: Session -> IO (TrackerList TrackerEntry)
+getSessionState Session {..} = readMVar sessionTrackers
+
 -- | Do we need to sent this event to a first working tracker or to
 -- the all known good trackers?
 allNotify :: Event -> Bool
@@ -226,27 +237,13 @@ notify mgr ses event = do
 askPeers :: Manager -> Session -> IO [PeerAddr IP]
 askPeers _mgr ses = do
   list    <- readMVar (sessionTrackers ses)
-  L.concat <$> collect (tryTakeData . peersCache) list
+  L.concat <$> collect (tryTakeData . trackerPeers) list
 
 collect :: (a -> IO (Maybe b)) -> TrackerList a -> IO [b]
 collect f lst =(catMaybes . toList) <$> traverse f lst
 
 --sourcePeers :: Session -> Source (PeerAddr IP)
 --sourcePeers
-
-{-----------------------------------------------------------------------
---  State query
------------------------------------------------------------------------}
-
-data TrackerInfo = TrackerInfo
-  {
-  }
-
---instance ToJSON TrackerInfo where
---  toJSON = undefined
-
---getSessionState :: Session -> IO (TrackerList TrackerInfo)
---getSessionState = undefined
 
 {-----------------------------------------------------------------------
 --  Tracker exchange

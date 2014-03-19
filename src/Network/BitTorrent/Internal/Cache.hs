@@ -27,6 +27,7 @@ module Network.BitTorrent.Internal.Cache
 
          -- * Cached data
        , tryTakeData
+       , unsafeTryTakeData
        , takeData
        ) where
 
@@ -35,6 +36,7 @@ import Data.Monoid
 import Data.Default
 import Data.Time
 import Data.Time.Clock.POSIX
+import System.IO.Unsafe
 
 
 data Cached a = Cached
@@ -142,6 +144,9 @@ tryTakeData :: Cached a -> IO (Maybe a)
 tryTakeData c = do
   alive <- isAlive c
   return $ if alive then Just (cachedData c) else Nothing
+
+unsafeTryTakeData :: Cached a -> Maybe a
+unsafeTryTakeData = unsafePerformIO . tryTakeData
 
 invalidateData :: Cached a -> IO a -> IO (Cached a)
 invalidateData Cached {..} action = do
