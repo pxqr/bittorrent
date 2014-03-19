@@ -7,6 +7,7 @@
 --
 --   Multitracker sessions.
 --
+{-# LANGUAGE TemplateHaskell #-}
 module Network.BitTorrent.Tracker.Session
        ( -- * Session
          Session
@@ -25,6 +26,7 @@ module Network.BitTorrent.Tracker.Session
        , getStatus
 
          -- ** Single tracker sessions
+       , LastScrape (..)
        , TrackerEntry
        , trackerURI
        , trackerPeers
@@ -42,6 +44,8 @@ import Control.Applicative
 import Control.Exception
 import Control.Concurrent
 import Control.Monad
+import Data.Aeson
+import Data.Aeson.TH
 import Data.Default
 import Data.Fixed
 import Data.Foldable as F
@@ -53,6 +57,7 @@ import Data.Traversable
 import Network.URI
 
 import Data.Torrent.InfoHash
+import Data.Torrent.JSON
 import Network.BitTorrent.Core
 import Network.BitTorrent.Internal.Cache
 import Network.BitTorrent.Tracker.List
@@ -79,9 +84,14 @@ instance Default LastScrape where
   def = LastScrape Nothing Nothing
 
 data LastScrape = LastScrape
-  { leechersCount :: Maybe Int
-  , seedersCount  :: Maybe Int
+  { -- | Count of leechers the tracker aware of.
+    scrapeLeechers :: Maybe Int
+
+    -- | Count of seeders the tracker aware of.
+  , scrapeSeeders  :: Maybe Int
   } deriving (Show, Eq)
+
+$(deriveJSON omitRecordPrefix ''LastScrape)
 
 -- | Single tracker session.
 data TrackerEntry = TrackerEntry
@@ -98,7 +108,14 @@ data TrackerEntry = TrackerEntry
   , trackerScrape :: Cached LastScrape
   }
 
--- | Single tracker session with empty state.
+instance ToJSON TrackerEntry where
+  toJSON TrackerEntry {..} = object
+    [ "uri"    .= trackerURI
+    , "peers"  .= trackerPeers
+    , "scrape" .= trackerScrape
+    ]
+
+-- | Single tracker session with empty state.l
 nullEntry :: URI -> TrackerEntry
 nullEntry uri = TrackerEntry uri Nothing def def
 
@@ -134,8 +151,8 @@ cacheScrape AnnounceInfo {..} =
   newCached (seconds respInterval)
             (seconds (fromMaybe respInterval respMinInterval))
     LastScrape
-      { seedersCount  = respComplete
-      , leechersCount = respIncomplete
+      { scrapeSeeders  = respComplete
+      , scrapeLeechers = respIncomplete
       }
 
 -- | Make announce request to specific tracker returning new state.
@@ -218,7 +235,7 @@ notifyAll mgr Session {..} event = do
   where
     traversal
       | allNotify event = traverseAll
-      |    otherwise     = traverseTiers
+      |    otherwise    = traverseTiers
 
 -- TODO send notifications to tracker periodically.
 -- |

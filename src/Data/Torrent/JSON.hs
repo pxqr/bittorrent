@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Data.Torrent.JSON
        ( omitLensPrefix
        , omitRecordPrefix
@@ -9,6 +10,7 @@ import Data.Aeson.Types
 import Data.ByteString as BS
 import Data.ByteString.Base16 as Base16
 import Data.Char
+import Data.IP
 import Data.List as L
 import Data.Text.Encoding as T
 
@@ -44,3 +46,11 @@ instance FromJSON ByteString where
     if BS.null bad
       then return ok
       else fail   "parseJSON: unable to decode ByteString"
+
+instance ToJSON IP where
+  toJSON = toJSON . show
+
+instance FromJSON IP where
+  parseJSON v = do
+    str <- parseJSON v
+    return $ read str

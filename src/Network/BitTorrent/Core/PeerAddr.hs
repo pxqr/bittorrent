@@ -34,6 +34,7 @@ module Network.BitTorrent.Core.PeerAddr
 import Control.Applicative
 import Control.Monad
 import Data.Aeson (ToJSON, FromJSON)
+import Data.Aeson.TH
 import Data.BEncode   as BS
 import Data.BEncode.BDict (BKey)
 import Data.ByteString.Char8 as BS8
@@ -57,6 +58,7 @@ import Text.Read (readMaybe)
 import qualified Text.ParserCombinators.ReadP as RP
 
 import Data.Torrent.InfoHash
+import Data.Torrent.JSON
 import Network.BitTorrent.Core.PeerId
 
 
@@ -205,6 +207,8 @@ data PeerAddr a = PeerAddr
     -- | The port the peer listenning for incoming P2P sessions.
   , peerPort :: {-# UNPACK #-} !PortNumber
   } deriving (Show, Eq, Ord, Typeable, Functor)
+
+$(deriveJSON omitRecordPrefix ''PeerAddr)
 
 peer_ip_key, peer_id_key, peer_port_key :: BKey
 peer_ip_key   = "ip"

@@ -32,6 +32,7 @@ module Network.BitTorrent.Internal.Cache
        ) where
 
 import Control.Applicative
+import Data.Aeson
 import Data.Monoid
 import Data.Default
 import Data.Time
@@ -54,6 +55,19 @@ data Cached a = Cached
   } deriving (Show, Eq)
 
 -- INVARIANT: minUpdateInterval <= updateInterval
+
+-- | TODO exsample
+instance ToJSON a => ToJSON (Cached a) where
+  toJSON Cached {..}
+    | currentTime < expireTime = object
+      [ "observed" .= posixSecondsToUTCTime lastUpdated
+      , "expired"  .= posixSecondsToUTCTime expireTime
+      , "data"     .= cachedData
+      ]
+    | otherwise = String "cached data expired"
+    where
+      expireTime  = currentTime + updateInterval
+      currentTime = unsafePerformIO getPOSIXTime
 
 instance Default (Cached a) where
   def = mempty
