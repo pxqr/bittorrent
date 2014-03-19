@@ -31,6 +31,7 @@ module Network.BitTorrent.Client
        , topic
        , TorrentSource (..)
        , closeHandle
+       , getHandle
        , getIndex
 
        , start

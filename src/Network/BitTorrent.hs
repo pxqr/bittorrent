@@ -40,6 +40,7 @@ module Network.BitTorrent
        , topic
        , TorrentSource(openHandle)
        , closeHandle
+       , getHandle
        , getIndex
 
          -- ** Control
