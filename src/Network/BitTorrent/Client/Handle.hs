@@ -82,10 +82,10 @@ openTorrent rootPath t @ Torrent {..} = do
     eses <- liftIO $ Exchange.newSession clientLogger (externalAddr c)
                        rootPath tInfoDict
     return $ Handle
-      { topic    = ih
-      , private  = idPrivate tInfoDict
-      , trackers = tses
-      , exchange = eses
+      { handleTopic    = ih
+      , handlePrivate  = idPrivate tInfoDict
+      , handleTrackers = tses
+      , handleExchange = eses
       }
 
 -- | Use 'nullMagnet' to open handle from 'InfoHash'.
@@ -97,10 +97,10 @@ openMagnet rootPath uri @ Magnet {..} = do
     eses <- liftIO $ Exchange.newSession clientLogger (externalAddr c)
                      rootPath (error "openMagnet" exactTopic)
     return $ Handle
-      { topic    = exactTopic
-      , private  = False
-      , trackers = tses
-      , exchange = eses
+      { handleTopic    = exactTopic
+      , handlePrivate  = False
+      , handleTrackers = tses
+      , handleExchange = eses
       }
 
 -- | Stop torrent and destroy all sessions. You don't need to close
@@ -109,10 +109,10 @@ openMagnet rootPath uri @ Magnet {..} = do
 -- may block.
 closeHandle :: Handle -> BitTorrent ()
 closeHandle h @ Handle {..} = do
-  freeHandle topic $ do
+  freeHandle handleTopic $ do
     stop h
-    liftIO $ Exchange.closeSession exchange
-    liftIO $ Tracker.closeSession trackers
+    liftIO $ Exchange.closeSession handleExchange
+    liftIO $ Tracker.closeSession handleTrackers
 
 {-----------------------------------------------------------------------
 --  Control
@@ -125,14 +125,14 @@ closeHandle h @ Handle {..} = do
 start :: Handle -> BitTorrent ()
 start Handle {..} = do
   Client {..} <- getClient
-  liftIO $ Tracker.notify trackerManager trackers Tracker.Started
-  unless private $ do
-    liftDHT $ DHT.insert topic (error "start")
+  liftIO $ Tracker.notify trackerManager handleTrackers Tracker.Started
+  unless handlePrivate $ do
+    liftDHT $ DHT.insert handleTopic (error "start")
   liftIO $ do
-    peers <- askPeers trackerManager trackers
+    peers <- askPeers trackerManager handleTrackers
     print $ "got: " ++ show (L.length peers) ++ " peers"
     forM_ peers $ \ peer -> do
-      Exchange.connect peer exchange
+      Exchange.connect peer handleExchange
 
 -- | Stop downloading this torrent.
 pause :: Handle -> BitTorrent ()
@@ -142,9 +142,9 @@ pause _ = return ()
 stop :: Handle -> BitTorrent ()
 stop Handle {..} = do
   Client {..} <- getClient
-  unless private $ do
-    liftDHT $ DHT.delete topic (error "stop")
-  liftIO  $ Tracker.notify trackerManager trackers Tracker.Stopped
+  unless handlePrivate $ do
+    liftDHT $ DHT.delete handleTopic (error "stop")
+  liftIO  $ Tracker.notify trackerManager handleTrackers Tracker.Stopped
 
 {-----------------------------------------------------------------------
 --  Query

@@ -37,7 +37,9 @@ module Network.BitTorrent
 
          -- ** Handle
        , Handle
-       , topic
+       , handleTopic
+       , handleTrackers
+
        , TorrentSource(openHandle)
        , closeHandle
        , getHandle

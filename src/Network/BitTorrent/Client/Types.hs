@@ -32,10 +32,10 @@ import Network.BitTorrent.Exchange as Exchange
 import Network.BitTorrent.Tracker  as Tracker
 
 data Handle = Handle
-  { topic    :: !InfoHash
-  , private  :: !Bool
-  , trackers :: !Tracker.Session
-  , exchange :: !Exchange.Session
+  { handleTopic    :: !InfoHash
+  , handlePrivate  :: !Bool
+  , handleTrackers :: !Tracker.Session
+  , handleExchange :: !Exchange.Session
   }
 
 data Client = Client

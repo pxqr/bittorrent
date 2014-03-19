@@ -28,12 +28,18 @@ module Network.BitTorrent.Client
 
          -- * Handle
        , Handle
-       , topic
+       , handleTopic
+       , handleTrackers
+
+         -- ** Construction
        , TorrentSource (..)
        , closeHandle
+
+         -- ** Query
        , getHandle
        , getIndex
 
+         -- ** Management
        , start
        , pause
        , stop
@@ -93,7 +99,7 @@ connHandler tmap ih = do
   m <- readMVar tmap
   case HM.lookup ih m of
     Nothing            -> error "torrent not found"
-    Just (Handle {..}) -> return exchange
+    Just (Handle {..}) -> return handleExchange
 
 initClient :: Options -> LogFun -> ResIO Client
 initClient opts @ Options {..} logFun = do
