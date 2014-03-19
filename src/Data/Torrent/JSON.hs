@@ -30,7 +30,7 @@ mapWhile p f = go
     go []       = []
     go (x : xs)
       |    p x    = f x : go xs
-      | otherwise = xs
+      | otherwise = x : xs
 
 omitRecordPrefix :: Options
 omitRecordPrefix = omitLensPrefix
