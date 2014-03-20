@@ -17,6 +17,7 @@ module Network.BitTorrent
        , allowedExtensions
 
          -- ** Initialization
+       , LogFun
        , newClient
        , closeClient
        , withClient

@@ -15,6 +15,7 @@ module Network.BitTorrent.Client
        , allowedExtensions
 
          -- ** Session initialization
+       , LogFun
        , newClient
        , closeClient
        , withClient
