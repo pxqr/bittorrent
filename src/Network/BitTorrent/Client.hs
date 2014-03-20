@@ -31,6 +31,7 @@ module Network.BitTorrent.Client
        , Handle
        , handleTopic
        , handleTrackers
+       , handleExchange
 
          -- ** Construction
        , TorrentSource (..)

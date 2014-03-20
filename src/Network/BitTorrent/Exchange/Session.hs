@@ -18,6 +18,7 @@ module Network.BitTorrent.Exchange.Session
 
          -- * Events
        , waitMetadata
+       , takeMetadata
        ) where
 
 import Control.Applicative
@@ -354,6 +355,9 @@ sendBroadcast msg = do
 
 waitMetadata :: Session -> IO InfoDict
 waitMetadata Session {..} = cachedValue <$> readMVar infodict
+
+takeMetadata :: Session -> IO (Maybe InfoDict)
+takeMetadata Session {..} = fmap cachedValue <$> tryReadMVar infodict
 
 {-----------------------------------------------------------------------
 --  Triggers

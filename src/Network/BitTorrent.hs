@@ -40,6 +40,7 @@ module Network.BitTorrent
        , Handle
        , handleTopic
        , handleTrackers
+       , handleExchange
 
        , TorrentSource(openHandle)
        , closeHandle

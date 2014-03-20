@@ -21,6 +21,10 @@ module Network.BitTorrent.Exchange
        , newSession
        , closeSession
 
+         -- * Query
+       , waitMetadata
+       , takeMetadata
+
          -- * Connections
        , connect
        ) where
