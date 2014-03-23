@@ -111,7 +111,8 @@ library
                      , SafeSemaphore
                      , lifted-async
 --                     , BoundedChan >= 1.0.1.0
-                     , stm         >= 2.4
+                     , split-channel >= 0.2
+                     , stm           >= 2.4
 
                        -- Streaming
                      , conduit          >= 1.0

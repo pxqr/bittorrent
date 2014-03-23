@@ -38,11 +38,16 @@ module Network.BitTorrent.Tracker.Session
        , addTracker
        , removeTracker
        , getTrustedTrackers
+
+         -- * Events
+       , SessionEvent (..)
+       , subscribe
        ) where
 
 import Control.Applicative
 import Control.Exception
 import Control.Concurrent
+import Control.Concurrent.Chan.Split
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.TH
@@ -189,6 +194,8 @@ data Session = Session
     -- | A set of single-tracker sessions. Any request to a tracker
     -- must take a lock.
   , sessionTrackers :: !(MVar (TrackerList TrackerEntry))
+
+  , sessionEvents   :: !(SendPort SessionEvent)
   }
 
 -- | Create a new multitracker session in paused state. Tracker list
@@ -196,18 +203,39 @@ data Session = Session
 -- client presence use 'notify'.
 newSession :: InfoHash -> TrackerList URI -> IO Session
 newSession ih origUris = do
-  urisList   <- shuffleTiers origUris
-  statusRef  <- newIORef def
-  entriesVar <- newMVar (fmap nullEntry urisList)
+  urisList    <- shuffleTiers origUris
+  statusRef   <- newIORef def
+  entriesVar  <- newMVar (fmap nullEntry urisList)
+  eventStream <- newSendPort
   return Session
     { sessionTopic    = ih
     , sessionStatus   = statusRef
     , sessionTrackers = entriesVar
+    , sessionEvents   = eventStream
     }
 
 -- | Release scarce resources associated with the given session.
 closeSession :: Session -> IO ()
 closeSession _ = return ()
+
+{-----------------------------------------------------------------------
+--  Events
+-----------------------------------------------------------------------}
+
+data SessionEvent
+  = TrackerAdded     URI
+  | TrackerConfirmed URI
+  | TrackerRemoved   URI
+  | AnnouncedTo      URI
+  | Reannounced      URI
+  | SessionClosed
+
+subscribe :: Session -> IO (ReceivePort SessionEvent)
+subscribe Session {..} = listen sessionEvents
+
+{-----------------------------------------------------------------------
+--  Operations
+-----------------------------------------------------------------------}
 
 -- | Normally you need to use 'Control.Monad.Trans.Resource.alloc'.
 withSession :: InfoHash -> TrackerList URI -> (Session -> IO ()) -> IO ()
