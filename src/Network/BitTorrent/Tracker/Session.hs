@@ -161,17 +161,18 @@ cacheScrape AnnounceInfo {..} =
       }
 
 -- | Make announce request to specific tracker returning new state.
-notifyTo :: Manager -> InfoHash -> Event
-           -> TrackerEntry -> IO TrackerEntry
-notifyTo mgr ih event entry @ TrackerEntry {..} = do
-
+notifyTo :: Manager -> Session -> Event -> TrackerEntry -> IO TrackerEntry
+notifyTo mgr s @ Session {..} event entry @ TrackerEntry {..} = do
   let shouldNotify = needNotify event statusSent
   mustNotify <- maybe (isExpired trackerPeers) return shouldNotify
   if not mustNotify
     then return entry
     else do
-      let q = SAnnounceQuery ih def Nothing (Just event)
+      let q = SAnnounceQuery sessionTopic def Nothing (Just event)
       res <- RPC.announce mgr trackerURI q
+      when (statusSent == Nothing) $ do
+        send sessionEvents (TrackerConfirmed trackerURI)
+      send sessionEvents (AnnouncedTo trackerURI)
       let status' = nextStatus event <|> statusSent
       TrackerEntry trackerURI status'
         <$> cachePeers res
@@ -218,8 +219,9 @@ newSession ih origUris = do
 -- function block until all trackers tied with this peer notified with
 -- 'Stopped' event.
 closeSession :: Manager -> Session -> IO ()
-closeSession m s = do
+closeSession m s @ Session {..} = do
   notify m s Stopped
+  send sessionEvents SessionClosed
 
 {-----------------------------------------------------------------------
 --  Events
@@ -230,7 +232,6 @@ data SessionEvent
   | TrackerConfirmed URI
   | TrackerRemoved   URI
   | AnnouncedTo      URI
-  | Reannounced      URI
   | SessionClosed
 
 subscribe :: Session -> IO (ReceivePort SessionEvent)
@@ -261,9 +262,9 @@ allNotify Stopped   = True
 allNotify Completed = True
 
 notifyAll :: Manager -> Session -> Event -> IO ()
-notifyAll mgr Session {..} event = do
+notifyAll mgr s @ Session {..} event = do
     modifyMVar_ sessionTrackers $
-      (traversal (notifyTo mgr sessionTopic event))
+      (traversal (notifyTo mgr s event))
   where
     traversal
       | allNotify event = traverseAll
@@ -304,10 +305,14 @@ collect f lst =(catMaybes . toList) <$> traverse f lst
 -- number of retries before giving up entirely.
 
 addTracker :: Session -> URI -> IO ()
-addTracker = undefined
+addTracker Session {..} uri = do
+  undefined
+  send sessionEvents (TrackerAdded uri)
 
 removeTracker :: Session -> URI -> IO ()
-removeTracker = undefined
+removeTracker Session {..} uri = do
+  undefined
+  send sessionEvents (TrackerRemoved uri)
 
 -- Also, as specified under the definitions section, a tracker that
 -- has not worked should never be propagated to other peers over the
