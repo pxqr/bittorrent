@@ -214,9 +214,12 @@ newSession ih origUris = do
     , sessionEvents   = eventStream
     }
 
--- | Release scarce resources associated with the given session.
-closeSession :: Session -> IO ()
-closeSession _ = return ()
+-- | Release scarce resources associated with the given session. This
+-- function block until all trackers tied with this peer notified with
+-- 'Stopped' event.
+closeSession :: Manager -> Session -> IO ()
+closeSession m s = do
+  notify m s Stopped
 
 {-----------------------------------------------------------------------
 --  Events
@@ -238,8 +241,9 @@ subscribe Session {..} = listen sessionEvents
 -----------------------------------------------------------------------}
 
 -- | Normally you need to use 'Control.Monad.Trans.Resource.alloc'.
-withSession :: InfoHash -> TrackerList URI -> (Session -> IO ()) -> IO ()
-withSession ih uris = bracket (newSession ih uris) closeSession
+withSession :: Manager -> InfoHash -> TrackerList URI
+            -> (Session -> IO ()) -> IO ()
+withSession m ih uris = bracket (newSession ih uris) (closeSession m)
 
 -- | Get last announced status. The only action can alter this status
 -- is 'notify'.

@@ -110,9 +110,10 @@ openMagnet rootPath uri @ Magnet {..} = do
 closeHandle :: Handle -> BitTorrent ()
 closeHandle h @ Handle {..} = do
   freeHandle handleTopic $ do
+    Client {..} <- getClient
     stop h
     liftIO $ Exchange.closeSession handleExchange
-    liftIO $ Tracker.closeSession handleTrackers
+    liftIO $ Tracker.closeSession trackerManager handleTrackers
 
 {-----------------------------------------------------------------------
 --  Control
