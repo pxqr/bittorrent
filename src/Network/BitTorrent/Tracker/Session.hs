@@ -66,7 +66,7 @@ import Data.Torrent.InfoHash
 import Data.Torrent.JSON
 import Network.BitTorrent.Core
 import Network.BitTorrent.Internal.Cache
-import Network.BitTorrent.Tracker.List
+import Network.BitTorrent.Tracker.List as TL
 import Network.BitTorrent.Tracker.Message
 import Network.BitTorrent.Tracker.RPC as RPC
 
@@ -248,8 +248,8 @@ withSession m ih uris = bracket (newSession ih uris) (closeSession m)
 getStatus :: Session -> IO Status
 getStatus Session {..} = readIORef sessionStatus
 
-getSessionState :: Session -> IO (TrackerList TrackerSession)
-getSessionState Session {..} = readMVar sessionTrackers
+getSessionState :: Session -> IO [[TierEntry TrackerSession]]
+getSessionState Session {..} = TL.toList <$> readMVar sessionTrackers
 
 -- | Do we need to sent this event to a first working tracker or to
 -- the all known good trackers?
@@ -287,7 +287,7 @@ askPeers _mgr ses = do
   L.concat <$> collect (tryTakeData . trackerPeers) list
 
 collect :: (a -> IO (Maybe b)) -> TrackerList a -> IO [b]
-collect f lst =(catMaybes . toList) <$> traverse f lst
+collect f lst = (catMaybes . F.toList) <$> traverse f lst
 
 --sourcePeers :: Session -> Source (PeerAddr IP)
 --sourcePeers

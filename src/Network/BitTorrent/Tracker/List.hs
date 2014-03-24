@@ -19,6 +19,7 @@ module Network.BitTorrent.Tracker.List
        , trackerList
        , shuffleTiers
        , mapWithURI
+       , Network.BitTorrent.Tracker.List.toList
 
          -- * Traversals
        , traverseAll
@@ -137,6 +138,10 @@ mapWithURI f (Announce (uri, a)) = Announce (uri, f uri a)
 mapWithURI f (TierList xs      ) = TierList (L.map (L.map mapEntry) xs)
   where
     mapEntry (uri, a) = (uri, f uri a)
+
+toList :: TrackerList a -> [[TierEntry a]]
+toList (Announce   e) = [[e]]
+toList (TierList xxs) = xxs
 
 {-----------------------------------------------------------------------
 --  Special traversals (suppressed RPC exceptions)
