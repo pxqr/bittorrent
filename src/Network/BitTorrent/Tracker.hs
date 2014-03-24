@@ -31,8 +31,7 @@ module Network.BitTorrent.Tracker
        , askPeers
 
          -- ** Session state
-       , TrackerEntry
-       , trackerURI
+       , TrackerSession
        , trackerPeers
        , trackerScrape
 

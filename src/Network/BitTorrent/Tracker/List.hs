@@ -12,11 +12,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Network.BitTorrent.Tracker.List
        ( -- * Tracker list
-         TrackerList
+         TierEntry
+       , TrackerList
 
          -- * Construction
        , trackerList
        , shuffleTiers
+       , mapWithURI
 
          -- * Traversals
        , traverseAll
@@ -24,10 +26,11 @@ module Network.BitTorrent.Tracker.List
        ) where
 
 import Prelude hiding (mapM, foldr)
+import Control.Arrow
 import Control.Applicative
 import Control.Exception
 import Data.Default
-import Data.List as L (elem, any, filter, null)
+import Data.List as L (map, elem, any, filter, null)
 import Data.Maybe
 import Data.Foldable
 import Data.Traversable
@@ -41,31 +44,43 @@ import Network.BitTorrent.Tracker.RPC as RPC
 --  Tracker list datatype
 -----------------------------------------------------------------------}
 
-type Tier a = [a]
+type TierEntry a = (URI, a)
+type Tier a = [TierEntry a]
 
 -- | Tracker list is either a single tracker or list of tiers. All
 -- trackers in each tier must be checked before the client goes on to
 -- the next tier.
 data TrackerList a
-  = Announce a           -- ^ torrent file 'announce'      field only
-  | TierList [Tier a]    -- ^ torrent file 'announce-list' field only
+  = Announce (TierEntry a) -- ^ torrent file 'announce'      field only
+  | TierList [Tier a]      -- ^ torrent file 'announce-list' field only
     deriving (Show, Eq)
 
 -- | Empty tracker list. Can be used for trackerless torrents.
-instance Default (TrackerList URI) where
+instance Default (TrackerList a) where
   def = TierList []
 
 instance Functor TrackerList where
-  fmap f (Announce a) = Announce (f a)
-  fmap f (TierList a) = TierList (fmap (fmap f) a)
+  fmap f (Announce (uri, a)) = Announce (uri, f a)
+  fmap f (TierList a)        = TierList (fmap (fmap (second f)) a)
 
 instance Foldable TrackerList where
-  foldr f z (Announce a ) = f a z
-  foldr f z (TierList xs) = foldr (flip (foldr f)) z xs
+  foldr f z (Announce e ) = f (snd e) z
+  foldr f z (TierList xs) = foldr (flip (foldr (f . snd))) z xs
+
+_traverseEntry f (uri, a) = (,) uri <$> f a
 
 instance Traversable TrackerList where
-  traverse f (Announce a ) = Announce <$> f a
-  traverse f (TierList xs) = TierList <$> traverse (traverse f) xs
+  traverse f (Announce e ) = Announce <$> _traverseEntry f e
+  traverse f (TierList xs) =
+      TierList <$> traverse (traverse (_traverseEntry f)) xs
+
+traverseWithURI :: Applicative f
+                => (TierEntry a -> f b) -> TrackerList a -> f (TrackerList b)
+traverseWithURI f (Announce (uri, a)) = (Announce . (,) uri) <$> f (uri, a)
+traverseWithURI f (TierList  xxs    ) =
+    TierList <$> traverse (traverse (traverseEntry f)) xxs
+  where
+    traverseEntry f (uri, a) = (,) uri <$> f (uri, a)
 
 {-----------------------------------------------------------------------
 --  List extraction
@@ -102,10 +117,13 @@ fixList mxss mx = do
 
 -- | Extract set of trackers from torrent file. The 'tAnnounce' key is
 -- only ignored if the 'tAnnounceList' key is present.
-trackerList :: Torrent -> TrackerList URI
+trackerList :: Torrent -> TrackerList ()
 trackerList Torrent {..} = fromMaybe (TierList []) $ do
-       TierList <$> (tAnnounceList `fixList` tAnnounce)
-   <|> Announce <$>  tAnnounce
+       (TierList . tierList)  <$> (tAnnounceList `fixList` tAnnounce)
+   <|> (Announce . nullEntry) <$>  tAnnounce
+  where
+    nullEntry uri = (uri, ())
+    tierList      = L.map (L.map nullEntry)
 
 -- | Shuffle /order of trackers/ in each tier, preserving original
 -- /order of tiers/. This can help to balance the load between the
@@ -113,6 +131,12 @@ trackerList Torrent {..} = fromMaybe (TierList []) $ do
 shuffleTiers :: TrackerList a -> IO (TrackerList a)
 shuffleTiers (Announce a ) = return (Announce a)
 shuffleTiers (TierList xs) = TierList <$> mapM shuffleM xs
+
+mapWithURI :: (URI -> a -> b) -> TrackerList a -> TrackerList b
+mapWithURI f (Announce (uri, a)) = Announce (uri, f uri a)
+mapWithURI f (TierList xs      ) = TierList (L.map (L.map mapEntry) xs)
+  where
+    mapEntry (uri, a) = (uri, f uri a)
 
 {-----------------------------------------------------------------------
 --  Special traversals (suppressed RPC exceptions)
@@ -127,21 +151,21 @@ catchRPC a b = catch a (f b)
 throwRPC :: String -> IO a
 throwRPC = throwIO . GenericException
 
--- | Like 'traverse' but ignore 'RpcExceptions'.
-traverseAll :: (a -> IO a) -> TrackerList a -> IO (TrackerList a)
-traverseAll action = traverse (action $?)
+-- | Like 'traverse' but ignores 'RpcExceptions'.
+traverseAll :: (TierEntry a -> IO a) -> TrackerList a -> IO (TrackerList a)
+traverseAll action = traverseWithURI (action $?)
   where
-    f $? x = catchRPC (f x) (return x)
+    f $? x = catchRPC (f x) (return (snd x))
 
 -- | Like 'traverse' but put working trackers to the head of tiers.
 -- This can help to avoid exceessive requests to not available
 -- trackers at each reannounce. If no one action succeed then original
 -- list is returned.
-traverseTiers :: (a -> IO a) -> TrackerList a -> IO (TrackerList a)
+traverseTiers :: (TierEntry a -> IO a) -> TrackerList a -> IO (TrackerList a)
 traverseTiers action ts = catchRPC (goList ts) (return ts)
   where
-    goList (Announce a)     = Announce <$> action a
-    goList (TierList tiers) = TierList <$> goTiers (goTier []) tiers
+    goList tl @ (Announce _    ) = traverseWithURI action tl
+    goList      (TierList tiers) = TierList <$> goTiers (goTier []) tiers
 
     goTiers _ []       = throwRPC "traverseTiers: no tiers"
     goTiers f (x : xs) = catchRPC shortcut failback
@@ -155,10 +179,10 @@ traverseTiers action ts = catchRPC (goList ts) (return ts)
           return (x : xs')
 
     goTier _      []       = throwRPC "traverseTiers: no trackers in tier"
-    goTier failed (a : as) = catchRPC shortcut failback
+    goTier failed ((uri, a) : as) = catchRPC shortcut failback
       where
         shortcut = do
-          a' <- action a
-          return (a' : as ++ failed) -- failed trackers at the end
+          a' <- action (uri, a)
+          return ((uri, a') : as ++ failed) -- failed trackers at the end
 
-        failback = goTier (a : failed) as
+        failback = goTier ((uri, a) : failed) as

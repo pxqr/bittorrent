@@ -7,7 +7,9 @@
 --
 --   Multitracker sessions.
 --
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TemplateHaskell      #-}
 module Network.BitTorrent.Tracker.Session
        ( -- * Session
          Session
@@ -27,8 +29,7 @@ module Network.BitTorrent.Tracker.Session
 
          -- ** Single tracker sessions
        , LastScrape (..)
-       , TrackerEntry
-       , trackerURI
+       , TrackerSession
        , trackerPeers
        , trackerScrape
        , getSessionState
@@ -99,12 +100,9 @@ data LastScrape = LastScrape
 $(deriveJSON omitRecordPrefix ''LastScrape)
 
 -- | Single tracker session.
-data TrackerEntry = TrackerEntry
-  { -- | Tracker announce URI.
-    trackerURI    :: !URI
-
-    -- | Used to notify 'Stopped' and 'Completed' events.
-  , statusSent    :: !(Maybe Status)
+data TrackerSession = TrackerSession
+  { -- | Used to notify 'Stopped' and 'Completed' events.
+    statusSent    :: !(Maybe Status)
 
     -- | Can be used to retrieve peer set.
   , trackerPeers  :: Cached [PeerAddr IP]
@@ -113,16 +111,16 @@ data TrackerEntry = TrackerEntry
   , trackerScrape :: Cached LastScrape
   }
 
-instance ToJSON TrackerEntry where
-  toJSON TrackerEntry {..} = object
-    [ "uri"    .= trackerURI
+instance ToJSON (TierEntry TrackerSession) where
+  toJSON (uri, TrackerSession {..}) = object
+    [ "uri"    .= uri
     , "peers"  .= trackerPeers
     , "scrape" .= trackerScrape
     ]
 
--- | Single tracker session with empty state.l
-nullEntry :: URI -> TrackerEntry
-nullEntry uri = TrackerEntry uri Nothing def def
+-- | Not contacted.
+instance Default TrackerSession where
+  def = TrackerSession Nothing def def
 
 -- | Do we need to notify this /specific/ tracker?
 needNotify :: Event -> Maybe Status -> Maybe Bool
@@ -161,22 +159,21 @@ cacheScrape AnnounceInfo {..} =
       }
 
 -- | Make announce request to specific tracker returning new state.
-notifyTo :: Manager -> Session -> Event -> TrackerEntry -> IO TrackerEntry
-notifyTo mgr s @ Session {..} event entry @ TrackerEntry {..} = do
+notifyTo :: Manager -> Session -> Event
+         -> TierEntry TrackerSession -> IO TrackerSession
+notifyTo mgr s @ Session {..} event (uri, entry @ TrackerSession {..}) = do
   let shouldNotify = needNotify event statusSent
   mustNotify <- maybe (isExpired trackerPeers) return shouldNotify
   if not mustNotify
     then return entry
     else do
       let q = SAnnounceQuery sessionTopic def Nothing (Just event)
-      res <- RPC.announce mgr trackerURI q
+      res <- RPC.announce mgr uri q
       when (statusSent == Nothing) $ do
-        send sessionEvents (TrackerConfirmed trackerURI)
-      send sessionEvents (AnnouncedTo trackerURI)
+        send sessionEvents (TrackerConfirmed uri)
+      send sessionEvents (AnnouncedTo uri)
       let status' = nextStatus event <|> statusSent
-      TrackerEntry trackerURI status'
-        <$> cachePeers res
-        <*> cacheScrape res
+      TrackerSession status' <$> cachePeers res <*> cacheScrape res
 
 {-----------------------------------------------------------------------
 --  Multitracker Session
@@ -194,7 +191,7 @@ data Session = Session
 
     -- | A set of single-tracker sessions. Any request to a tracker
     -- must take a lock.
-  , sessionTrackers :: !(MVar (TrackerList TrackerEntry))
+  , sessionTrackers :: !(MVar (TrackerList TrackerSession))
 
   , sessionEvents   :: !(SendPort SessionEvent)
   }
@@ -202,11 +199,11 @@ data Session = Session
 -- | Create a new multitracker session in paused state. Tracker list
 -- must contant only /trusted/ tracker uris. To start announcing
 -- client presence use 'notify'.
-newSession :: InfoHash -> TrackerList URI -> IO Session
+newSession :: InfoHash -> TrackerList () -> IO Session
 newSession ih origUris = do
   urisList    <- shuffleTiers origUris
   statusRef   <- newIORef def
-  entriesVar  <- newMVar (fmap nullEntry urisList)
+  entriesVar  <- newMVar (fmap (const def) urisList)
   eventStream <- newSendPort
   return Session
     { sessionTopic    = ih
@@ -242,7 +239,7 @@ subscribe Session {..} = listen sessionEvents
 -----------------------------------------------------------------------}
 
 -- | Normally you need to use 'Control.Monad.Trans.Resource.alloc'.
-withSession :: Manager -> InfoHash -> TrackerList URI
+withSession :: Manager -> InfoHash -> TrackerList ()
             -> (Session -> IO ()) -> IO ()
 withSession m ih uris = bracket (newSession ih uris) (closeSession m)
 
@@ -251,7 +248,7 @@ withSession m ih uris = bracket (newSession ih uris) (closeSession m)
 getStatus :: Session -> IO Status
 getStatus Session {..} = readIORef sessionStatus
 
-getSessionState :: Session -> IO (TrackerList TrackerEntry)
+getSessionState :: Session -> IO (TrackerList TrackerSession)
 getSessionState Session {..} = readMVar sessionTrackers
 
 -- | Do we need to sent this event to a first working tracker or to
@@ -309,9 +306,8 @@ addTracker Session {..} uri = do
   undefined
   send sessionEvents (TrackerAdded uri)
 
-removeTracker :: Session -> URI -> IO ()
-removeTracker Session {..} uri = do
-  undefined
+removeTracker :: Manager -> Session -> URI -> IO ()
+removeTracker m Session {..} uri = do
   send sessionEvents (TrackerRemoved uri)
 
 -- Also, as specified under the definitions section, a tracker that
