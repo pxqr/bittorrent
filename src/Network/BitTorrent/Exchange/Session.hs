@@ -37,7 +37,6 @@ import Data.ByteString as BS
 import Data.ByteString.Lazy as BL
 import Data.Conduit
 import Data.Conduit.List as CL (iterM)
-import Data.Maybe
 import Data.Map as M
 import Data.Monoid
 import Data.Set  as S
