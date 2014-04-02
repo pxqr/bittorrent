@@ -24,6 +24,7 @@ module Network.BitTorrent.Tracker
        , Session
        , newSession
        , closeSession
+       , withSession
 
          -- ** Events
        , Event (..)
