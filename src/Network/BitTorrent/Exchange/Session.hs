@@ -16,13 +16,18 @@ module Network.BitTorrent.Exchange.Session
        , connect
        , establish
 
-         -- * Events
+         -- * Query
        , waitMetadata
        , takeMetadata
+
+         -- * Events
+       , SessionEvent (..)
+       , subscription
        ) where
 
 import Control.Applicative
 import Control.Concurrent
+import Control.Concurrent.Chan.Split as CS
 import Control.Concurrent.STM
 import Control.Exception hiding (Handler)
 import Control.Lens
@@ -91,6 +96,7 @@ data Session = Session
   { sessionPeerId          :: !(PeerId)
   , sessionTopic           :: !(InfoHash)
   , sessionLogger          :: !(LogFun)
+  , sessionEvents          :: !(SendPort SessionEvent)
 
   , metadata               :: !(MVar Metadata.Status)
   , infodict               :: !(MVar (Cached InfoDict))
@@ -137,11 +143,13 @@ newSession logFun addr rootPath dict = do
   pSetVar     <- newTVarIO S.empty
   eSetVar     <- newTVarIO M.empty
   chan        <- newChan
+  eventStream <- newSendPort
 
   return Session
     { sessionPeerId          = pid
     , sessionTopic           = idInfoHash dict
     , sessionLogger          = logFun
+    , sessionEvents          = eventStream
 
     , metadata               = metadataVar
     , infodict               = infodictVar
@@ -169,6 +177,21 @@ closeSession Session {..} = do
 
 withSession :: ()
 withSession = error "withSession"
+
+{-----------------------------------------------------------------------
+--  Session events
+-----------------------------------------------------------------------}
+
+data SessionEvent
+  = ConnectingTo (PeerAddr IP)
+  | ConnectionEstablished (PeerAddr IP)
+  | ConnectionAborted
+  | ConnectionClosed (PeerAddr IP)
+  | SessionClosed
+    deriving Show
+
+subscription :: Session -> IO (ReceivePort SessionEvent)
+subscription Session {..} = listen sessionEvents
 
 {-----------------------------------------------------------------------
 --  Logging
