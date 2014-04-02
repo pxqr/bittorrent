@@ -29,6 +29,10 @@ module Network.BitTorrent
        , getClient
        , simpleClient
 
+         -- ** Events
+       , ClientEvent (..)
+       , subscription
+
          -- * Torrent
          -- ** Source
        , InfoHash

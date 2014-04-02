@@ -12,10 +12,14 @@ module Network.BitTorrent.Client.Types
        , getClient
 
        , MonadBitTorrent (..)
+
+         -- * Events
+       , ClientEvent (..)
        ) where
 
 import Control.Applicative
 import Control.Concurrent
+import Control.Concurrent.Chan.Split
 import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
@@ -48,6 +52,7 @@ data Client = Client
   , clientNode         :: !(Node IPv4)
   , clientTorrents     :: !(MVar (HashMap InfoHash Handle))
   , clientLogger       :: !LogFun
+  , clientEvents       :: !(SendPort ClientEvent)
   }
 
 instance Eq Client where
@@ -65,6 +70,10 @@ externalAddr Client {..} = PeerAddr
   , peerHost = Nothing -- TODO return external IP address, if known
   , peerPort = clientListenerPort
   }
+
+data ClientEvent
+  = TorrentAdded InfoHash
+    deriving (Show, Eq)
 
 {-----------------------------------------------------------------------
 --  BitTorrent monad

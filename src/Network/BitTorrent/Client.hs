@@ -21,6 +21,10 @@ module Network.BitTorrent.Client
        , withClient
        , simpleClient
 
+         -- ** Events
+       , ClientEvent (..)
+       , subscription
+
          -- * BitTorrent monad
        , MonadBitTorrent (..)
        , BitTorrent
@@ -50,6 +54,7 @@ module Network.BitTorrent.Client
 import Control.Applicative
 import Control.Exception
 import Control.Concurrent
+import Control.Concurrent.Chan.Split as CS
 import Control.Monad.Logger
 import Control.Monad.Trans
 import Control.Monad.Trans.Resource
@@ -119,6 +124,8 @@ initClient opts @ Options {..} logFun = do
   (_, node) <- allocate mkNode DHT.closeNode
 
   resourceMap <- getInternalState
+  eventStream <- liftIO newSendPort
+
   return Client
     { clientPeerId       = pid
     , clientListenerPort = optPort
@@ -129,6 +136,7 @@ initClient opts @ Options {..} logFun = do
     , clientNode         = node
     , clientTorrents     = tmap
     , clientLogger       = logFun
+    , clientEvents       = eventStream
     }
 
 newClient :: Options -> LogFun -> IO Client
@@ -157,6 +165,11 @@ simpleClient :: BitTorrent () -> IO ()
 simpleClient m = do
   runStderrLoggingT $ LoggingT $ \ logger -> do
     withClient def logger (`runBitTorrent` m)
+
+subscription :: BitTorrent (ReceivePort ClientEvent)
+subscription = do
+  Client {..} <- getClient
+  liftIO $ listen clientEvents
 
 {-----------------------------------------------------------------------
 --  Torrent identifiers
