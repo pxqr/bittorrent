@@ -24,6 +24,7 @@ module Network.BitTorrent.DHT
        , dht
 
          -- * Bootstrapping
+         -- $bootstrapping-terms
        , tNodes
        , defaultBootstrapNodes
        , resolveHostName
@@ -93,6 +94,29 @@ dht opts addr action = do
 {-----------------------------------------------------------------------
 --  Bootstrapping
 -----------------------------------------------------------------------}
+-- $bootstrapping-terms
+--
+--  [@Bootstrapping@] DHT @bootstrapping@ is the process of filling
+--  routing 'Table' by /good/ nodes.
+--
+--  [@Bootstrapping time@] Bootstrapping process can take up to 5
+--  minutes. Bootstrapping should only happen at first application
+--  startup, if possible you should use 'snapshot' & 'restore'
+--  mechanism which must work faster.
+--
+--  [@Bootstrap nodes@] DHT @bootstrap node@ is either:
+--
+--    * a specialized high performance node maintained by bittorrent
+--    software authors\/maintainers, like those listed in
+--    'defaultBootstrapNodes'. /Specialized/ means that those nodes
+--    may not support 'insert' queries and is running for the sake of
+--    bootstrapping only.
+--
+--    * an ordinary bittorrent client running DHT node. The list of
+--    such bootstrapping nodes usually obtained from
+--    'Data.Torrent.tNodes' field or
+--    'Network.BitTorrent.Exchange.Message.Port' messages.
+
 -- Do not include the following hosts in the default bootstrap nodes list:
 --
 --   * "dht.aelitis.com" and "dht6.azureusplatform.com" - since
