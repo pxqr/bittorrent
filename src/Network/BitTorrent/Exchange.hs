@@ -30,7 +30,7 @@ module Network.BitTorrent.Exchange
 
          -- * Events
        , SessionEvent    (..)
-       , subscribe
+       , subscription
        ) where
 
 import Network.BitTorrent.Exchange.Connection hiding (Options)

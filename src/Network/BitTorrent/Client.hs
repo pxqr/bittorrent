@@ -23,7 +23,7 @@ module Network.BitTorrent.Client
 
          -- ** Events
        , ClientEvent (..)
-       , subscription
+       , Network.BitTorrent.Client.subscription
 
          -- * BitTorrent monad
        , MonadBitTorrent (..)
