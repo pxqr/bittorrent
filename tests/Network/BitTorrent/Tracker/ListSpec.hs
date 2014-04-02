@@ -17,7 +17,7 @@ uris = fmap (fromJust . parseURI . renderURI) [1..10 :: Int]
   where
     renderURI n = "http://" ++ show n ++ ".org"
 
-list :: TrackerList URI
+list :: TrackerList ()
 list = trackerList def { tAnnounceList = Just [uris] }
 
 spec :: Spec
@@ -28,14 +28,13 @@ spec = do
       list' `shouldSatisfy` (/= list)
 
     it "traverseAll" $ do
-      xs <- traverseAll (\ uri -> if uri == L.last uris
+      xs <- traverseAll (\ (uri, _) -> if uri == L.last uris
                then throwIO (GenericException "")
-               else return uri { uriScheme = "udp://" }) list
-      let udps = F.sum $ fmap (fromEnum . ("udp://" ==) . uriScheme) xs
-      udps `shouldBe` pred (L.length uris)
+               else return ()) list
+      return ()
 
     it "traverseTiers" $ do
-      xs' <- traverseTiers (\ uri -> if uri == L.last uris then return uri
+      xs' <- traverseTiers (\ (uri, _) -> if uri == L.last uris then return ()
                               else throwIO (GenericException "")) list
 
       return ()

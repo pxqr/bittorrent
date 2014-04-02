@@ -16,11 +16,11 @@ testSession :: Bool -> (Manager -> Session -> IO ()) -> IO ()
 testSession runEmpty action = do
   t <- getTestTorrent
   withManager def def $ \ m -> do
-    withSession (idInfoHash (tInfoDict t)) (trackerList t) $ \ s ->
+    withSession m (idInfoHash (tInfoDict t)) (trackerList t) $ \ s ->
       action m s
 
     when runEmpty $ do
-      withSession (idInfoHash (tInfoDict t)) def $ \ s ->
+      withSession m (idInfoHash (tInfoDict t)) def $ \ s ->
         action m s
 
 spec :: Spec
