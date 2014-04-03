@@ -14,11 +14,10 @@ module Network.BitTorrent.Client.Handle
 
          -- * Query
        , getHandle
-       , HandleState
-       , getState
+       , HandleStatus (..)
+       , getStatus
        ) where
 
-import Control.Applicative
 import Control.Concurrent.Lifted as L
 import Control.Monad
 import Control.Monad.Trans
@@ -50,7 +49,7 @@ allocHandle ih m = do
 
 freeHandle :: InfoHash -> BitTorrent () -> BitTorrent ()
 freeHandle ih finalizer = do
-  c @ Client {..} <- getClient
+  Client {..} <- getClient
   modifyMVar_ clientTorrents $ \ handles -> do
     case HM.lookup ih handles of
       Nothing -> return handles
@@ -90,7 +89,7 @@ openTorrent rootPath t @ Torrent {..} = do
 
 -- | Use 'nullMagnet' to open handle from 'InfoHash'.
 openMagnet :: FilePath -> Magnet -> BitTorrent Handle
-openMagnet rootPath uri @ Magnet {..} = do
+openMagnet rootPath Magnet {..} = do
   allocHandle exactTopic $ do
     tses <- liftIO $ Tracker.newSession exactTopic def
     eses <- newExchangeSession rootPath (Left exactTopic)
@@ -149,7 +148,7 @@ stop Handle {..} = do
 --  Query
 -----------------------------------------------------------------------}
 
-data HandleState
+data HandleStatus
   = Running
   | Paused
   | Stopped
@@ -161,5 +160,5 @@ getHandle ih = do
     Nothing -> error "should we throw some exception?"
     Just h  -> return h
 
-getState :: Handle -> IO HandleState
-getState = undefined
+getStatus :: Handle -> IO HandleStatus
+getStatus = undefined
