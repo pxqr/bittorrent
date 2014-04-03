@@ -1,4 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Network.BitTorrent.Client.Types
        ( -- * Core types
@@ -20,8 +22,10 @@ module Network.BitTorrent.Client.Types
 import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.Chan.Split
+import Control.Monad.Base
 import Control.Monad.Logger
 import Control.Monad.Reader
+import Control.Monad.Trans.Control
 import Control.Monad.Trans.Resource
 import Data.Function
 import Data.HashMap.Strict as HM
@@ -82,11 +86,20 @@ data ClientEvent
 newtype BitTorrent a = BitTorrent
   { unBitTorrent :: ReaderT Client IO a
   } deriving ( Functor, Applicative, Monad
-             , MonadIO, MonadThrow, MonadUnsafeIO
+             , MonadIO, MonadThrow, MonadUnsafeIO, MonadBase IO
              )
 
 class MonadBitTorrent m where
   liftBT :: BitTorrent a -> m a
+
+instance MonadBaseControl IO BitTorrent where
+  newtype StM BitTorrent a = StM { unSt :: StM (ReaderT Client IO) a }
+  liftBaseWith cc = BitTorrent $ liftBaseWith $ \ cc' ->
+      cc $ \ (BitTorrent m) -> StM <$> cc' m
+  {-# INLINE liftBaseWith #-}
+
+  restoreM = BitTorrent . restoreM . unSt
+  {-# INLINE restoreM #-}
 
 -- | NOP.
 instance MonadBitTorrent BitTorrent where

@@ -19,7 +19,7 @@ module Network.BitTorrent.Client.Handle
        ) where
 
 import Control.Applicative
-import Control.Concurrent
+import Control.Concurrent.Lifted as L
 import Control.Monad
 import Control.Monad.Trans
 import Data.Default
@@ -40,28 +40,28 @@ import Network.BitTorrent.Tracker  as Tracker
 
 allocHandle :: InfoHash -> BitTorrent Handle -> BitTorrent Handle
 allocHandle ih m = do
-  c @ Client {..} <- getClient
-  liftIO $ modifyMVar clientTorrents $ \ handles -> do
+  Client {..} <- getClient
+  modifyMVar clientTorrents $ \ handles -> do
     case HM.lookup ih handles of
       Just h  -> return (handles, h)
       Nothing -> do
-        h <- runBitTorrent c m
+        h <- m
         return (HM.insert ih h handles, h)
 
 freeHandle :: InfoHash -> BitTorrent () -> BitTorrent ()
 freeHandle ih finalizer = do
   c @ Client {..} <- getClient
-  liftIO $ modifyMVar_ clientTorrents $ \ handles -> do
+  modifyMVar_ clientTorrents $ \ handles -> do
     case HM.lookup ih handles of
       Nothing -> return handles
       Just _  -> do
-        runBitTorrent c finalizer
+        finalizer
         return (HM.delete ih handles)
 
 lookupHandle :: InfoHash -> BitTorrent (Maybe Handle)
 lookupHandle ih = do
   Client {..} <- getClient
-  handles     <- liftIO $ readMVar clientTorrents
+  handles     <- readMVar clientTorrents
   return (HM.lookup ih handles)
 
 {-----------------------------------------------------------------------
