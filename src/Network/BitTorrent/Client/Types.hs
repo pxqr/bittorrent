@@ -4,7 +4,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Network.BitTorrent.Client.Types
        ( -- * Core types
-         Handle (..)
+         HandleStatus (..)
+       , Handle (..)
        , Client (..)
        , externalAddr
 
@@ -39,9 +40,16 @@ import Network.BitTorrent.DHT      as DHT
 import Network.BitTorrent.Exchange as Exchange
 import Network.BitTorrent.Tracker  as Tracker
 
+data HandleStatus
+  = Running
+  | Stopped
+    deriving (Show, Eq)
+
 data Handle = Handle
   { handleTopic    :: !InfoHash
   , handlePrivate  :: !Bool
+
+  , handleStatus   :: !(MVar HandleStatus)
   , handleTrackers :: !Tracker.Session
   , handleExchange :: !Exchange.Session
   }

@@ -29,7 +29,7 @@ import Data.HashMap.Strict as HM
 import Data.Torrent
 import Data.Torrent.InfoHash
 import Data.Torrent.Magnet
-import Network.BitTorrent.Client.Types
+import Network.BitTorrent.Client.Types as Types
 import Network.BitTorrent.DHT      as DHT
 import Network.BitTorrent.Exchange as Exchange
 import Network.BitTorrent.Tracker  as Tracker
@@ -86,11 +86,13 @@ openTorrent :: FilePath -> Torrent -> BitTorrent Handle
 openTorrent rootPath t @ Torrent {..} = do
   let ih = idInfoHash tInfoDict
   allocHandle ih $ do
+    statusVar <- newMVar Types.Stopped
     tses <- liftIO $ Tracker.newSession ih (trackerList t)
     eses <- newExchangeSession rootPath (Right tInfoDict)
     return $ Handle
       { handleTopic    = ih
       , handlePrivate  = idPrivate tInfoDict
+      , handleStatus   = statusVar
       , handleTrackers = tses
       , handleExchange = eses
       }
@@ -99,11 +101,13 @@ openTorrent rootPath t @ Torrent {..} = do
 openMagnet :: FilePath -> Magnet -> BitTorrent Handle
 openMagnet rootPath Magnet {..} = do
   allocHandle exactTopic $ do
+    statusVar <- newMVar Types.Stopped
     tses <- liftIO $ Tracker.newSession exactTopic def
     eses <- newExchangeSession rootPath (Left exactTopic)
     return $ Handle
       { handleTopic    = exactTopic
       , handlePrivate  = False
+      , handleStatus   = statusVar
       , handleTrackers = tses
       , handleExchange = eses
       }
@@ -124,21 +128,32 @@ closeHandle h @ Handle {..} = do
 --  Control
 -----------------------------------------------------------------------}
 
+modifyStatus :: HandleStatus -> Handle -> (HandleStatus -> BitTorrent ()) -> BitTorrent ()
+modifyStatus targetStatus Handle {..} targetAction = do
+  modifyMVar_ handleStatus $ \ actualStatus -> do
+    unless (actualStatus == targetStatus) $ do
+      targetAction actualStatus
+    return targetStatus
+
 -- | Start downloading, uploading and announcing this torrent.
 --
 -- This operation is blocking, use
 -- 'Control.Concurrent.Async.Lifted.async' if needed.
 start :: Handle -> BitTorrent ()
-start Handle {..} = do
-  Client {..} <- getClient
-  liftIO $ Tracker.notify trackerManager handleTrackers Tracker.Started
-  unless handlePrivate $ do
-    liftDHT $ DHT.insert handleTopic (error "start")
-  liftIO $ do
-    peers <- askPeers trackerManager handleTrackers
-    print $ "got: " ++ show (L.length peers) ++ " peers"
-    forM_ peers $ \ peer -> do
-      Exchange.connect peer handleExchange
+start h @ Handle {..} = do
+  modifyStatus Types.Running h $ \ status -> do
+    case status of
+      Types.Running -> return ()
+      Types.Stopped -> do
+        Client {..} <- getClient
+        liftIO $ Tracker.notify trackerManager handleTrackers Tracker.Started
+        unless handlePrivate $ do
+          liftDHT $ DHT.insert handleTopic (error "start")
+        liftIO $ do
+          peers <- askPeers trackerManager handleTrackers
+          print $ "got: " ++ show (L.length peers) ++ " peers"
+          forM_ peers $ \ peer -> do
+            Exchange.connect peer handleExchange
 
 -- | Stop downloading this torrent.
 pause :: Handle -> BitTorrent ()
@@ -146,20 +161,19 @@ pause _ = return ()
 
 -- | Stop downloading, uploading and announcing this torrent.
 stop :: Handle -> BitTorrent ()
-stop Handle {..} = do
-  Client {..} <- getClient
-  unless handlePrivate $ do
-    liftDHT $ DHT.delete handleTopic (error "stop")
-  liftIO  $ Tracker.notify trackerManager handleTrackers Tracker.Stopped
+stop h @ Handle {..} = do
+  modifyStatus Types.Stopped h $ \ status -> do
+    case status of
+      Types.Stopped -> return ()
+      Types.Running -> do
+        Client {..} <- getClient
+        unless handlePrivate $ do
+          liftDHT $ DHT.delete handleTopic (error "stop")
+        liftIO  $ Tracker.notify trackerManager handleTrackers Tracker.Stopped
 
 {-----------------------------------------------------------------------
 --  Query
 -----------------------------------------------------------------------}
-
-data HandleStatus
-  = Running
-  | Paused
-  | Stopped
 
 getHandle :: InfoHash -> BitTorrent Handle
 getHandle ih = do
@@ -169,4 +183,4 @@ getHandle ih = do
     Just h  -> return h
 
 getStatus :: Handle -> IO HandleStatus
-getStatus = undefined
+getStatus Handle {..} = readMVar handleStatus
