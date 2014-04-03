@@ -18,6 +18,7 @@ module Network.BitTorrent.Client.Handle
        , getStatus
        ) where
 
+import Control.Concurrent.Chan.Split
 import Control.Concurrent.Lifted as L
 import Control.Monad
 import Control.Monad.Trans
@@ -40,16 +41,23 @@ import Network.BitTorrent.Tracker  as Tracker
 allocHandle :: InfoHash -> BitTorrent Handle -> BitTorrent Handle
 allocHandle ih m = do
   Client {..} <- getClient
-  modifyMVar clientTorrents $ \ handles -> do
+
+  (h, added) <- modifyMVar clientTorrents $ \ handles -> do
     case HM.lookup ih handles of
-      Just h  -> return (handles, h)
+      Just h  -> return (handles, (h, False))
       Nothing -> do
         h <- m
-        return (HM.insert ih h handles, h)
+        return (HM.insert ih h handles, (h, True))
+
+  when added $ do
+    liftIO $ send clientEvents (TorrentAdded ih)
+
+  return h
 
 freeHandle :: InfoHash -> BitTorrent () -> BitTorrent ()
 freeHandle ih finalizer = do
   Client {..} <- getClient
+
   modifyMVar_ clientTorrents $ \ handles -> do
     case HM.lookup ih handles of
       Nothing -> return handles
