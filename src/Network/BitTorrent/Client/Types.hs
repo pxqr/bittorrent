@@ -18,6 +18,7 @@ module Network.BitTorrent.Client.Types
 
          -- * Events
        , ClientEvent (..)
+       , HandleEvent (..)
        ) where
 
 import Control.Applicative
@@ -45,6 +46,9 @@ data HandleStatus
   | Stopped
     deriving (Show, Eq)
 
+data HandleEvent
+  = StatusChanged HandleStatus
+
 data Handle = Handle
   { handleTopic    :: !InfoHash
   , handlePrivate  :: !Bool
@@ -52,6 +56,7 @@ data Handle = Handle
   , handleStatus   :: !(MVar HandleStatus)
   , handleTrackers :: !Tracker.Session
   , handleExchange :: !Exchange.Session
+  , handleEvents   :: !(SendPort HandleEvent)
   }
 
 data Client = Client

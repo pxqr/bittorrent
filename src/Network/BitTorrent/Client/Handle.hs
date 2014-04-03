@@ -16,6 +16,9 @@ module Network.BitTorrent.Client.Handle
        , getHandle
        , HandleStatus (..)
        , getStatus
+
+         -- * Events
+       , HandleEvent (..)
        ) where
 
 import Control.Concurrent.Chan.Split
@@ -89,12 +92,14 @@ openTorrent rootPath t @ Torrent {..} = do
     statusVar <- newMVar Types.Stopped
     tses <- liftIO $ Tracker.newSession ih (trackerList t)
     eses <- newExchangeSession rootPath (Right tInfoDict)
+    eventStream <- liftIO newSendPort
     return $ Handle
       { handleTopic    = ih
       , handlePrivate  = idPrivate tInfoDict
       , handleStatus   = statusVar
       , handleTrackers = tses
       , handleExchange = eses
+      , handleEvents   = eventStream
       }
 
 -- | Use 'nullMagnet' to open handle from 'InfoHash'.
@@ -104,12 +109,14 @@ openMagnet rootPath Magnet {..} = do
     statusVar <- newMVar Types.Stopped
     tses <- liftIO $ Tracker.newSession exactTopic def
     eses <- newExchangeSession rootPath (Left exactTopic)
+    eventStream <- liftIO newSendPort
     return $ Handle
       { handleTopic    = exactTopic
       , handlePrivate  = False
       , handleStatus   = statusVar
       , handleTrackers = tses
       , handleExchange = eses
+      , handleEvents   = eventStream
       }
 
 -- | Stop torrent and destroy all sessions. You don't need to close
@@ -134,6 +141,7 @@ modifyStatus targetStatus Handle {..} targetAction = do
     unless (actualStatus == targetStatus) $ do
       targetAction actualStatus
     return targetStatus
+  liftIO $ send handleEvents (StatusChanged targetStatus)
 
 -- | Start downloading, uploading and announcing this torrent.
 --
@@ -184,3 +192,6 @@ getHandle ih = do
 
 getStatus :: Handle -> IO HandleStatus
 getStatus Handle {..} = readMVar handleStatus
+
+subscription :: Handle -> IO (ReceivePort HandleEvent)
+subscription Handle {..} = listen handleEvents
