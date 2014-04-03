@@ -38,7 +38,6 @@ import Network.BitTorrent.Tracker  as Tracker
 --  Safe handle set manupulation
 -----------------------------------------------------------------------}
 
--- | Guarantees that we newer allocate the same handle twice.
 allocHandle :: InfoHash -> BitTorrent Handle -> BitTorrent Handle
 allocHandle ih m = do
   c @ Client {..} <- getClient
@@ -49,7 +48,6 @@ allocHandle ih m = do
         h <- runBitTorrent c m
         return (HM.insert ih h handles, h)
 
--- |
 freeHandle :: InfoHash -> BitTorrent () -> BitTorrent ()
 freeHandle ih finalizer = do
   c @ Client {..} <- getClient
@@ -60,7 +58,6 @@ freeHandle ih finalizer = do
         runBitTorrent c finalizer
         return (HM.delete ih handles)
 
--- |
 lookupHandle :: InfoHash -> BitTorrent (Maybe Handle)
 lookupHandle ih = do
   Client {..} <- getClient
