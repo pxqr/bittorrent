@@ -21,6 +21,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString as BS
 import Data.ByteString.Lazy as BL
+import Data.Default
 import Data.List as L
 import Data.Tuple
 
@@ -40,6 +41,9 @@ data Status = Status
   }
 
 makeLenses ''Status
+
+instance Default Status where
+  def = error "default status"
 
 -- | Create a new scheduler for infodict of the given size.
 nullStatus :: Int -> Status

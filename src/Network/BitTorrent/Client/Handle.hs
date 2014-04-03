@@ -71,10 +71,10 @@ lookupHandle ih = do
 --  Initialization
 -----------------------------------------------------------------------}
 
-newExchangeSession :: FilePath -> InfoDict -> BitTorrent Exchange.Session
-newExchangeSession rootPath dict = do
+newExchangeSession :: FilePath -> Either InfoHash InfoDict -> BitTorrent Exchange.Session
+newExchangeSession rootPath source = do
   c @ Client {..} <- getClient
-  liftIO $ Exchange.newSession clientLogger (externalAddr c) rootPath dict
+  liftIO $ Exchange.newSession clientLogger (externalAddr c) rootPath source
 
 -- | Open a torrent in 'stop'ed state. Use 'nullTorrent' to open
 -- handle from 'InfoDict'. This operation do not block.
@@ -83,7 +83,7 @@ openTorrent rootPath t @ Torrent {..} = do
   let ih = idInfoHash tInfoDict
   allocHandle ih $ do
     tses <- liftIO $ Tracker.newSession ih (trackerList t)
-    eses <- newExchangeSession rootPath tInfoDict
+    eses <- newExchangeSession rootPath (Right tInfoDict)
     return $ Handle
       { handleTopic    = ih
       , handlePrivate  = idPrivate tInfoDict
@@ -96,7 +96,7 @@ openMagnet :: FilePath -> Magnet -> BitTorrent Handle
 openMagnet rootPath uri @ Magnet {..} = do
   allocHandle exactTopic $ do
     tses <- liftIO $ Tracker.newSession exactTopic def
-    eses <- newExchangeSession rootPath (error "openMagnet" exactTopic)
+    eses <- newExchangeSession rootPath (Left exactTopic)
     return $ Handle
       { handleTopic    = exactTopic
       , handlePrivate  = False

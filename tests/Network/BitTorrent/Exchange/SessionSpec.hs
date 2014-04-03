@@ -16,7 +16,7 @@ simpleSession :: InfoDict -> (Session -> IO ()) -> IO ()
 simpleSession dict action = do
   withRemoteAddr $ \ addr -> do
     myAddr <- getMyAddr
-    ses  <- newSession nullLogger myAddr "" dict
+    ses  <- newSession nullLogger myAddr "" (Right dict)
     connect addr ses
     action ses
     closeSession ses
