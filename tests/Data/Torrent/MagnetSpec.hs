@@ -9,7 +9,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Network.URI
 
-import Data.Torrent.Magnet
+import Data.Torrent
 import Data.Torrent.InfoHashSpec ()
 
 

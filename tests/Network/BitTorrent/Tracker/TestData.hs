@@ -12,7 +12,7 @@ import Data.Maybe
 import Data.String
 import Network.URI
 
-import Data.Torrent.InfoHash
+import Data.Torrent
 
 
 data TrackerEntry = TrackerEntry

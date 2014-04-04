@@ -62,8 +62,7 @@ import Data.Conduit as C
 import Data.Conduit.List as C
 import Network.Socket
 
-import Data.Torrent (tNodes)
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Query
 import Network.BitTorrent.DHT.Session

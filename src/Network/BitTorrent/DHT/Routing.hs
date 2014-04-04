@@ -73,7 +73,7 @@ import GHC.Generics
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Network.BitTorrent.Core
 
 {-----------------------------------------------------------------------

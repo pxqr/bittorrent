@@ -8,7 +8,6 @@ import Test.Hspec
 import Test.QuickCheck
 
 import Data.Torrent
-import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Connection
 import Network.BitTorrent.Exchange.Message

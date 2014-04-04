@@ -34,7 +34,7 @@ import Data.Ord
 import Network
 import System.Log.FastLogger
 
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Network.BitTorrent.Internal.Types as Types
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT      as DHT

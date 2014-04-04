@@ -136,7 +136,7 @@ import System.Log.FastLogger (ToLogStr(..))
 import System.Timeout
 
 import Data.Torrent.Bitfield as BF
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Message as Msg
 

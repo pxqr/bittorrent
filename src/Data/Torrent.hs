@@ -17,16 +17,42 @@
 --   <https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure>
 --
 {-# LANGUAGE CPP                        #-}
+{-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE OverlappingInstances       #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# OPTIONS -fno-warn-orphans           #-}
 module Data.Torrent
-       ( -- * Info dictionary
-         InfoDict (..)
+       ( -- * InfoHash
+         -- $infohash
+         InfoHash
+       , textToInfoHash
+       , longHex
+       , shortHex
+
+         -- * Magnet
+         -- $magnet-link
+       , Magnet(..)
+       , nullMagnet
+       , simpleMagnet
+       , detailedMagnet
+       , parseMagnet
+       , renderMagnet
+
+         -- ** URN
+       , URN (..)
+       , NamespaceId
+       , btih
+       , infohashURN
+       , parseURN
+       , renderURN
+
+         -- * Info dictionary
+       , InfoDict (..)
        , infoDictionary
 
          -- ** Lenses
@@ -67,33 +93,170 @@ module Data.Torrent
 
 import Prelude hiding (sum)
 import Control.Applicative
-import qualified Crypto.Hash.SHA1 as C
 import Control.DeepSeq
 import Control.Exception
-import Control.Lens
+import Control.Lens hiding (unsnoc)
+import Control.Monad
+import qualified Crypto.Hash.SHA1 as C
 import Data.BEncode as BE
 import Data.BEncode.Types as BE
 import           Data.ByteString as BS
+import           Data.ByteString.Base16 as Base16
+import           Data.ByteString.Base32 as Base32
+import           Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8 as BC (pack, unpack)
 import qualified Data.ByteString.Lazy  as BL
+import           Data.Char
 import           Data.Convertible
 import           Data.Default
 import           Data.Hashable   as Hashable
 import qualified Data.List as L
+import           Data.Map as M
+import           Data.Maybe
+import           Data.Serialize as S
+import           Data.String
 import           Data.Text as T
-import Data.Time
+import           Data.Text.Encoding as T
+import           Data.Text.Read
 import Data.Time.Clock.POSIX
 import Data.Typeable
 import Network (HostName)
+import Network.HTTP.Types.QueryLike
+import Network.HTTP.Types.URI
 import Network.URI
+import Text.ParserCombinators.ReadP as P
 import Text.PrettyPrint as PP
 import Text.PrettyPrint.Class
 import System.FilePath
 
-import Data.Torrent.InfoHash as IH
 import Data.Torrent.Layout
 import Data.Torrent.Piece
 import Network.BitTorrent.Core.NodeInfo
+
+
+{-----------------------------------------------------------------------
+--  Info hash
+-----------------------------------------------------------------------}
+-- TODO
+--
+-- data Word160 = Word160 {-# UNPACK #-} !Word64
+--                        {-# UNPACK #-} !Word64
+--                        {-# UNPACK #-} !Word32
+--
+-- newtype InfoHash = InfoHash Word160
+--
+-- reason: bytestring have overhead = 8 words, while infohash have length 20 bytes
+
+-- $infohash
+--
+-- Infohash is a unique identifier of torrent.
+
+-- | Exactly 20 bytes long SHA1 hash of the info part of torrent file.
+newtype InfoHash = InfoHash { getInfoHash :: BS.ByteString }
+  deriving (Eq, Ord, Typeable)
+
+infoHashLen :: Int
+infoHashLen = 20
+
+-- | Meaningless placeholder value.
+instance Default InfoHash where
+  def = "0123456789012345678901234567890123456789"
+
+-- | Hash raw bytes. (no encoding)
+instance Hashable InfoHash where
+  hashWithSalt s (InfoHash ih) = hashWithSalt s ih
+  {-# INLINE hashWithSalt #-}
+
+-- | Convert to\/from raw bencoded string. (no encoding)
+instance BEncode InfoHash where
+  toBEncode = toBEncode . getInfoHash
+  fromBEncode be = InfoHash <$> fromBEncode be
+
+-- | Convert to\/from raw bytestring. (no encoding)
+instance Serialize InfoHash where
+  put (InfoHash ih) = putByteString ih
+  {-# INLINE put #-}
+
+  get = InfoHash <$> getBytes infoHashLen
+  {-# INLINE get #-}
+
+-- | Convert to raw query value. (no encoding)
+instance QueryValueLike InfoHash where
+  toQueryValue (InfoHash ih) = Just ih
+  {-# INLINE toQueryValue #-}
+
+-- | Convert to base16 encoded string.
+instance Show InfoHash where
+  show (InfoHash ih) = BC.unpack (Base16.encode ih)
+
+-- | Convert to base16 encoded Doc string.
+instance Pretty InfoHash where
+  pretty = text . show
+
+-- | Read base16 encoded string.
+instance Read InfoHash where
+  readsPrec _ = readP_to_S $ do
+      str <- replicateM (infoHashLen * 2) (satisfy isHexDigit)
+      return $ InfoHash $ decodeIH str
+    where
+      decodeIH       = BS.pack . L.map fromHex . pair
+      fromHex (a, b) = read $ '0' : 'x' : a : b : []
+
+      pair (a : b : xs) = (a, b) : pair xs
+      pair _            = []
+
+-- | Convert raw bytes to info hash.
+instance Convertible BS.ByteString InfoHash where
+  safeConvert bs
+    | BS.length bs == infoHashLen = pure (InfoHash bs)
+    |          otherwise          = convError "invalid length" bs
+
+-- | Parse infohash from base16\/base32\/base64 encoded string.
+instance Convertible Text InfoHash where
+  safeConvert t
+      | 20 == hashLen = pure (InfoHash hashStr)
+      | 26 <= hashLen && hashLen <= 28 =
+        case Base64.decode hashStr of
+          Left  msg   -> convError ("invalid base64 encoding " ++ msg) t
+          Right ihStr -> safeConvert ihStr
+
+      |      hashLen == 32   =
+        case Base32.decode hashStr of
+          Left  msg   -> convError msg t
+          Right ihStr -> safeConvert ihStr
+
+      |      hashLen == 40   =
+        let (ihStr, inv) = Base16.decode hashStr
+        in if BS.length inv /= 0
+           then convError "invalid base16 encoding" t
+           else safeConvert ihStr
+
+      |        otherwise     = convError "invalid length" t
+    where
+      hashLen = BS.length hashStr
+      hashStr = T.encodeUtf8 t
+
+-- | Decode from base16\/base32\/base64 encoded string.
+instance IsString InfoHash where
+  fromString = either (error . prettyConvertError) id . safeConvert . T.pack
+
+ignoreErrorMsg :: Either a b -> Maybe b
+ignoreErrorMsg = either (const Nothing) Just
+
+-- | Tries both base16 and base32 while decoding info hash.
+--
+--  Use 'safeConvert' for detailed error messages.
+--
+textToInfoHash :: Text -> Maybe InfoHash
+textToInfoHash = ignoreErrorMsg . safeConvert
+
+-- | Hex encode infohash to text, full length.
+longHex :: InfoHash -> Text
+longHex = T.decodeUtf8 . Base16.encode . getInfoHash
+
+-- | The same as 'longHex', but only first 7 characters.
+shortHex :: InfoHash -> Text
+shortHex = T.take 7 . longHex
 
 {-----------------------------------------------------------------------
 --  Info dictionary
@@ -145,9 +308,9 @@ instance Default InfoDict where
 infoDictionary :: LayoutInfo -> PieceInfo -> Bool -> InfoDict
 infoDictionary li pinfo private = InfoDict ih li pinfo private
   where
-    ih = hashLazyIH $ encode $ InfoDict def li pinfo private
+    ih = hashLazyIH $ BE.encode $ InfoDict def li pinfo private
 
-getPrivate :: Get Bool
+getPrivate :: BE.Get Bool
 getPrivate = (Just True ==) <$>? "private"
 
 putPrivate :: Bool -> BDict -> BDict
@@ -172,7 +335,7 @@ instance BEncode InfoDict where
                   <*> getPieceInfo
                   <*> getPrivate
     where
-      ih = hashLazyIH (encode dict)
+      ih = hashLazyIH (BE.encode dict)
 
 ppPrivacy :: Bool -> Doc
 ppPrivacy privacy = "Privacy: " <> if privacy then "private" else "public"
@@ -361,10 +524,314 @@ isTorrentPath filepath = takeExtension filepath == extSeparator : torrentExt
 fromFile :: FilePath -> IO Torrent
 fromFile filepath = do
   contents <- BS.readFile filepath
-  case decode contents of
+  case BE.decode contents of
     Right !t -> return t
     Left msg -> throwIO $ userError $ msg ++ " while reading torrent file"
 
 -- | Encode and write a .torrent file.
 toFile :: FilePath -> Torrent -> IO ()
-toFile filepath = BL.writeFile filepath . encode
+toFile filepath = BL.writeFile filepath . BE.encode
+
+{-----------------------------------------------------------------------
+--  URN
+-----------------------------------------------------------------------}
+
+-- | Namespace identifier determines the syntactic interpretation of
+-- namespace-specific string.
+type NamespaceId = [Text]
+
+-- | BitTorrent Info Hash (hence the name) namespace
+-- identifier. Namespace-specific string /should/ be a base16\/base32
+-- encoded SHA1 hash of the corresponding torrent /info/ dictionary.
+--
+btih :: NamespaceId
+btih  = ["btih"]
+
+-- | URN is pesistent location-independent identifier for
+--   resources. In particular, URNs are used represent torrent names
+--   as a part of magnet link, see 'Data.Torrent.Magnet.Magnet' for
+--   more info.
+--
+data URN = URN
+  { urnNamespace :: NamespaceId -- ^ a namespace identifier;
+  , urnString    :: Text        -- ^ a corresponding
+                                -- namespace-specific string.
+  } deriving (Eq, Ord, Typeable)
+
+-----------------------------------------------------------------------
+
+instance Convertible URN InfoHash where
+  safeConvert u @ URN {..}
+    | urnNamespace /= btih = convError "invalid namespace" u
+    |       otherwise      = safeConvert urnString
+
+-- | Make resource name for torrent with corresponding
+-- infohash. Infohash is base16 (hex) encoded.
+--
+infohashURN :: InfoHash -> URN
+infohashURN = URN btih . longHex
+
+-- | Meaningless placeholder value.
+instance Default URN where
+  def = infohashURN def
+
+------------------------------------------------------------------------
+
+-- | Render URN to its text representation.
+renderURN :: URN -> Text
+renderURN URN {..}
+  = T.intercalate ":" $ "urn" : urnNamespace ++ [urnString]
+
+instance Pretty URN where
+  pretty = text . T.unpack . renderURN
+
+instance Show URN where
+  showsPrec n = showsPrec n . T.unpack . renderURN
+
+instance QueryValueLike URN where
+  toQueryValue = toQueryValue . renderURN
+  {-# INLINE toQueryValue #-}
+
+-----------------------------------------------------------------------
+
+unsnoc :: [a] -> Maybe ([a], a)
+unsnoc [] = Nothing
+unsnoc xs = Just (L.init xs, L.last xs)
+
+instance Convertible Text URN where
+  safeConvert t = case T.split (== ':') t of
+    uriScheme : body
+      | T.toLower uriScheme == "urn" ->
+        case unsnoc body of
+          Just (namespace, val) -> pure URN
+            { urnNamespace = namespace
+            , urnString    = val
+            }
+          Nothing -> convError "missing URN string" body
+      | otherwise -> convError "invalid URN scheme" uriScheme
+    []            -> convError "missing URN scheme" t
+
+instance IsString URN where
+  fromString = either (error . prettyConvertError) id
+             . safeConvert . T.pack
+
+-- | Try to parse an URN from its text representation.
+--
+--  Use 'safeConvert' for detailed error messages.
+--
+parseURN :: Text -> Maybe URN
+parseURN = either (const Nothing) pure . safeConvert
+
+{-----------------------------------------------------------------------
+--  Magnet
+-----------------------------------------------------------------------}
+-- $magnet-link
+--
+--   Magnet URI scheme is an standard defining Magnet links. Magnet
+--   links are refer to resources by hash, in particular magnet links
+--   can refer to torrent using corresponding infohash. In this way,
+--   magnet links can be used instead of torrent files.
+--
+--   This module provides bittorrent specific implementation of magnet
+--   links.
+--
+--   For generic magnet uri scheme see:
+--   <http://magnet-uri.sourceforge.net/magnet-draft-overview.txt>,
+--   <http://www.iana.org/assignments/uri-schemes/prov/magnet>
+--
+--   Bittorrent specific details:
+--   <http://www.bittorrent.org/beps/bep_0009.html>
+--
+
+-- TODO multiple exact topics
+-- TODO render/parse supplement for URI/query
+
+-- | An URI used to identify torrent.
+data Magnet = Magnet
+  { -- | Torrent infohash hash. Can be used in DHT queries if no
+    -- 'tracker' provided.
+    exactTopic  :: !InfoHash -- TODO InfoHash -> URN?
+
+    -- | A filename for the file to download. Can be used to
+    -- display name while waiting for metadata.
+  , displayName :: Maybe Text
+
+    -- | Size of the resource in bytes.
+  , exactLength :: Maybe Integer
+
+    -- | URI pointing to manifest, e.g. a list of further items.
+  , manifest :: Maybe Text
+
+    -- | Search string.
+  , keywordTopic :: Maybe Text
+
+    -- | A source to be queried after not being able to find and
+    -- download the file in the bittorrent network in a defined
+    -- amount of time.
+  , acceptableSource :: Maybe URI
+
+    -- | Direct link to the resource.
+  , exactSource      :: Maybe URI
+
+    -- | URI to the tracker.
+  , tracker :: Maybe URI
+
+    -- | Additional or experimental parameters.
+  , supplement :: Map Text Text
+  } deriving (Eq, Ord, Typeable)
+
+instance QueryValueLike Integer where
+  toQueryValue = toQueryValue . show
+
+instance QueryValueLike URI where
+  toQueryValue = toQueryValue . show
+
+instance QueryLike Magnet where
+  toQuery Magnet {..} =
+    [ ("xt", toQueryValue $ infohashURN exactTopic)
+    , ("dn", toQueryValue displayName)
+    , ("xl", toQueryValue exactLength)
+    , ("mt", toQueryValue manifest)
+    , ("kt", toQueryValue keywordTopic)
+    , ("as", toQueryValue acceptableSource)
+    , ("xs", toQueryValue exactSource)
+    , ("tr", toQueryValue tracker)
+    ]
+
+instance QueryValueLike Magnet where
+  toQueryValue = toQueryValue . renderMagnet
+
+instance Convertible QueryText Magnet where
+  safeConvert xs = do
+      urnStr   <- getTextMsg "xt" "exact topic not defined" xs
+      infoHash <- convertVia (error "safeConvert" :: URN)  urnStr
+      return Magnet
+        { exactTopic       = infoHash
+        , displayName      = getText "dn" xs
+        , exactLength      = getText "xl" xs >>= getInt
+        , manifest         = getText "mt" xs
+        , keywordTopic     = getText "kt" xs
+        , acceptableSource = getText "as" xs >>= getURI
+        , exactSource      = getText "xs" xs >>= getURI
+        , tracker          = getText "tr" xs >>= getURI
+        , supplement       = M.empty
+        }
+    where
+      getInt    = either (const Nothing) (Just . fst) . signed decimal
+      getURI    = parseURI . T.unpack
+      getText p = join . L.lookup p
+      getTextMsg p msg ps = maybe (convError msg xs) pure $ getText p ps
+
+magnetScheme :: URI
+magnetScheme = URI
+    { uriScheme    = "magnet:"
+    , uriAuthority = Nothing
+    , uriPath      = ""
+    , uriQuery     = ""
+    , uriFragment  = ""
+    }
+
+isMagnetURI :: URI -> Bool
+isMagnetURI u = u { uriQuery = "" } == magnetScheme
+
+-- | Can be used instead of 'parseMagnet'.
+instance Convertible URI Magnet where
+  safeConvert u @ URI {..}
+    | not (isMagnetURI u) = convError "this is not a magnet link" u
+    |      otherwise      = safeConvert $ parseQueryText $ BC.pack uriQuery
+
+-- | Can be used instead of 'renderMagnet'.
+instance Convertible Magnet URI where
+  safeConvert m = pure $ magnetScheme
+    { uriQuery = BC.unpack $ renderQuery True $ toQuery m }
+
+instance Convertible String Magnet where
+  safeConvert str
+    | Just uri <- parseURI str = safeConvert uri
+    |        otherwise         = convError "unable to parse uri" str
+
+------------------------------------------------------------------------
+
+-- | Meaningless placeholder value.
+instance Default Magnet where
+  def = Magnet
+    { exactTopic       = def
+    , displayName      = Nothing
+    , exactLength      = Nothing
+    , manifest         = Nothing
+    , keywordTopic     = Nothing
+    , acceptableSource = Nothing
+    , exactSource      = Nothing
+    , tracker          = Nothing
+    , supplement       = M.empty
+    }
+
+-- | Set 'exactTopic' ('xt' param) only, other params are empty.
+nullMagnet :: InfoHash -> Magnet
+nullMagnet u = Magnet
+    { exactTopic   = u
+    , displayName  = Nothing
+    , exactLength  = Nothing
+    , manifest     = Nothing
+    , keywordTopic = Nothing
+    , acceptableSource = Nothing
+    , exactSource      = Nothing
+    , tracker    = Nothing
+    , supplement = M.empty
+    }
+
+-- | Like 'nullMagnet' but also include 'displayName' ('dn' param).
+simpleMagnet :: Torrent -> Magnet
+simpleMagnet Torrent {tInfoDict = InfoDict {..}}
+  = (nullMagnet idInfoHash)
+    { displayName = Just $ T.decodeUtf8 $ suggestedName idLayoutInfo
+    }
+
+-- | Like 'simpleMagnet' but also include 'exactLength' ('xl' param) and
+-- 'tracker' ('tr' param).
+--
+detailedMagnet :: Torrent -> Magnet
+detailedMagnet t @ Torrent {tInfoDict = InfoDict {..}, tAnnounce}
+  = (simpleMagnet t)
+    { exactLength = Just $ fromIntegral $ contentLength idLayoutInfo
+    , tracker     = tAnnounce
+    }
+
+-----------------------------------------------------------------------
+
+parseMagnetStr :: String -> Maybe Magnet
+parseMagnetStr = either (const Nothing) Just . safeConvert
+
+renderMagnetStr :: Magnet -> String
+renderMagnetStr = show . (convert :: Magnet -> URI)
+
+instance Pretty Magnet where
+  pretty = PP.text . renderMagnetStr
+
+instance Show Magnet where
+  show = renderMagnetStr
+  {-# INLINE show #-}
+
+instance Read Magnet where
+  readsPrec _ xs
+      | Just m <- parseMagnetStr mstr = [(m, rest)]
+      | otherwise = []
+    where
+      (mstr, rest) = L.break (== ' ') xs
+
+instance IsString Magnet where
+  fromString str = fromMaybe (error msg) $ parseMagnetStr str
+    where
+      msg = "unable to parse magnet: " ++ str
+
+-- | Try to parse magnet link from urlencoded string. Use
+-- 'safeConvert' to find out error location.
+--
+parseMagnet :: Text -> Maybe Magnet
+parseMagnet = parseMagnetStr . T.unpack
+{-# INLINE parseMagnet #-}
+
+-- | Render magnet link to urlencoded string
+renderMagnet :: Magnet -> Text
+renderMagnet = T.pack . renderMagnetStr
+{-# INLINE renderMagnet #-}

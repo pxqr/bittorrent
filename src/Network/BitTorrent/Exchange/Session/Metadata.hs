@@ -26,8 +26,7 @@ import Data.List as L
 import Data.Tuple
 
 import Data.BEncode as BE
-import Data.Torrent
-import Data.Torrent.InfoHash
+import Data.Torrent as Torrent
 import Data.Torrent.Piece as Torrent
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block   as Block

@@ -92,7 +92,7 @@ import Data.Typeable
 import Network
 import Network.KRPC
 
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Token
 import Network.KRPC ()

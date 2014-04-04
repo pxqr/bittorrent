@@ -56,7 +56,7 @@ import Text.PrettyPrint as PP hiding ((<>), ($$))
 import Text.PrettyPrint.Class
 
 import Network.KRPC hiding (Options, def)
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Routing

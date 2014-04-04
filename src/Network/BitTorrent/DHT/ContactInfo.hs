@@ -11,7 +11,7 @@ import Data.Monoid
 import Data.HashMap.Strict as HM
 import Data.Serialize
 
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Network.BitTorrent.Core.PeerAddr
 
 {-

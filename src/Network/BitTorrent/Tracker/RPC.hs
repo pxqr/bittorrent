@@ -25,7 +25,7 @@ module Network.BitTorrent.Tracker.RPC
          -- * RPC
        , SAnnounceQuery (..)
        , RpcException (..)
-       , announce
+       , Network.BitTorrent.Tracker.RPC.announce
        , scrape
        ) where
 
@@ -36,7 +36,7 @@ import Network
 import Network.URI
 import Network.Socket (HostAddress)
 
-import           Data.Torrent.InfoHash
+import           Data.Torrent
 import           Data.Torrent.Progress
 import           Network.BitTorrent.Core
 import           Network.BitTorrent.Tracker.Message

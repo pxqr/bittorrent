@@ -57,7 +57,5 @@ module Network.BitTorrent
        ) where
 
 import Data.Torrent
-import Data.Torrent.InfoHash
-import Data.Torrent.Magnet
 import Network.BitTorrent.Client
 import Network.BitTorrent.Internal.Types

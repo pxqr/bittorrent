@@ -12,7 +12,7 @@ import Control.Monad
 import Data.Default
 import Network.Socket
 
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Connection hiding (Options)
 import Network.BitTorrent.Exchange.Session

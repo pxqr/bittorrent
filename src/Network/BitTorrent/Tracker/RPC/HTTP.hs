@@ -47,7 +47,7 @@ import qualified Network.HTTP.Conduit as HTTP
 import           Network.HTTP.Types.Header (hUserAgent)
 import           Network.HTTP.Types.URI    (SimpleQuery, renderSimpleQuery)
 
-import Data.Torrent.InfoHash               (InfoHash)
+import Data.Torrent                        (InfoHash)
 import Network.BitTorrent.Core.Fingerprint (libUserAgent)
 import Network.BitTorrent.Tracker.Message hiding (Request, Response)
 

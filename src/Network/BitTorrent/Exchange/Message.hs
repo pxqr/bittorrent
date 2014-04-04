@@ -118,7 +118,7 @@ import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.Bitfield
-import Data.Torrent.InfoHash
+import Data.Torrent
 import qualified Data.Torrent.Piece as P
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block

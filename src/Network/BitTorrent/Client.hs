@@ -61,8 +61,6 @@ import Data.Text
 import Network
 
 import           Data.Torrent
-import           Data.Torrent.InfoHash
-import           Data.Torrent.Magnet
 import           Network.BitTorrent.Client.Types
 import           Network.BitTorrent.Client.Handle
 import           Network.BitTorrent.Core

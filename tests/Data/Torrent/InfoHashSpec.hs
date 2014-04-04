@@ -10,8 +10,6 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 import Data.Torrent
-import Data.Torrent.InfoHash as IH
-
 
 instance Arbitrary InfoHash where
   arbitrary = do

@@ -124,7 +124,7 @@ import Numeric
 import System.Entropy
 import Text.Read (readMaybe)
 
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Data.Torrent.Progress
 import Network.BitTorrent.Core
 
