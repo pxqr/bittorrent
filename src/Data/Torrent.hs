@@ -144,38 +144,37 @@ module Data.Torrent
        , renderURN
        ) where
 
-import Prelude hiding (sum)
+import Prelude
 import Control.Applicative
 import Control.DeepSeq
 import Control.Exception
-import Control.Lens hiding (unsnoc)
+import Control.Lens
 import Control.Monad
-import qualified Crypto.Hash.SHA1 as C
-import qualified Crypto.Hash.SHA1 as SHA1
+import Crypto.Hash.SHA1 as SHA1
 import Data.BEncode as BE
 import Data.BEncode.Types as BE
 import Data.Bits
 import Data.Bits.Extras
-import           Data.ByteString as BS
-import           Data.ByteString.Base16 as Base16
-import           Data.ByteString.Base32 as Base32
-import           Data.ByteString.Base64 as Base64
-import qualified Data.ByteString.Char8 as BC (pack, unpack)
-import qualified Data.ByteString.Lazy  as BL
-import           Data.Char
-import           Data.Convertible
-import           Data.Default
-import           Data.Foldable as F
-import           Data.Hashable   as Hashable
-import           Data.Int
-import qualified Data.List as L
-import           Data.Map as M
-import           Data.Maybe
-import           Data.Serialize as S
-import           Data.String
-import           Data.Text as T
-import           Data.Text.Encoding as T
-import           Data.Text.Read
+import Data.ByteString as BS
+import Data.ByteString.Base16 as Base16
+import Data.ByteString.Base32 as Base32
+import Data.ByteString.Base64 as Base64
+import Data.ByteString.Char8 as BC (pack, unpack)
+import Data.ByteString.Lazy  as BL
+import Data.Char
+import Data.Convertible
+import Data.Default
+import Data.Foldable as F
+import Data.Hashable   as Hashable
+import Data.Int
+import Data.List as L
+import Data.Map as M
+import Data.Maybe
+import Data.Serialize as S
+import Data.String
+import Data.Text as T
+import Data.Text.Encoding as T
+import Data.Text.Read
 import Data.Time.Clock.POSIX
 import Data.Typeable
 import Network (HostName)
@@ -330,7 +329,7 @@ data FileInfo a = FileInfo {
       -- ^ Length of the file in bytes.
 
       -- TODO unpacked MD5 sum
-    , fiMD5Sum      :: !(Maybe ByteString)
+    , fiMD5Sum      :: !(Maybe BS.ByteString)
       -- ^ 32 character long MD5 sum of the file.  Used by third-party
       -- tools, not by bittorrent protocol itself.
 
@@ -361,7 +360,7 @@ instance NFData a => NFData (FileInfo a) where
   rnf FileInfo {..} = rnf fiName
   {-# INLINE rnf #-}
 
-instance BEncode (FileInfo [ByteString]) where
+instance BEncode (FileInfo [BS.ByteString]) where
   toBEncode FileInfo {..} = toDict $
        "length" .=! fiLength
     .: "md5sum" .=? fiMD5Sum
@@ -377,20 +376,20 @@ instance BEncode (FileInfo [ByteString]) where
 
 type Put a = a -> BDict -> BDict
 
-putFileInfoSingle :: Data.Torrent.Put (FileInfo ByteString)
+putFileInfoSingle :: Data.Torrent.Put (FileInfo BS.ByteString)
 putFileInfoSingle FileInfo {..} cont =
        "length" .=! fiLength
     .: "md5sum" .=? fiMD5Sum
     .: "name"   .=! fiName
     .: cont
 
-getFileInfoSingle :: BE.Get (FileInfo ByteString)
+getFileInfoSingle :: BE.Get (FileInfo BS.ByteString)
 getFileInfoSingle = do
     FileInfo <$>! "length"
              <*>? "md5sum"
              <*>! "name"
 
-instance BEncode (FileInfo ByteString) where
+instance BEncode (FileInfo BS.ByteString) where
   toBEncode = toDict . (`putFileInfoSingle` endDict)
   {-# INLINE toBEncode #-}
 
@@ -406,7 +405,7 @@ instance Pretty (FileInfo BS.ByteString) where
     ppMD5 md5 = "MD5 : " <> text (show (Base16.encode md5))
 
 -- | Join file path.
-joinFilePath :: FileInfo [ByteString] -> FileInfo ByteString
+joinFilePath :: FileInfo [BS.ByteString] -> FileInfo BS.ByteString
 joinFilePath = fmap (BS.intercalate "/")
 
 {-----------------------------------------------------------------------
@@ -422,15 +421,15 @@ joinFilePath = fmap (BS.intercalate "/")
 data LayoutInfo
   = SingleFile
     { -- | Single file info.
-      liFile     :: !(FileInfo ByteString)
+      liFile     :: !(FileInfo BS.ByteString)
     }
   | MultiFile
     { -- | List of the all files that torrent contains.
-      liFiles    :: ![FileInfo [ByteString]]
+      liFiles    :: ![FileInfo [BS.ByteString]]
 
       -- | The /suggested/ name of the root directory in which to
       -- store all the files.
-    , liDirName  :: !ByteString
+    , liDirName  :: !BS.ByteString
     } deriving (Show, Read, Eq, Typeable)
 
 makeLensesFor
@@ -482,7 +481,7 @@ isMultiFile _            = False
 {-# INLINE isMultiFile #-}
 
 -- | Get name of the torrent based on the root path piece.
-suggestedName :: LayoutInfo -> ByteString
+suggestedName :: LayoutInfo -> BS.ByteString
 suggestedName (SingleFile FileInfo {..}) = fiName
 suggestedName  MultiFile           {..}  = liDirName
 {-# INLINE suggestedName #-}
@@ -520,9 +519,9 @@ flatLayout prefixPath SingleFile { liFile = FileInfo {..} }
     = [(prefixPath </> BC.unpack fiName, fiLength)]
 flatLayout prefixPath MultiFile  {..}     = L.map mkPath liFiles
   where   -- TODO use utf8 encoding in name
-    mkPath FileInfo {..} = (path, fiLength)
+    mkPath FileInfo {..} = (_path, fiLength)
       where
-        path = prefixPath </> BC.unpack liDirName
+        _path = prefixPath </> BC.unpack liDirName
            </> joinPath (L.map BC.unpack fiName)
 
 -- | Calculate offset of each file based on its length, incrementally.
@@ -597,7 +596,7 @@ defaultPieceSize x = max minPieceSize $ min maxPieceSize $ toPow2 pc
 -- Piece data
 -----------------------------------------------------------------------}
 
-type PieceHash = ByteString
+type PieceHash = BS.ByteString
 
 hashsize :: Int
 hashsize = 20
@@ -632,7 +631,7 @@ hashPiece Piece {..} = SHA1.hashlazy pieceData
 -----------------------------------------------------------------------}
 
 -- | A flat array of SHA1 hash for each piece.
-newtype HashList = HashList { unHashList :: ByteString }
+newtype HashList = HashList { unHashList :: BS.ByteString }
   deriving (Show, Read, Eq, BEncode, Typeable)
 
 -- | Empty hash list.
@@ -688,7 +687,7 @@ instance BEncode PieceInfo where
 instance Pretty PieceInfo where
   pretty  PieceInfo {..} = "Piece size: " <> int piPieceLength
 
-slice :: Int -> Int -> ByteString -> ByteString
+slice :: Int -> Int -> BS.ByteString -> BS.ByteString
 slice start len = BS.take len . BS.drop start
 {-# INLINE slice #-}
 
@@ -773,7 +772,7 @@ putPrivate True  = \ cont -> "private" .=! True .: cont
 
 -- | Hash lazy bytestring using SHA1 algorithm.
 hashLazyIH :: BL.ByteString -> InfoHash
-hashLazyIH = either (const (error msg)) id . safeConvert . C.hashlazy
+hashLazyIH = either (const (error msg)) id . safeConvert . SHA1.hashlazy
   where
     msg = "Infohash.hash: impossible: SHA1 is always 20 bytes long"
 
@@ -850,7 +849,7 @@ data Torrent = Torrent
     -- authority to allow new peers onto the swarm.
 
   , tPublisherURL :: !(Maybe URI)
-  , tSignature    :: !(Maybe ByteString)
+  , tSignature    :: !(Maybe BS.ByteString)
     -- ^ The RSA signature of the info dictionary (specifically, the
     --   encrypted SHA-1 hash of the info dictionary).
     } deriving (Show, Eq, Typeable)
@@ -1049,15 +1048,15 @@ instance QueryValueLike URN where
 
 -----------------------------------------------------------------------
 
-unsnoc :: [a] -> Maybe ([a], a)
-unsnoc [] = Nothing
-unsnoc xs = Just (L.init xs, L.last xs)
+_unsnoc :: [a] -> Maybe ([a], a)
+_unsnoc [] = Nothing
+_unsnoc xs = Just (L.init xs, L.last xs)
 
 instance Convertible Text URN where
   safeConvert t = case T.split (== ':') t of
     uriScheme : body
       | T.toLower uriScheme == "urn" ->
-        case unsnoc body of
+        case _unsnoc body of
           Just (namespace, val) -> pure URN
             { urnNamespace = namespace
             , urnString    = val
