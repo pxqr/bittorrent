@@ -49,6 +49,19 @@ module Network.BitTorrent.Exchange.Connection
        , connSession
        , connStats
 
+         -- ** Status
+       , PeerStatus (..)
+       , ConnectionStatus (..)
+       , updateStatus
+       , statusUpdates
+       , clientStatus
+       , remoteStatus
+       , canUpload
+       , canDownload
+       , defaultUnchokeSlots
+       , defaultRechokeInterval
+
+
          -- * Setup
        , ConnectionPrefs  (..)
        , SessionLink      (..)
@@ -102,21 +115,21 @@ import Control.Monad.State
 import Control.Lens
 import Data.ByteString as BS
 import Data.ByteString.Lazy as BSL
-import Data.Conduit
+import Data.Conduit as C
 import Data.Conduit.Cereal
 import Data.Conduit.List
 import Data.Conduit.Network
 import Data.Default
 import Data.IORef
 import Data.List as L
-import Data.Maybe
+import Data.Maybe as M
 import Data.Monoid
 import Data.Serialize as S
 import Data.Typeable
 import Network
 import Network.Socket hiding (Connected)
 import Network.Socket.ByteString as BS
-import Text.PrettyPrint as PP hiding (($$), (<>))
+import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 import Text.Show.Functions ()
 import System.Log.FastLogger (ToLogStr(..))
@@ -125,7 +138,6 @@ import System.Timeout
 import Data.Torrent.Bitfield as BF
 import Data.Torrent.InfoHash
 import Network.BitTorrent.Core
-import Network.BitTorrent.Exchange.Connection.Status
 import Network.BitTorrent.Exchange.Message as Msg
 
 -- TODO handle port message?
@@ -463,6 +475,93 @@ instance Default Options where
     }
 
 {-----------------------------------------------------------------------
+--  Peer status
+-----------------------------------------------------------------------}
+
+-- | Connections contain two bits of state on either end: choked or
+-- not, and interested or not.
+data PeerStatus = PeerStatus
+  { -- | Choking is a notification that no data will be sent until
+    -- unchoking happens.
+    _choking    :: !Bool
+
+    -- |
+  , _interested :: !Bool
+  } deriving (Show, Eq, Ord)
+
+$(makeLenses ''PeerStatus)
+
+instance Pretty PeerStatus where
+  pretty PeerStatus {..} =
+    pretty (Choking _choking) <+> "and" <+> pretty (Interested _interested)
+
+-- | Connections start out choked and not interested.
+instance Default PeerStatus where
+  def = PeerStatus True False
+
+instance Monoid PeerStatus where
+  mempty      = def
+  mappend a b = PeerStatus
+    { _choking    = _choking    a && _choking    b
+    , _interested = _interested a || _interested b
+    }
+
+-- | Can be used to update remote peer status using incoming 'Status'
+-- message.
+updateStatus :: StatusUpdate -> PeerStatus -> PeerStatus
+updateStatus (Choking    b) = choking    .~ b
+updateStatus (Interested b) = interested .~ b
+
+-- | Can be used to generate outcoming messages.
+statusUpdates :: PeerStatus -> PeerStatus -> [StatusUpdate]
+statusUpdates a b = M.catMaybes $
+  [ if _choking    a == _choking    b then Nothing
+    else Just $ Choking    $ _choking    b
+  , if _interested a == _interested b then Nothing
+    else Just $ Interested $ _interested b
+  ]
+
+{-----------------------------------------------------------------------
+--  Connection status
+-----------------------------------------------------------------------}
+
+-- | Status of the both endpoints.
+data ConnectionStatus = ConnectionStatus
+  { _clientStatus :: !PeerStatus
+  , _remoteStatus :: !PeerStatus
+  } deriving (Show, Eq)
+
+$(makeLenses ''ConnectionStatus)
+
+instance Pretty ConnectionStatus where
+  pretty ConnectionStatus {..} =
+    "this  " PP.<+> pretty _clientStatus PP.$$
+    "remote" PP.<+> pretty _remoteStatus
+
+-- | Connections start out choked and not interested.
+instance Default ConnectionStatus where
+  def = ConnectionStatus def def
+
+-- | Can the client transfer to the remote peer?
+canUpload :: ConnectionStatus -> Bool
+canUpload ConnectionStatus {..}
+  = _interested _remoteStatus && not (_choking _clientStatus)
+
+-- | Can the client transfer from the remote peer?
+canDownload :: ConnectionStatus -> Bool
+canDownload ConnectionStatus {..}
+  = _interested _clientStatus && not (_choking _remoteStatus)
+
+-- | Indicates how many peers are allowed to download from the client
+-- by default.
+defaultUnchokeSlots :: Int
+defaultUnchokeSlots = 4
+
+-- |
+defaultRechokeInterval :: Int
+defaultRechokeInterval = 10 * 1000 * 1000
+
+{-----------------------------------------------------------------------
 --  Connection
 -----------------------------------------------------------------------}
 
@@ -681,7 +780,7 @@ runWire action sock chan conn = flip runReaderT conn $ runConnected $
     conduitGet S.get       $=
       trackFlow RemotePeer $=
          action            $=
-      trackFlow ThisPeer   $$
+      trackFlow ThisPeer   C.$$
     sinkChan chan
 
 -- | This function will block until a peer send new message. You can
@@ -835,7 +934,7 @@ closePending PendingConnection {..} = do
 
 chanToSock :: Int -> Chan Message -> Socket -> IO ()
 chanToSock ka chan sock =
-  sourceChan ka chan $= conduitPut S.put $$ sinkSocket sock
+  sourceChan ka chan $= conduitPut S.put C.$$ sinkSocket sock
 
 afterHandshaking :: ChannelSide -> PeerAddr IP -> Socket -> HandshakePair
                  -> ConnectionConfig s -> IO ()

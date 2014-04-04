@@ -72,7 +72,6 @@ library
                        Network.BitTorrent.Exchange.Assembler
                        Network.BitTorrent.Exchange.Block
                        Network.BitTorrent.Exchange.Connection
-                       Network.BitTorrent.Exchange.Connection.Status
                        Network.BitTorrent.Exchange.Manager
                        Network.BitTorrent.Exchange.Message
                        Network.BitTorrent.Exchange.Selection

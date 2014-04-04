@@ -54,7 +54,6 @@ import Network.BitTorrent.Internal.Types
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block   as Block
 import Network.BitTorrent.Exchange.Connection
-import Network.BitTorrent.Exchange.Connection.Status
 import Network.BitTorrent.Exchange.Message as Message
 import Network.BitTorrent.Exchange.Session.Metadata as Metadata
 import Network.BitTorrent.Exchange.Session.Status   as SS
