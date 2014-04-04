@@ -17,9 +17,9 @@ import Test.Hspec
 import Test.QuickCheck
 import System.Timeout
 
+import Data.TorrentSpec                 ()
 import Network.BitTorrent.CoreSpec      ()
 import Network.BitTorrent.DHT.TokenSpec ()
-import Data.Torrent.InfoHashSpec        ()
 
 
 instance MonadLogger IO where

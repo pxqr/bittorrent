@@ -16,7 +16,7 @@ import Data.Maybe
 import Test.Hspec
 import Test.QuickCheck
 
-import Data.Torrent.InfoHashSpec ()
+import Data.TorrentSpec ()
 import Data.Torrent.ProgressSpec ()
 import Network.BitTorrent.Core.PeerIdSpec ()
 import Network.BitTorrent.Core.PeerAddrSpec ()

@@ -15,7 +15,7 @@ import Network.BitTorrent.DHT
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Session
 
-import Data.Torrent.InfoHashSpec ()
+import Data.TorrentSpec ()
 import Network.BitTorrent.CoreSpec ()
 import Network.BitTorrent.DHT.TokenSpec ()
 

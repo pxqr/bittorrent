@@ -10,8 +10,8 @@ import Data.String
 import Test.Hspec
 import Test.QuickCheck
 
+import Data.TorrentSpec ()
 import Data.Torrent.BitfieldSpec ()
-import Data.Torrent.InfoHashSpec ()
 import Network.BitTorrent.CoreSpec ()
 import Network.BitTorrent.Core ()
 import Network.BitTorrent.Exchange.BlockSpec ()

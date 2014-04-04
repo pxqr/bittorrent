@@ -176,12 +176,8 @@ test-suite spec
   other-modules:       Spec
                        Config
 
+                       Data.TorrentSpec
                        Data.Torrent.BitfieldSpec
-                       Data.Torrent.InfoHashSpec
-                       Data.Torrent.LayoutSpec
-                       Data.Torrent.MagnetSpec
-                       Data.Torrent.MetainfoSpec
-                       Data.Torrent.PieceSpec
                        Data.Torrent.ProgressSpec
                        Network.BitTorrent.Client.HandleSpec
                        Network.BitTorrent.CoreSpec
