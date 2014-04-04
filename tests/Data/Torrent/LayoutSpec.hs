@@ -7,7 +7,7 @@ import Test.Hspec
 import Test.QuickCheck
 import System.Posix.Types
 
-import Data.Torrent.Layout
+import Data.Torrent
 
 
 instance Arbitrary COff where

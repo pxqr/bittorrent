@@ -13,9 +13,8 @@ import Test.Hspec
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
-import Data.Torrent.Piece
-import Data.Torrent.Layout
 import Data.Torrent
+import Data.Torrent.Piece
 import Data.Torrent.LayoutSpec ()
 import Network.BitTorrent.Core.NodeInfoSpec ()
 

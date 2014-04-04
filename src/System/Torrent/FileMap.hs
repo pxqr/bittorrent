@@ -34,7 +34,7 @@ import Data.Vector as V -- TODO use unboxed vector
 import Foreign
 import System.IO.MMap
 
-import Data.Torrent.Layout
+import Data.Torrent
 
 
 data FileEntry = FileEntry

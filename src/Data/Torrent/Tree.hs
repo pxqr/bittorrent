@@ -31,7 +31,7 @@ import Data.List as L
 import Data.Map  as M
 import Data.Monoid
 
-import Data.Torrent.Layout
+import Data.Torrent
 
 
 -- | 'DirTree' is more convenient form of 'LayoutInfo'.
