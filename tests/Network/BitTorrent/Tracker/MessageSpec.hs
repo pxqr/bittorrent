@@ -31,7 +31,7 @@ import Network.BitTorrent.Core
 --prop_urlencode :: Eq a => URLDecoded a => URLEncoded a => a -> Bool
 --prop_urlencode a = urlDecode (T.pack (urlEncode a)) == a
 
-instance Arbitrary Event where
+instance Arbitrary AnnounceEvent where
   arbitrary = elements [minBound..maxBound]
 
 instance Arbitrary AnnounceQuery where
