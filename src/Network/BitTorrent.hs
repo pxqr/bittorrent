@@ -29,10 +29,6 @@ module Network.BitTorrent
        , getClient
        , simpleClient
 
-         -- ** Events
-       , ClientEvent (..)
-       , subscription
-
          -- * Torrent
          -- ** Source
        , InfoHash
@@ -55,9 +51,13 @@ module Network.BitTorrent
        , start
        , pause
        , stop
+
+         -- * Events
+       , EventSource (..)
        ) where
 
-import Data.Torrent as BT
-import Data.Torrent.InfoHash as BT
-import Data.Torrent.Magnet as BT
-import Network.BitTorrent.Client as BT
+import Data.Torrent
+import Data.Torrent.InfoHash
+import Data.Torrent.Magnet
+import Network.BitTorrent.Client
+import Network.BitTorrent.Internal.Types

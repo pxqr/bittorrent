@@ -17,13 +17,12 @@ module Network.BitTorrent.Client.Types
        , MonadBitTorrent (..)
 
          -- * Events
-       , ClientEvent (..)
-       , HandleEvent (..)
+       , Types.Event (..)
        ) where
 
 import Control.Applicative
 import Control.Concurrent
-import Control.Concurrent.Chan.Split
+import Control.Concurrent.Chan.Split as CS
 import Control.Monad.Base
 import Control.Monad.Logger
 import Control.Monad.Reader
@@ -36,18 +35,16 @@ import Network
 import System.Log.FastLogger
 
 import Data.Torrent.InfoHash
+import Network.BitTorrent.Internal.Types as Types
 import Network.BitTorrent.Core
 import Network.BitTorrent.DHT      as DHT
 import Network.BitTorrent.Exchange as Exchange
-import Network.BitTorrent.Tracker  as Tracker
+import Network.BitTorrent.Tracker  as Tracker hiding (Event)
 
 data HandleStatus
   = Running
   | Stopped
     deriving (Show, Eq)
-
-data HandleEvent
-  = StatusChanged HandleStatus
 
 data Handle = Handle
   { handleTopic    :: !InfoHash
@@ -56,8 +53,12 @@ data Handle = Handle
   , handleStatus   :: !(MVar HandleStatus)
   , handleTrackers :: !Tracker.Session
   , handleExchange :: !Exchange.Session
-  , handleEvents   :: !(SendPort HandleEvent)
+  , handleEvents   :: !(SendPort (Event Handle))
   }
+
+instance EventSource Handle where
+  data Event Handle  = StatusChanged HandleStatus
+  listen Handle {..} = CS.listen undefined
 
 data Client = Client
   { clientPeerId       :: !PeerId
@@ -69,7 +70,7 @@ data Client = Client
   , clientNode         :: !(Node IPv4)
   , clientTorrents     :: !(MVar (HashMap InfoHash Handle))
   , clientLogger       :: !LogFun
-  , clientEvents       :: !(SendPort ClientEvent)
+  , clientEvents       :: !(SendPort (Event Client))
   }
 
 instance Eq Client where
@@ -77,6 +78,10 @@ instance Eq Client where
 
 instance Ord Client where
   compare = comparing clientPeerId
+
+instance EventSource Client where
+  data Event Client = TorrentAdded InfoHash
+  listen Client {..} = CS.listen clientEvents
 
 -- | External IP address of a host running a bittorrent client
 -- software may be used to acknowledge remote peer the host connected
@@ -87,10 +92,6 @@ externalAddr Client {..} = PeerAddr
   , peerHost = Nothing -- TODO return external IP address, if known
   , peerPort = clientListenerPort
   }
-
-data ClientEvent
-  = TorrentAdded InfoHash
-    deriving (Show, Eq)
 
 {-----------------------------------------------------------------------
 --  BitTorrent monad

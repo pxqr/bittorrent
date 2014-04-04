@@ -63,7 +63,7 @@ data SAnnounceQuery = SAnnounceQuery
   { sInfoHash :: InfoHash
   , sProgress :: Progress
   , sNumWant  :: Maybe Int
-  , sEvent    :: Maybe Event
+  , sEvent    :: Maybe AnnounceEvent
   }
 
 fillAnnounceQuery :: PeerInfo  ->  SAnnounceQuery  ->    AnnounceQuery

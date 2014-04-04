@@ -27,13 +27,8 @@ module Network.BitTorrent.Exchange
 
          -- * Connections
        , connect
-
-         -- * Events
-       , SessionEvent    (..)
-       , subscription
        ) where
 
-import Network.BitTorrent.Exchange.Connection hiding (Options)
 import Network.BitTorrent.Exchange.Manager
 import Network.BitTorrent.Exchange.Message
 import Network.BitTorrent.Exchange.Session

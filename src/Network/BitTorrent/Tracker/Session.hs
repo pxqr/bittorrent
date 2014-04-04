@@ -8,17 +8,18 @@
 --   Multitracker sessions.
 --
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE TemplateHaskell      #-}
 module Network.BitTorrent.Tracker.Session
        ( -- * Session
          Session
+       , Event (..)
        , newSession
        , closeSession
        , withSession
 
          -- * Client send notifications
-       , Event (..)
        , notify
        , askPeers
 
@@ -39,16 +40,12 @@ module Network.BitTorrent.Tracker.Session
        , addTracker
        , removeTracker
        , getTrustedTrackers
-
-         -- * Events
-       , SessionEvent (..)
-       , subscribe
        ) where
 
 import Control.Applicative
 import Control.Exception
 import Control.Concurrent
-import Control.Concurrent.Chan.Split
+import Control.Concurrent.Chan.Split as CS
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.TH
@@ -66,6 +63,7 @@ import Data.Torrent.InfoHash
 import Data.Torrent.JSON
 import Network.BitTorrent.Core
 import Network.BitTorrent.Internal.Cache
+import Network.BitTorrent.Internal.Types
 import Network.BitTorrent.Tracker.List as TL
 import Network.BitTorrent.Tracker.Message
 import Network.BitTorrent.Tracker.RPC as RPC
@@ -123,7 +121,7 @@ instance Default TrackerSession where
   def = TrackerSession Nothing def def
 
 -- | Do we need to notify this /specific/ tracker?
-needNotify :: Event -> Maybe Status -> Maybe Bool
+needNotify :: AnnounceEvent -> Maybe Status -> Maybe Bool
 needNotify Started    Nothing       = Just True
 needNotify Stopped    Nothing       = Just False
 needNotify Completed  Nothing       = Just False
@@ -135,7 +133,7 @@ needNotify Stopped   (Just Paused ) = Just False
 needNotify Completed (Just Paused ) = Just True
 
 -- | Client status after event announce succeed.
-nextStatus :: Event -> Maybe Status
+nextStatus :: AnnounceEvent -> Maybe Status
 nextStatus Started   = Just Running
 nextStatus Stopped   = Just Paused
 nextStatus Completed = Nothing -- must keep previous status
@@ -159,7 +157,7 @@ cacheScrape AnnounceInfo {..} =
       }
 
 -- | Make announce request to specific tracker returning new state.
-notifyTo :: Manager -> Session -> Event
+notifyTo :: Manager -> Session -> AnnounceEvent
          -> TierEntry TrackerSession -> IO TrackerSession
 notifyTo mgr s @ Session {..} event (uri, entry @ TrackerSession {..}) = do
   let shouldNotify = needNotify event statusSent
@@ -193,8 +191,19 @@ data Session = Session
     -- must take a lock.
   , sessionTrackers :: !(MVar (TrackerList TrackerSession))
 
-  , sessionEvents   :: !(SendPort SessionEvent)
+  , sessionEvents   :: !(SendPort (Event Session))
   }
+
+instance EventSource Session where
+  data Event Session
+    = TrackerAdded     URI
+    | TrackerConfirmed URI
+    | TrackerRemoved   URI
+    | AnnouncedTo      URI
+    | SessionClosed
+
+  listen Session {..} = CS.listen sessionEvents
+
 
 -- | Create a new multitracker session in paused state. Tracker list
 -- must contant only /trusted/ tracker uris. To start announcing
@@ -221,20 +230,6 @@ closeSession m s @ Session {..} = do
   send sessionEvents SessionClosed
 
 {-----------------------------------------------------------------------
---  Events
------------------------------------------------------------------------}
-
-data SessionEvent
-  = TrackerAdded     URI
-  | TrackerConfirmed URI
-  | TrackerRemoved   URI
-  | AnnouncedTo      URI
-  | SessionClosed
-
-subscribe :: Session -> IO (ReceivePort SessionEvent)
-subscribe Session {..} = listen sessionEvents
-
-{-----------------------------------------------------------------------
 --  Operations
 -----------------------------------------------------------------------}
 
@@ -253,12 +248,12 @@ getSessionState Session {..} = TL.toList <$> readMVar sessionTrackers
 
 -- | Do we need to sent this event to a first working tracker or to
 -- the all known good trackers?
-allNotify :: Event -> Bool
+allNotify :: AnnounceEvent -> Bool
 allNotify Started   = False
 allNotify Stopped   = True
 allNotify Completed = True
 
-notifyAll :: Manager -> Session -> Event -> IO ()
+notifyAll :: Manager -> Session -> AnnounceEvent -> IO ()
 notifyAll mgr s @ Session {..} event = do
     modifyMVar_ sessionTrackers $
       (traversal (notifyTo mgr s event))
@@ -271,7 +266,7 @@ notifyAll mgr s @ Session {..} event = do
 -- |
 --
 -- This function /may/ block until tracker query proceed.
-notify :: Manager -> Session -> Event -> IO ()
+notify :: Manager -> Session -> AnnounceEvent -> IO ()
 notify mgr ses event = do
   prevStatus <- atomicModifyIORef (sessionStatus ses) $ \ s ->
                   (fromMaybe s (nextStatus event), s)

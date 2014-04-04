@@ -21,10 +21,6 @@ module Network.BitTorrent.Client
        , withClient
        , simpleClient
 
-         -- ** Events
-       , ClientEvent (..)
-       , Network.BitTorrent.Client.subscription
-
          -- * BitTorrent monad
        , MonadBitTorrent (..)
        , BitTorrent
@@ -165,11 +161,6 @@ simpleClient :: BitTorrent () -> IO ()
 simpleClient m = do
   runStderrLoggingT $ LoggingT $ \ logger -> do
     withClient def logger (`runBitTorrent` m)
-
-subscription :: BitTorrent (ReceivePort ClientEvent)
-subscription = do
-  Client {..} <- getClient
-  liftIO $ listen clientEvents
 
 {-----------------------------------------------------------------------
 --  Torrent identifiers

@@ -14,11 +14,7 @@ module Network.BitTorrent.Client.Handle
 
          -- * Query
        , getHandle
-       , HandleStatus (..)
        , getStatus
-
-         -- * Events
-       , HandleEvent (..)
        ) where
 
 import Control.Concurrent.Chan.Split
@@ -192,6 +188,3 @@ getHandle ih = do
 
 getStatus :: Handle -> IO HandleStatus
 getStatus Handle {..} = readMVar handleStatus
-
-subscription :: Handle -> IO (ReceivePort HandleEvent)
-subscription Handle {..} = listen handleEvents

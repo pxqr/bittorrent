@@ -1,9 +1,11 @@
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
 module Network.BitTorrent.Exchange.Session
        ( -- * Session
          Session
+       , Event (..)
        , LogFun
        , sessionLogger
 
@@ -19,10 +21,6 @@ module Network.BitTorrent.Exchange.Session
          -- * Query
        , waitMetadata
        , takeMetadata
-
-         -- * Events
-       , SessionEvent (..)
-       , subscription
        ) where
 
 import Control.Applicative
@@ -52,6 +50,7 @@ import Data.Torrent.Bitfield as BF
 import Data.Torrent.InfoHash
 import Data.Torrent.Piece
 import qualified Data.Torrent.Piece as Torrent (Piece ())
+import Network.BitTorrent.Internal.Types
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block   as Block
 import Network.BitTorrent.Exchange.Connection
@@ -138,7 +137,7 @@ data Session = Session
   { sessionPeerId          :: !(PeerId)
   , sessionTopic           :: !(InfoHash)
   , sessionLogger          :: !(LogFun)
-  , sessionEvents          :: !(SendPort SessionEvent)
+  , sessionEvents          :: !(SendPort (Event Session))
 
   , sessionState           :: !(MVar SessionState)
 
@@ -161,6 +160,17 @@ data Session = Session
     -- handshake).
   , connectionsBroadcast   :: !(Chan Message)
   }
+
+instance EventSource Session where
+  data Event Session
+    = ConnectingTo (PeerAddr IP)
+    | ConnectionEstablished (PeerAddr IP)
+    | ConnectionAborted
+    | ConnectionClosed (PeerAddr IP)
+    | SessionClosed
+      deriving Show
+
+  listen Session {..} = CS.listen sessionEvents
 
 newSession :: LogFun
            -> PeerAddr (Maybe IP)      -- ^ /external/ address of this peer;
@@ -203,21 +213,6 @@ closeSession Session {..} = do
 
 withSession :: ()
 withSession = error "withSession"
-
-{-----------------------------------------------------------------------
---  Session events
------------------------------------------------------------------------}
-
-data SessionEvent
-  = ConnectingTo (PeerAddr IP)
-  | ConnectionEstablished (PeerAddr IP)
-  | ConnectionAborted
-  | ConnectionClosed (PeerAddr IP)
-  | SessionClosed
-    deriving Show
-
-subscription :: Session -> IO (ReceivePort SessionEvent)
-subscription Session {..} = listen sessionEvents
 
 {-----------------------------------------------------------------------
 --  Logging
@@ -577,14 +572,3 @@ mainWire = do
   logEvent "Connection established"
   iterM logMessage =$= exchange =$= iterM logMessage
   lift finishedConnection
-
-data Event = NewMessage (PeerAddr IP) Message
-           | Timeout -- for scheduling
-
-type Exchange a = Wire Session a
-
-awaitEvent :: Exchange Event
-awaitEvent = error "awaitEvent"
-
-yieldEvent :: Exchange Event
-yieldEvent = error "yieldEvent"

@@ -30,8 +30,8 @@
 module Network.BitTorrent.Tracker.Message
        ( -- * Announce
          -- ** Query
-         Event(..)
-       , AnnounceQuery(..)
+         AnnounceEvent (..)
+       , AnnounceQuery (..)
        , renderAnnounceQuery
        , ParamParseFailure
        , parseAnnounceQuery
@@ -136,7 +136,7 @@ import Network.BitTorrent.Core
 -----------------------------------------------------------------------}
 
 -- | Events are used to specify which kind of announce query is performed.
-data Event
+data AnnounceEvent
     -- | For the first request: when download first begins.
   = Started
 
@@ -150,10 +150,10 @@ data Event
   | Completed
     deriving (Show, Read, Eq, Ord, Enum, Bounded, Typeable)
 
-$(deriveJSON omitRecordPrefix ''Event)
+$(deriveJSON omitRecordPrefix ''AnnounceEvent)
 
 -- | HTTP tracker protocol compatible encoding.
-instance QueryValueLike Event where
+instance QueryValueLike AnnounceEvent where
   toQueryValue e = toQueryValue (Char.toLower x : xs)
     where
       (x : xs) = show e -- INVARIANT: this is always nonempty list
@@ -161,17 +161,17 @@ instance QueryValueLike Event where
 type EventId = Word32
 
 -- | UDP tracker encoding event codes.
-eventId :: Event -> EventId
+eventId :: AnnounceEvent -> EventId
 eventId Completed = 1
 eventId Started   = 2
 eventId Stopped   = 3
 
 -- TODO add Regular event
-putEvent :: Putter (Maybe Event)
+putEvent :: Putter (Maybe AnnounceEvent)
 putEvent Nothing  = putWord32be 0
 putEvent (Just e) = putWord32be (eventId e)
 
-getEvent :: S.Get (Maybe Event)
+getEvent :: S.Get (Maybe AnnounceEvent)
 getEvent = do
   eid <- getWord32be
   case eid of
@@ -221,7 +221,7 @@ data AnnounceQuery = AnnounceQuery
 
      -- | If not specified, the request is regular periodic
      -- request. Regular request should be sent
-   , reqEvent      :: Maybe Event
+   , reqEvent      :: Maybe AnnounceEvent
    } deriving (Show, Eq, Typeable)
 
 $(deriveJSON omitRecordPrefix ''AnnounceQuery)
@@ -351,7 +351,7 @@ instance FromParam Int where
 instance FromParam PortNumber where
   fromParam bs = fromIntegral <$> (fromParam bs :: Maybe Word32)
 
-instance FromParam Event where
+instance FromParam AnnounceEvent where
   fromParam bs = do
     (x, xs) <- BC.uncons bs
     readMaybe $ BC.unpack $ BC.cons (Char.toUpper x) xs

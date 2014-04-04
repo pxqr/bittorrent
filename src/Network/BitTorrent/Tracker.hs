@@ -22,12 +22,13 @@ module Network.BitTorrent.Tracker
          -- * Multitracker session
        , trackerList
        , Session
+       , Event (..)
        , newSession
        , closeSession
        , withSession
 
          -- ** Events
-       , Event (..)
+       , AnnounceEvent (..)
        , notify
        , askPeers
 

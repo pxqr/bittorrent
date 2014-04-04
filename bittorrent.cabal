@@ -80,6 +80,7 @@ library
                        Network.BitTorrent.Exchange.Session.Metadata
                        Network.BitTorrent.Exchange.Session.Status
                        Network.BitTorrent.Internal.Cache
+                       Network.BitTorrent.Internal.Types
                        Network.BitTorrent.Tracker
                        Network.BitTorrent.Tracker.List
                        Network.BitTorrent.Tracker.Message
