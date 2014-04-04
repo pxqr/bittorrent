@@ -95,7 +95,8 @@ import Data.Torrent.InfoHash
 import Network.KRPC hiding (Options, def)
 import qualified Network.KRPC as KRPC (def)
 import Network.BitTorrent.Core
-import Network.BitTorrent.Core.PeerAddr as P
+import Network.BitTorrent.Core.PeerAddr
+import Network.BitTorrent.DHT.ContactInfo as P
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Routing as R
 import Network.BitTorrent.DHT.Token   as T
