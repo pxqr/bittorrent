@@ -97,7 +97,6 @@ module Network.BitTorrent.Tracker.Message
 
 import Control.Applicative
 import Control.Monad
-import Data.Aeson.TH
 import Data.BEncode as BE hiding (Result)
 import Data.BEncode.BDict as BE
 import Data.ByteString as BS
@@ -126,7 +125,6 @@ import System.Entropy
 import Text.Read (readMaybe)
 
 import Data.Torrent.InfoHash
-import Data.Torrent.JSON
 import Data.Torrent.Progress
 import Network.BitTorrent.Core
 
@@ -149,8 +147,6 @@ data AnnounceEvent
     -- sent if the file was completed when 'Started'.
   | Completed
     deriving (Show, Read, Eq, Ord, Enum, Bounded, Typeable)
-
-$(deriveJSON omitRecordPrefix ''AnnounceEvent)
 
 -- | HTTP tracker protocol compatible encoding.
 instance QueryValueLike AnnounceEvent where
@@ -223,8 +219,6 @@ data AnnounceQuery = AnnounceQuery
      -- request. Regular request should be sent
    , reqEvent      :: Maybe AnnounceEvent
    } deriving (Show, Eq, Typeable)
-
-$(deriveJSON omitRecordPrefix ''AnnounceQuery)
 
 -- | UDP tracker protocol compatible encoding.
 instance Serialize AnnounceQuery where
@@ -635,8 +629,6 @@ data ScrapeEntry = ScrapeEntry {
     --   file in the info section of the .torrent file.
   , siName       :: !(Maybe Text)
   } deriving (Show, Eq, Typeable)
-
-$(deriveJSON omitRecordPrefix ''ScrapeEntry)
 
 -- | HTTP tracker protocol compatible encoding.
 instance BEncode ScrapeEntry where

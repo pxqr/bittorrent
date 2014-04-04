@@ -71,8 +71,6 @@ import qualified Crypto.Hash.SHA1 as C
 import Control.DeepSeq
 import Control.Exception
 import Control.Lens
-import Data.Aeson.Types (ToJSON(..), FromJSON(..), Value(..), withText)
-import Data.Aeson.TH
 import Data.BEncode as BE
 import Data.BEncode.Types as BE
 import           Data.ByteString as BS
@@ -93,7 +91,6 @@ import Text.PrettyPrint.Class
 import System.FilePath
 
 import Data.Torrent.InfoHash as IH
-import Data.Torrent.JSON
 import Data.Torrent.Layout
 import Data.Torrent.Piece
 import Network.BitTorrent.Core.NodeInfo
@@ -124,8 +121,6 @@ data InfoDict = InfoDict
     --
     --   BEP 27: <http://www.bittorrent.org/beps/bep_0027.html>
   } deriving (Show, Read, Eq, Typeable)
-
-$(deriveJSON omitRecordPrefix ''InfoDict)
 
 makeLensesFor
   [ ("idInfoHash"  , "infohash"  )
@@ -241,21 +236,6 @@ data Torrent = Torrent
     -- ^ The RSA signature of the info dictionary (specifically, the
     --   encrypted SHA-1 hash of the info dictionary).
     } deriving (Show, Eq, Typeable)
-
-instance FromJSON URI where
-  parseJSON = withText "URI" $
-    maybe (fail "could not parse URI") pure . parseURI . T.unpack
-
-instance ToJSON URI where
-  toJSON = String . T.pack . show
-
-instance ToJSON NominalDiffTime where
-  toJSON = toJSON . posixSecondsToUTCTime
-
-instance FromJSON NominalDiffTime where
-  parseJSON v = utcTimeToPOSIXSeconds <$> parseJSON v
-
-$(deriveJSON omitRecordPrefix ''Torrent)
 
 makeLensesFor
   [ ("tAnnounce"    , "announce"    )

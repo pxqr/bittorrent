@@ -57,7 +57,6 @@ module Network.BitTorrent.Exchange.Block
 
 import Prelude hiding (span)
 import Control.Applicative
-import Data.Aeson.TH
 import Data.ByteString as BS hiding (span)
 import Data.ByteString.Lazy as BL hiding (span)
 import Data.ByteString.Lazy.Builder as BS
@@ -70,7 +69,6 @@ import Numeric
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
-import Data.Torrent.JSON
 import Data.Torrent.Piece
 
 {-----------------------------------------------------------------------
@@ -113,8 +111,6 @@ data BlockIx = BlockIx {
     -- | Block size starting from offset.
   , ixLength :: {-# UNPACK #-} !BlockSize
   } deriving (Show, Eq, Typeable)
-
-$(deriveJSON omitRecordPrefix ''BlockIx)
 
 -- | First block in torrent. Useful for debugging.
 instance Default BlockIx where

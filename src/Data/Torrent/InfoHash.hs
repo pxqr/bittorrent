@@ -24,7 +24,6 @@ module Data.Torrent.InfoHash
 
 import Control.Applicative
 import Control.Monad
-import Data.Aeson
 import Data.BEncode
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
@@ -145,15 +144,6 @@ instance Convertible Text InfoHash where
 -- | Decode from base16\/base32\/base64 encoded string.
 instance IsString InfoHash where
   fromString = either (error . prettyConvertError) id . safeConvert . T.pack
-
--- | Convert to base16 encoded JSON string.
-instance ToJSON InfoHash where
-  toJSON (InfoHash ih) = String $ T.decodeUtf8 $ Base16.encode ih
-
--- | Convert from base16\/base32\/base64 encoded JSON string.
-instance FromJSON InfoHash where
-  parseJSON = withText "InfoHash" $
-    either (fail . prettyConvertError) pure . safeConvert
 
 ignoreErrorMsg :: Either a b -> Maybe b
 ignoreErrorMsg = either (const Nothing) Just

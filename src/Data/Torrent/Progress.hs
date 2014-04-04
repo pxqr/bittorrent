@@ -36,7 +36,6 @@ module Data.Torrent.Progress
 
 import Control.Applicative
 import Control.Lens hiding ((%=))
-import Data.Aeson.TH
 import Data.ByteString.Lazy.Builder  as BS
 import Data.ByteString.Lazy.Builder.ASCII as BS
 import Data.Default
@@ -48,8 +47,6 @@ import Data.Word
 import Network.HTTP.Types.QueryLike
 import Text.PrettyPrint as PP
 import Text.PrettyPrint.Class
-
-import Data.Torrent.JSON
 
 
 -- | Progress data is considered as dynamic within one client
@@ -64,7 +61,6 @@ data Progress = Progress
   } deriving (Show, Read, Eq)
 
 $(makeLenses ''Progress)
-$(deriveJSON omitLensPrefix ''Progress)
 
 -- | UDP tracker compatible encoding.
 instance Serialize Progress where

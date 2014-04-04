@@ -47,8 +47,6 @@ module Data.Torrent.Piece
 import Control.DeepSeq
 import Control.Lens
 import qualified Crypto.Hash.SHA1 as SHA1
-import Data.Aeson (ToJSON(..), FromJSON(..), Value(..), withText)
-import Data.Aeson.TH
 import Data.BEncode
 import Data.BEncode.Types
 import Data.Bits
@@ -62,8 +60,6 @@ import Data.Text.Encoding as T
 import Data.Typeable
 import Text.PrettyPrint
 import Text.PrettyPrint.Class
-
-import Data.Torrent.JSON
 
 
 -- TODO add torrent file validation
@@ -139,8 +135,6 @@ data Piece a = Piece
   , pieceData  :: !a
   } deriving (Show, Read, Eq, Functor, Typeable)
 
-$(deriveJSON omitRecordPrefix ''Piece)
-
 instance NFData (Piece a)
 
 -- | Payload bytes are omitted.
@@ -163,14 +157,6 @@ hashPiece Piece {..} = SHA1.hashlazy pieceData
 newtype HashList = HashList { unHashList :: ByteString }
   deriving (Show, Read, Eq, BEncode, Typeable)
 
--- | Represented as base64 encoded JSON string.
-instance ToJSON HashList where
-  toJSON (HashList bs) = String $ T.decodeUtf8 $ Base64.encode bs
-
-instance FromJSON HashList where
-  parseJSON = withText "HashArray" $
-    either fail (return . HashList) . Base64.decode . T.encodeUtf8
-
 -- | Empty hash list.
 instance Default HashList where
   def = HashList ""
@@ -183,8 +169,6 @@ data PieceInfo = PieceInfo
   , piPieceHashes  :: !HashList
     -- ^ Concatenation of all 20-byte SHA1 hash values.
   } deriving (Show, Read, Eq, Typeable)
-
-$(deriveJSON omitRecordPrefix ''PieceInfo)
 
 -- | Number of bytes in each piece.
 makeLensesFor [("piPieceLength", "pieceLength")] ''PieceInfo

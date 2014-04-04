@@ -91,8 +91,6 @@ library
                        System.Torrent.FileMap
                        System.Torrent.Storage
   other-modules:       Paths_bittorrent
-                       Data.Torrent.JSON
-
   build-depends:       base       == 4.*
                      , lifted-base
                      , bits-extras  >= 0.1.2
@@ -141,7 +139,6 @@ library
                      , hashable     >= 1.2
 
                        -- Codecs & Serialization
-                     , aeson             >= 0.7
                      , attoparsec        >= 0.10
                      , base16-bytestring >= 0.1
                      , base32-bytestring >= 0.2

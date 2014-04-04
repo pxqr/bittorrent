@@ -39,8 +39,6 @@ module Network.BitTorrent.Core.NodeInfo
        ) where
 
 import Control.Applicative
-import Data.Aeson (ToJSON, FromJSON)
-import Data.Aeson.TH
 import Data.Bits
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BC
@@ -62,7 +60,6 @@ import System.Entropy
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
-import Data.Torrent.JSON
 import Network.BitTorrent.Core.PeerAddr (PeerAddr (..))
 
 {-----------------------------------------------------------------------
@@ -76,7 +73,7 @@ import Network.BitTorrent.Core.PeerAddr (PeerAddr (..))
 --   Normally, /this/ node id should be saved between invocations
 --   of the client software.
 newtype NodeId = NodeId ByteString
-  deriving (Show, Eq, Ord, BEncode, FromJSON, ToJSON, Typeable)
+  deriving (Show, Eq, Ord, BEncode, Typeable)
 
 nodeIdSize :: Int
 nodeIdSize = 20
@@ -146,8 +143,6 @@ data NodeAddr a = NodeAddr
   , nodePort :: {-# UNPACK #-} !PortNumber
   } deriving (Eq, Typeable, Functor)
 
-$(deriveJSON omitRecordPrefix ''NodeAddr)
-
 instance Show a => Show (NodeAddr a) where
   showsPrec i NodeAddr {..}
     = showsPrec i nodeHost <> showString ":" <> showsPrec i nodePort
@@ -201,8 +196,6 @@ data NodeInfo a = NodeInfo
   { nodeId   :: !NodeId
   , nodeAddr :: !(NodeAddr a)
   } deriving (Show, Eq, Functor)
-
-$(deriveJSON omitRecordPrefix ''NodeInfo)
 
 instance Eq a => Ord (NodeInfo a) where
   compare = comparing nodeId

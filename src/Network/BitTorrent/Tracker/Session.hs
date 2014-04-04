@@ -47,8 +47,6 @@ import Control.Exception
 import Control.Concurrent
 import Control.Concurrent.Chan.Split as CS
 import Control.Monad
-import Data.Aeson
-import Data.Aeson.TH
 import Data.Default
 import Data.Fixed
 import Data.Foldable as F
@@ -60,7 +58,6 @@ import Data.Traversable
 import Network.URI
 
 import Data.Torrent.InfoHash
-import Data.Torrent.JSON
 import Network.BitTorrent.Core
 import Network.BitTorrent.Internal.Cache
 import Network.BitTorrent.Internal.Types
@@ -95,8 +92,6 @@ data LastScrape = LastScrape
   , scrapeSeeders  :: Maybe Int
   } deriving (Show, Eq)
 
-$(deriveJSON omitRecordPrefix ''LastScrape)
-
 -- | Single tracker session.
 data TrackerSession = TrackerSession
   { -- | Used to notify 'Stopped' and 'Completed' events.
@@ -108,13 +103,6 @@ data TrackerSession = TrackerSession
     -- | Can be used to show brief swarm stats in client GUI.
   , trackerScrape :: Cached LastScrape
   }
-
-instance ToJSON (TierEntry TrackerSession) where
-  toJSON (uri, TrackerSession {..}) = object
-    [ "uri"    .= uri
-    , "peers"  .= trackerPeers
-    , "scrape" .= trackerScrape
-    ]
 
 -- | Not contacted.
 instance Default TrackerSession where

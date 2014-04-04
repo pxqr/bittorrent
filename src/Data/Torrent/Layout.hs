@@ -64,8 +64,6 @@ module Data.Torrent.Layout
 import Control.Applicative
 import Control.DeepSeq
 import Control.Lens
-import Data.Aeson.TH
-import Data.Aeson.Types (FromJSON, ToJSON)
 import Data.BEncode
 import Data.BEncode.Types
 import Data.ByteString as BS
@@ -82,8 +80,6 @@ import Text.PrettyPrint.Class
 import System.FilePath
 import System.Posix.Types
 
-import Data.Torrent.JSON
-
 {-----------------------------------------------------------------------
 --  File attribytes
 -----------------------------------------------------------------------}
@@ -91,8 +87,6 @@ import Data.Torrent.JSON
 -- | Size of a file in bytes.
 type FileSize = FileOffset
 
-deriving instance FromJSON FileOffset
-deriving instance ToJSON   FileOffset
 deriving instance BEncode  FileOffset
 
 {-----------------------------------------------------------------------
@@ -124,8 +118,6 @@ data FileInfo a = FileInfo {
     } deriving (Show, Read, Eq, Typeable
                , Functor, Foldable
                )
-
-$(deriveJSON omitRecordPrefix ''FileInfo)
 
 makeLensesFor
   [ ("fiLength", "fileLength")
@@ -209,8 +201,6 @@ data LayoutInfo
       -- store all the files.
     , liDirName  :: !ByteString
     } deriving (Show, Read, Eq, Typeable)
-
-$(deriveJSON omitRecordPrefix ''LayoutInfo)
 
 makeLensesFor
   [ ("liFile"   , "singleFile" )

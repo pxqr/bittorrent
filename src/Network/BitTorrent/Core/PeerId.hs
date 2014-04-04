@@ -34,7 +34,6 @@ module Network.BitTorrent.Core.PeerId
        ) where
 
 import Control.Applicative
-import Data.Aeson
 import Data.BEncode as BE
 import Data.ByteString as BS
 import Data.ByteString.Internal as BS
@@ -62,14 +61,13 @@ import Text.PrettyPrint hiding ((<>))
 import Text.PrettyPrint.Class
 import Text.Read        (readMaybe)
 
-import Data.Torrent.JSON ()
 import Network.BitTorrent.Core.Fingerprint
 
 -- TODO use unpacked Word160 form (length is known statically)
 
 -- | Peer identifier is exactly 20 bytes long bytestring.
 newtype PeerId = PeerId { getPeerId :: ByteString }
-  deriving (Show, Eq, Ord, BEncode, ToJSON, FromJSON, Typeable)
+  deriving (Show, Eq, Ord, BEncode, Typeable)
 
 peerIdLen :: Int
 peerIdLen = 20

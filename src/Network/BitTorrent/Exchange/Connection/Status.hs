@@ -34,14 +34,12 @@ module Network.BitTorrent.Exchange.Connection.Status
        ) where
 
 import Control.Lens
-import Data.Aeson.TH
 import Data.Default
 import Data.Maybe
 import Data.Monoid
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
-import Data.Torrent.JSON
 import Network.BitTorrent.Exchange.Message
 
 
@@ -61,7 +59,6 @@ data PeerStatus = PeerStatus
   } deriving (Show, Eq, Ord)
 
 $(makeLenses ''PeerStatus)
-$(deriveJSON omitLensPrefix ''PeerStatus)
 
 instance Pretty PeerStatus where
   pretty PeerStatus {..} =
@@ -104,7 +101,6 @@ data ConnectionStatus = ConnectionStatus
   } deriving (Show, Eq)
 
 $(makeLenses ''ConnectionStatus)
-$(deriveJSON omitRecordPrefix ''ConnectionStatus)
 
 instance Pretty ConnectionStatus where
   pretty ConnectionStatus {..} =
