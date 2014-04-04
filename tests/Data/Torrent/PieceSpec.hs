@@ -3,7 +3,7 @@ module Data.Torrent.PieceSpec (spec) where
 import Control.Applicative
 import Test.Hspec
 import Test.QuickCheck
-import Data.Torrent.Piece
+import Data.Torrent
 
 
 instance Arbitrary a => Arbitrary (Piece a) where

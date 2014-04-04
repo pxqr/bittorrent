@@ -45,8 +45,7 @@ import Text.PrettyPrint.Class
 import System.Log.FastLogger (LogStr, ToLogStr (..))
 
 import Data.BEncode as BE
-import Data.Torrent as T
-import Data.Torrent.Piece as Torrent
+import Data.Torrent as Torrent
 import Data.Torrent.Bitfield as BF
 import Network.BitTorrent.Internal.Types
 import Network.BitTorrent.Core

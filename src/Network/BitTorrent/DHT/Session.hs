@@ -91,7 +91,7 @@ import System.Random (randomIO)
 import Text.PrettyPrint as PP hiding ((<>), ($$))
 import Text.PrettyPrint.Class
 
-import Data.Torrent
+import Data.Torrent as Torrent
 import Network.KRPC hiding (Options, def)
 import qualified Network.KRPC as KRPC (def)
 import Network.BitTorrent.Core

@@ -92,7 +92,7 @@ import           Data.List (foldl')
 import           Data.Monoid
 import           Data.Ratio
 
-import Data.Torrent.Piece
+import Data.Torrent
 
 -- TODO cache some operations
 

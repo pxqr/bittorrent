@@ -28,7 +28,7 @@ import Data.Map as M
 import Data.Set as S
 import Data.Tuple
 
-import Data.Torrent.Piece
+import Data.Torrent
 import Data.Torrent.Bitfield as BF
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block as Block

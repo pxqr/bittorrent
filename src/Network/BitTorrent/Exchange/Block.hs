@@ -69,7 +69,7 @@ import Numeric
 import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
-import Data.Torrent.Piece
+import Data.Torrent
 
 {-----------------------------------------------------------------------
 --  Block attributes

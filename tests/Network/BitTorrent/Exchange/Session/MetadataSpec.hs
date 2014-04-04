@@ -7,8 +7,7 @@ import Test.Hspec
 import Test.QuickCheck
 
 import Data.BEncode as BE
-import Data.Torrent
-import Data.Torrent.Piece as P
+import Data.Torrent as Torrent
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Message
 import Network.BitTorrent.Exchange.Session.Metadata
@@ -36,7 +35,7 @@ simulateFetch :: InfoDict -> Updates (Maybe InfoDict)
 simulateFetch dict = go
   where
     blocks = chunkBy metadataPieceSize (BL.toStrict (BE.encode dict))
-    packPiece ix = P.Piece ix (blocks !! ix)
+    packPiece ix = Torrent.Piece ix (blocks !! ix)
     ih     = idInfoHash dict
 
     go = do

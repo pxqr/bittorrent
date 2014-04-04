@@ -118,8 +118,8 @@ import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
 import Data.Torrent.Bitfield
-import Data.Torrent
-import qualified Data.Torrent.Piece as P
+import Data.Torrent hiding (Piece (..))
+import qualified Data.Torrent as P (Piece (..))
 import Network.BitTorrent.Core
 import Network.BitTorrent.Exchange.Block
 
@@ -864,7 +864,7 @@ instance PeerMessage ExtendedMetadata where
 
 -- | All 'Piece's in 'MetadataData' messages MUST have size equal to
 -- this value. The last trailing piece can be shorter.
-metadataPieceSize :: P.PieceSize
+metadataPieceSize :: PieceSize
 metadataPieceSize = 16 * 1024
 
 isLastPiece :: P.Piece a -> Int -> Bool
@@ -877,8 +877,8 @@ isLastPiece P.Piece {..} total = succ pieceIndex == pcnt
 -- length; otherwise serialization MUST fail.
 isValidPiece :: P.Piece BL.ByteString -> Int -> Bool
 isValidPiece p @ P.Piece {..} total
-  | isLastPiece p total = P.pieceSize p <= metadataPieceSize
-  |       otherwise     = P.pieceSize p == metadataPieceSize
+  | isLastPiece p total = pieceSize p <= metadataPieceSize
+  |       otherwise     = pieceSize p == metadataPieceSize
 
 setMetadataPayload :: BS.ByteString -> ExtendedMetadata -> ExtendedMetadata
 setMetadataPayload bs (MetadataData (P.Piece pix _) t) =

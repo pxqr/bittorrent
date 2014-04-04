@@ -57,8 +57,6 @@ import Data.Typeable
 
 import Data.Torrent
 import Data.Torrent.Bitfield as BF
-import Data.Torrent
-import Data.Torrent.Piece
 import System.Torrent.FileMap as FM
 
 

@@ -46,7 +46,6 @@ library
   hs-source-dirs:      src
   exposed-modules:     Data.Torrent
                        Data.Torrent.Bitfield
-                       Data.Torrent.Piece
                        Data.Torrent.Progress
                        Data.Torrent.Tree
                        Network.BitTorrent
