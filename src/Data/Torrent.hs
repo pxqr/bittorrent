@@ -38,23 +38,6 @@ module Data.Torrent
        , longHex
        , shortHex
 
-         -- * Magnet
-         -- $magnet-link
-       , Magnet(..)
-       , nullMagnet
-       , simpleMagnet
-       , detailedMagnet
-       , parseMagnet
-       , renderMagnet
-
-         -- ** URN
-       , URN (..)
-       , NamespaceId
-       , btih
-       , infohashURN
-       , parseURN
-       , renderURN
-
          -- * File layout
          -- ** FileInfo
        , FileOffset
@@ -66,10 +49,10 @@ module Data.Torrent
 
          -- ** Layout info
        , LayoutInfo (..)
-       , joinFilePath
        , singleFile
        , multiFile
        , rootDirName
+       , joinFilePath
        , isSingleFile
        , isMultiFile
        , suggestedName
@@ -104,11 +87,9 @@ module Data.Torrent
          -- ** Piece control
        , HashList (..)
        , PieceInfo (..)
-       , pieceCount
-
-         -- ** Lens
        , pieceLength
        , pieceHashes
+       , pieceCount
 
          -- ** Validation
        , pieceHash
@@ -116,13 +97,11 @@ module Data.Torrent
 
          -- * Info dictionary
        , InfoDict (..)
-       , infoDictionary
-
-         -- ** Lenses
        , infohash
        , layoutInfo
        , pieceInfo
        , isPrivate
+       , infoDictionary
 
          -- * Torrent file
        , Torrent(..)
@@ -139,19 +118,30 @@ module Data.Torrent
        , publisherURL
        , signature
 
-         -- * Construction
+         -- ** Utils
        , nullTorrent
-
-         -- * Mime types
        , typeTorrent
-
-         -- * File paths
        , torrentExt
        , isTorrentPath
-
-         -- * IO
        , fromFile
        , toFile
+
+         -- * Magnet
+         -- $magnet-link
+       , Magnet(..)
+       , nullMagnet
+       , simpleMagnet
+       , detailedMagnet
+       , parseMagnet
+       , renderMagnet
+
+         -- ** URN
+       , URN (..)
+       , NamespaceId
+       , btih
+       , infohashURN
+       , parseURN
+       , renderURN
        ) where
 
 import Prelude hiding (sum)
