@@ -46,9 +46,9 @@ import System.Log.FastLogger (LogStr, ToLogStr (..))
 
 import Data.BEncode as BE
 import Data.Torrent as Torrent
-import Data.Torrent.Bitfield as BF
 import Network.BitTorrent.Internal.Types
 import Network.BitTorrent.Address
+import Network.BitTorrent.Exchange.Bitfield as BF
 import Network.BitTorrent.Exchange.Block   as Block
 import Network.BitTorrent.Exchange.Connection
 import Network.BitTorrent.Exchange.Message as Message

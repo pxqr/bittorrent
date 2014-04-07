@@ -27,7 +27,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
-module Data.Torrent.Bitfield
+module Network.BitTorrent.Exchange.Bitfield
        ( -- * Bitfield
          PieceIx
        , PieceCount
@@ -43,8 +43,8 @@ module Data.Torrent.Bitfield
 
          -- * Query
          -- ** Cardinality
-       , Data.Torrent.Bitfield.null
-       , Data.Torrent.Bitfield.full
+       , Network.BitTorrent.Exchange.Bitfield.null
+       , Network.BitTorrent.Exchange.Bitfield.full
        , haveCount
        , totalCount
        , completeness

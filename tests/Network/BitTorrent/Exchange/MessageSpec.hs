@@ -11,7 +11,7 @@ import Test.Hspec
 import Test.QuickCheck
 
 import Data.TorrentSpec ()
-import Data.Torrent.BitfieldSpec ()
+import Network.BitTorrent.Exchange.BitfieldSpec ()
 import Network.BitTorrent.CoreSpec ()
 import Network.BitTorrent.Address ()
 import Network.BitTorrent.Exchange.BlockSpec ()

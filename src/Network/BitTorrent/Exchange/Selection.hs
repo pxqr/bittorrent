@@ -22,7 +22,7 @@ module Network.BitTorrent.Exchange.Selection
 
 import Data.Ratio
 
-import Data.Torrent.Bitfield
+import Network.BitTorrent.Exchange.Bitfield
 
 
 type Selector =  Bitfield      -- ^ Indices of client /have/ pieces.

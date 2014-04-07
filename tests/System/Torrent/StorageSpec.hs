@@ -8,7 +8,7 @@ import System.IO.Unsafe
 import Test.Hspec
 
 import Data.Torrent
-import Data.Torrent.Bitfield as BF
+import Network.BitTorrent.Exchange.Bitfield as BF
 import System.Torrent.Storage
 
 
