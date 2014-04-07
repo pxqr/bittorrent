@@ -187,7 +187,7 @@ import Text.PrettyPrint.Class
 import System.FilePath
 import System.Posix.Types
 
-import Network.BitTorrent.Core.NodeInfo
+import Network.BitTorrent.Address
 
 
 {-----------------------------------------------------------------------
@@ -836,7 +836,7 @@ data Torrent = Torrent
   , tNodes        :: !(Maybe [NodeAddr HostName])
     -- ^ This key should be set to the /K closest/ nodes in the
     -- torrent generating client's routing table. Alternatively, the
-    -- key could be set to a known good 'Network.BitTorrent.Core.Node'
+    -- key could be set to a known good 'Network.BitTorrent.Address.Node'
     -- such as one operated by the person generating the torrent.
     --
     -- Please do not automatically add \"router.bittorrent.com\" to

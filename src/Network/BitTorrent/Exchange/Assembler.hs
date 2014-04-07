@@ -68,7 +68,7 @@ import Data.Maybe
 import Data.IP
 
 import Data.Torrent
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.Exchange.Block as B
 
 {-----------------------------------------------------------------------

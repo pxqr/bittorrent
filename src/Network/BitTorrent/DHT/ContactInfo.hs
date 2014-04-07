@@ -12,13 +12,13 @@ import Data.HashMap.Strict as HM
 import Data.Serialize
 
 import Data.Torrent
-import Network.BitTorrent.Core.PeerAddr
+import Network.BitTorrent.Address
 
 {-
 import Data.HashMap.Strict as HM
 
 import Data.Torrent.InfoHash
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 
 -- increase prefix when table is too large
 -- decrease prefix when table is too small

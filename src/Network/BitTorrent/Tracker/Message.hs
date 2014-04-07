@@ -126,7 +126,7 @@ import Text.Read (readMaybe)
 
 import Data.Torrent
 import Data.Torrent.Progress
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 
 
 {-----------------------------------------------------------------------

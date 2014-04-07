@@ -94,8 +94,7 @@ import Text.PrettyPrint.Class
 import Data.Torrent as Torrent
 import Network.KRPC hiding (Options, def)
 import qualified Network.KRPC as KRPC (def)
-import Network.BitTorrent.Core
-import Network.BitTorrent.Core.PeerAddr
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT.ContactInfo as P
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Routing as R

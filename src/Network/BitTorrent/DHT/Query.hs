@@ -57,7 +57,7 @@ import Text.PrettyPrint.Class
 
 import Network.KRPC hiding (Options, def)
 import Data.Torrent
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Routing
 import Network.BitTorrent.DHT.Session

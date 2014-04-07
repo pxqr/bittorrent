@@ -11,8 +11,8 @@ import Network
 import Test.Hspec
 import Test.QuickCheck
 
-import Network.BitTorrent.Core.PeerIdSpec hiding (spec)
-import Network.BitTorrent.Core.PeerAddr
+import Network.BitTorrent.Core.PeerIdSpec ()
+import Network.BitTorrent.Address
 
 instance Arbitrary IPv4 where
   arbitrary = do

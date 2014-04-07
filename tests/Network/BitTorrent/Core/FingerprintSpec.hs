@@ -1,7 +1,7 @@
 -- | see <http://bittorrent.org/beps/bep_0020.html>
 module Network.BitTorrent.Core.FingerprintSpec (spec) where
 import Test.Hspec
-import Network.BitTorrent.Core.PeerId
+import Network.BitTorrent.Address
 
 spec :: Spec
 spec = do

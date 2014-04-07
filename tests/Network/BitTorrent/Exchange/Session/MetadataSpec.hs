@@ -8,7 +8,7 @@ import Test.QuickCheck
 
 import Data.BEncode as BE
 import Data.Torrent as Torrent
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.Exchange.Message
 import Network.BitTorrent.Exchange.Session.Metadata
 

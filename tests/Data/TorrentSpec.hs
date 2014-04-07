@@ -19,7 +19,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 import Data.Torrent
-import Network.BitTorrent.Core.NodeInfoSpec ()
+import Network.BitTorrent.CoreSpec ()
 
 
 pico :: Gen (Maybe NominalDiffTime)

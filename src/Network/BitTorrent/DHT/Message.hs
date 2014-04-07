@@ -93,7 +93,7 @@ import Network
 import Network.KRPC
 
 import Data.Torrent
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT.Token
 import Network.KRPC ()
 

@@ -49,14 +49,10 @@ library
                        Data.Torrent.Progress
                        Data.Torrent.Tree
                        Network.BitTorrent
+                       Network.BitTorrent.Address
                        Network.BitTorrent.Client
                        Network.BitTorrent.Client.Types
                        Network.BitTorrent.Client.Handle
-                       Network.BitTorrent.Core
-                       Network.BitTorrent.Core.Fingerprint
-                       Network.BitTorrent.Core.NodeInfo
-                       Network.BitTorrent.Core.PeerId
-                       Network.BitTorrent.Core.PeerAddr
                        Network.BitTorrent.DHT
                        Network.BitTorrent.DHT.ContactInfo
                        Network.BitTorrent.DHT.Message

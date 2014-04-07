@@ -27,7 +27,7 @@ import Data.Tuple
 
 import Data.BEncode as BE
 import Data.Torrent as Torrent
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.Exchange.Block   as Block
 import Network.BitTorrent.Exchange.Message as Message hiding (Status)
 

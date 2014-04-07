@@ -74,7 +74,7 @@ import Text.PrettyPrint as PP hiding ((<>))
 import Text.PrettyPrint.Class
 
 import Data.Torrent
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 
 {-----------------------------------------------------------------------
 --  Routing monad

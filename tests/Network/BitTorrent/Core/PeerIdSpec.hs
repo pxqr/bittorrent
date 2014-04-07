@@ -6,7 +6,7 @@ import Data.Text.Encoding as T
 import Test.Hspec
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
-import Network.BitTorrent.Core.PeerId
+import Network.BitTorrent.Address
 
 
 instance Arbitrary PeerId where

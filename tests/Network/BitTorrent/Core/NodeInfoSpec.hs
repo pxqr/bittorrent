@@ -6,7 +6,7 @@ import Data.String
 import Test.Hspec
 import Test.QuickCheck
 
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.Core.PeerAddrSpec ()
 
 instance Arbitrary NodeId where

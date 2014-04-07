@@ -120,7 +120,7 @@ import Text.PrettyPrint.Class
 import Data.Torrent.Bitfield
 import Data.Torrent hiding (Piece (..))
 import qualified Data.Torrent as P (Piece (..))
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.Exchange.Block
 
 {-----------------------------------------------------------------------

@@ -18,11 +18,11 @@ import Test.QuickCheck
 
 import Data.TorrentSpec ()
 import Data.Torrent.ProgressSpec ()
-import Network.BitTorrent.Core.PeerIdSpec ()
-import Network.BitTorrent.Core.PeerAddrSpec ()
+import Network.BitTorrent.Address ()
+import Network.BitTorrent.Address ()
 
 import Network.BitTorrent.Tracker.Message as Message
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 
 
 --prop_bencode :: Eq a => BEncode a => a -> Bool

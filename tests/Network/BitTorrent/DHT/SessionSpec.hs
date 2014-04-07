@@ -10,7 +10,7 @@ import Data.List as L
 import Test.Hspec
 import Test.QuickCheck
 
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Session

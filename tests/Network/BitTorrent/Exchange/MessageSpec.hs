@@ -13,7 +13,7 @@ import Test.QuickCheck
 import Data.TorrentSpec ()
 import Data.Torrent.BitfieldSpec ()
 import Network.BitTorrent.CoreSpec ()
-import Network.BitTorrent.Core ()
+import Network.BitTorrent.Address ()
 import Network.BitTorrent.Exchange.BlockSpec ()
 import Network.BitTorrent.Exchange.Message
 

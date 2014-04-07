@@ -63,7 +63,7 @@ import Data.Conduit.List as C
 import Network.Socket
 
 import Data.Torrent
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT.Query
 import Network.BitTorrent.DHT.Session
 import Network.BitTorrent.DHT.Routing as T

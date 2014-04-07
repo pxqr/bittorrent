@@ -9,7 +9,7 @@ import Data.List as L
 import Data.Maybe
 import Test.Hspec
 
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.Tracker.Message as Message
 
 import Network.BitTorrent.Tracker.TestData

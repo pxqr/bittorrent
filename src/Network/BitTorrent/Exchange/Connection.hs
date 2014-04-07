@@ -137,7 +137,7 @@ import System.Timeout
 
 import Data.Torrent.Bitfield as BF
 import Data.Torrent
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.Exchange.Message as Msg
 
 -- TODO handle port message?

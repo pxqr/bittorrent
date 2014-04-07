@@ -30,7 +30,7 @@ import Data.Tuple
 
 import Data.Torrent
 import Data.Torrent.Bitfield as BF
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.Exchange.Block as Block
 import System.Torrent.Storage (Storage, writePiece)
 
