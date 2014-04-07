@@ -177,10 +177,6 @@ test-suite spec
                        Data.Torrent.ProgressSpec
                        Network.BitTorrent.Client.HandleSpec
                        Network.BitTorrent.CoreSpec
-                       Network.BitTorrent.Core.FingerprintSpec
-                       Network.BitTorrent.Core.NodeInfoSpec
-                       Network.BitTorrent.Core.PeerAddrSpec
-                       Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.DHTSpec
                        Network.BitTorrent.DHT.TestData
                        Network.BitTorrent.DHT.MessageSpec
