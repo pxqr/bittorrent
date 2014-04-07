@@ -66,7 +66,7 @@ module Network.BitTorrent.Address
 
          -- * Fingerprint
          -- $fingerprint
-       , ClientImpl (..)
+       , Software (..)
        , Fingerprint (..)
        , libFingerprint
        , fingerprint
@@ -296,7 +296,9 @@ defaultClientId = "HS"
 -- package.  Version is taken from .cabal file.
 defaultVersionNumber :: ByteString
 defaultVersionNumber = BS.take 4 $ BC.pack $ foldMap show $
-                         versionBranch $ ciVersion libFingerprint
+                         versionBranch myVersion
+  where
+    Fingerprint _ myVersion = libFingerprint
 
 ------------------------------------------------------------------------
 
@@ -792,7 +794,7 @@ version = Version [0, 0, 0, 3] []
 -- prefixed by \"I\" because some of them starts from lowercase letter
 -- but that is not a valid Haskell constructor name.
 --
-data ClientImpl =
+data Software =
    IUnknown
 
  | IMainline
@@ -870,8 +872,8 @@ data ClientImpl =
  | IZipTorrent
    deriving (Show, Eq, Ord, Enum, Bounded)
 
-parseImpl :: ByteString -> ClientImpl
-parseImpl = f . BC.unpack
+parseSoftware :: ByteString -> Software
+parseSoftware = f . BC.unpack
  where
   f "AG" = IAres
   f "A~" = IAres
@@ -937,12 +939,12 @@ parseImpl = f . BC.unpack
   f _    = IUnknown
 
 -- | Used to represent a not recognized implementation
-instance Default ClientImpl where
+instance Default Software where
   def = IUnknown
   {-# INLINE def #-}
 
 -- | Example: @\"BitLet\" == 'IBitLet'@
-instance IsString ClientImpl where
+instance IsString Software where
   fromString str
     | Just impl <- L.lookup str alist = impl
     | otherwise = error $ "fromString: not recognized " ++ str
@@ -951,7 +953,7 @@ instance IsString ClientImpl where
       mk  x = (L.tail $ show x, x)
 
 -- | Example: @pretty 'IBitLet' == \"IBitLet\"@
-instance Pretty ClientImpl where
+instance Pretty Software where
   pretty = text . L.tail . show
 
 -- | Just the '0' version.
@@ -974,10 +976,8 @@ instance Pretty Version where
 
 -- | The all sensible infomation that can be obtained from a peer
 -- identifier or torrent /createdBy/ field.
-data Fingerprint = Fingerprint
-  { ciImpl    :: ClientImpl
-  , ciVersion :: Version
-  } deriving (Show, Eq, Ord)
+data Fingerprint = Fingerprint Software Version
+  deriving (Show, Eq, Ord)
 
 -- | Unrecognized client implementation.
 instance Default Fingerprint where
@@ -993,7 +993,7 @@ instance IsString Fingerprint where
       (impl, _ver) = L.span ((/=) '-') str
 
 instance Pretty Fingerprint where
-  pretty Fingerprint {..} = pretty ciImpl <+> "version" <+> pretty ciVersion
+  pretty (Fingerprint s v) = pretty s <+> "version" <+> pretty v
 
 -- | Fingerprint of this (the bittorrent library) package. Normally,
 -- applications should introduce its own fingerprints, otherwise they
@@ -1128,8 +1128,8 @@ fingerprint pid = either (const def) id $ runGet getCI (getPeerId pid)
       let mnums = L.filter (not . L.null) $ L.linesBy ('-' ==) str
       return $ Version (fromMaybe [] $ sequence $ L.map readMaybe mnums) []
 
-    getAzureusImpl    = parseImpl <$> getByteString 2
-    getAzureusVersion = mkVer     <$> getByteString 4
+    getAzureusImpl    = parseSoftware <$> getByteString 2
+    getAzureusVersion = mkVer         <$> getByteString 4
       where
         mkVer bs = Version [fromMaybe 0 $ readMaybe $ BC.unpack bs] []
 
