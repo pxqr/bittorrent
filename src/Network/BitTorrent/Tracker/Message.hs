@@ -125,9 +125,8 @@ import System.Entropy
 import Text.Read (readMaybe)
 
 import Data.Torrent
-import Data.Torrent.Progress
 import Network.BitTorrent.Address
-
+import Network.BitTorrent.Internal.Progress
 
 {-----------------------------------------------------------------------
 --  Events

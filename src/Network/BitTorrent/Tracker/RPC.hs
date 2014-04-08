@@ -37,8 +37,8 @@ import Network.URI
 import Network.Socket (HostAddress)
 
 import           Data.Torrent
-import           Data.Torrent.Progress
 import           Network.BitTorrent.Address
+import           Network.BitTorrent.Internal.Progress
 import           Network.BitTorrent.Tracker.Message
 import qualified Network.BitTorrent.Tracker.RPC.HTTP as HTTP
 import qualified Network.BitTorrent.Tracker.RPC.UDP  as UDP

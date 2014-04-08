@@ -17,7 +17,7 @@ import Test.Hspec
 import Test.QuickCheck
 
 import Data.TorrentSpec ()
-import Data.Torrent.ProgressSpec ()
+import Network.BitTorrent.Internal.ProgressSpec ()
 import Network.BitTorrent.Address ()
 import Network.BitTorrent.Address ()
 
