@@ -342,7 +342,7 @@ genPeerId = azureusStyle defaultClientId defaultVersionNumber <$> timestamp
 {-----------------------------------------------------------------------
 -- Peer Addr
 -----------------------------------------------------------------------}
---   $peer-addr
+-- $peer-addr
 --
 --   'PeerAddr' is used to represent peer address. Currently it's
 --   just peer IP and peer port but this might change in future.
@@ -767,7 +767,7 @@ rank nid = L.sortBy (comparing (distance nid . nodeId))
 {-----------------------------------------------------------------------
 -- Fingerprint
 -----------------------------------------------------------------------}
---   $fingerprint
+-- $fingerprint
 --
 --   'Fingerprint' is used to identify the client implementation and
 --   version which also contained in 'Peer'. For exsample first 6
