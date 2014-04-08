@@ -70,7 +70,6 @@ library
                        Network.BitTorrent.Exchange.Connection
                        Network.BitTorrent.Exchange.Manager
                        Network.BitTorrent.Exchange.Message
-                       Network.BitTorrent.Exchange.Selection
                        Network.BitTorrent.Exchange.Session
                        Network.BitTorrent.Exchange.Session.Metadata
                        Network.BitTorrent.Exchange.Session.Status
