@@ -50,7 +50,6 @@ library
   hs-source-dirs:      src
   exposed-modules:     Data.Torrent
                        Data.Torrent.Progress
-                       Data.Torrent.Tree
                        Network.BitTorrent
                        Network.BitTorrent.Address
                        Network.BitTorrent.Client
@@ -87,11 +86,13 @@ library
                        Network.BitTorrent.Internal.Cache
                        Network.BitTorrent.Internal.Types
                        System.Torrent.FileMap
+                       System.Torrent.Tree
   else
     other-modules:
                        Network.BitTorrent.Internal.Cache
                        Network.BitTorrent.Internal.Types
                        System.Torrent.FileMap
+                       System.Torrent.Tree
 
   build-depends:       base       == 4.*
                      , lifted-base

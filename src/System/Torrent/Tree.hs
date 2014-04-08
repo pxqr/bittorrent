@@ -10,7 +10,7 @@
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-module Data.Torrent.Tree
+module System.Torrent.Tree
        ( -- * Directory tree
          DirTree (..)
 
@@ -18,7 +18,7 @@ module Data.Torrent.Tree
        , build
 
          -- * Query
-       , Data.Torrent.Tree.lookup
+       , System.Torrent.Tree.lookup
        , lookupDir
        , fileNumber
        , dirNumber
@@ -61,13 +61,13 @@ build MultiFile {..} = Dir $ M.singleton liDirName files
 lookup :: [FilePath] -> DirTree a -> Maybe (DirTree a)
 lookup []        t      = Just t
 lookup (p : ps) (Dir m) | Just subTree <- M.lookup (BC.pack p) m
-                        = Data.Torrent.Tree.lookup ps subTree
+                        = System.Torrent.Tree.lookup ps subTree
 lookup _         _      = Nothing
 
 -- | Lookup directory by path.
 lookupDir :: [FilePath] -> DirTree a -> Maybe [(ByteString, DirTree a)]
 lookupDir ps d = do
-  subTree <- Data.Torrent.Tree.lookup ps d
+  subTree <- System.Torrent.Tree.lookup ps d
   case subTree of
     File _  -> Nothing
     Dir  es -> Just $ M.toList es
