@@ -34,6 +34,10 @@ source-repository this
   branch:              master
   tag:                 v0.0.0.3
 
+flag testing
+  description:         Whether to build tests.
+  default:             False
+
 flag examples
   description:         Whether to build examples.
   default:             False
@@ -70,8 +74,6 @@ library
                        Network.BitTorrent.Exchange.Session
                        Network.BitTorrent.Exchange.Session.Metadata
                        Network.BitTorrent.Exchange.Session.Status
-                       Network.BitTorrent.Internal.Cache
-                       Network.BitTorrent.Internal.Types
                        Network.BitTorrent.Tracker
                        Network.BitTorrent.Tracker.List
                        Network.BitTorrent.Tracker.Message
@@ -79,9 +81,19 @@ library
                        Network.BitTorrent.Tracker.RPC.HTTP
                        Network.BitTorrent.Tracker.RPC.UDP
                        Network.BitTorrent.Tracker.Session
-                       System.Torrent.FileMap
                        System.Torrent.Storage
   other-modules:       Paths_bittorrent
+  if flag(testing)
+    exposed-modules:
+                       Network.BitTorrent.Internal.Cache
+                       Network.BitTorrent.Internal.Types
+                       System.Torrent.FileMap
+  else
+    other-modules:
+                       Network.BitTorrent.Internal.Cache
+                       Network.BitTorrent.Internal.Types
+                       System.Torrent.FileMap
+
   build-depends:       base       == 4.*
                      , lifted-base
                      , bits-extras  >= 0.1.2
