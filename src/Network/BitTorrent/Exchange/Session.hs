@@ -51,9 +51,9 @@ import Network.BitTorrent.Address
 import Network.BitTorrent.Exchange.Bitfield as BF
 import Network.BitTorrent.Exchange.Block   as Block
 import Network.BitTorrent.Exchange.Connection
+import Network.BitTorrent.Exchange.Download   as SS
 import Network.BitTorrent.Exchange.Message as Message
 import Network.BitTorrent.Exchange.Session.Metadata as Metadata
-import Network.BitTorrent.Exchange.Session.Status   as SS
 import System.Torrent.Storage
 
 {-----------------------------------------------------------------------

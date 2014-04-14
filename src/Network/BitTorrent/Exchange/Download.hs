@@ -1,4 +1,4 @@
-module Network.BitTorrent.Exchange.Session.Status
+module Network.BitTorrent.Exchange.Download
        ( -- * Environment
          StatusUpdates
        , runStatusUpdates
