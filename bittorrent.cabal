@@ -63,15 +63,13 @@ library
                        Network.BitTorrent.DHT.Session
                        Network.BitTorrent.DHT.Token
                        Network.BitTorrent.Exchange
-                       Network.BitTorrent.Exchange.Assembler
                        Network.BitTorrent.Exchange.Bitfield
                        Network.BitTorrent.Exchange.Block
                        Network.BitTorrent.Exchange.Connection
+                       Network.BitTorrent.Exchange.Download
                        Network.BitTorrent.Exchange.Manager
                        Network.BitTorrent.Exchange.Message
                        Network.BitTorrent.Exchange.Session
-                       Network.BitTorrent.Exchange.Session.Metadata
-                       Network.BitTorrent.Exchange.Session.Status
                        Network.BitTorrent.Tracker
                        Network.BitTorrent.Tracker.List
                        Network.BitTorrent.Tracker.Message
@@ -207,9 +205,9 @@ test-suite spec
                        Network.BitTorrent.Tracker.SessionSpec
                        Network.BitTorrent.Exchange.BitfieldSpec
                        Network.BitTorrent.Exchange.ConnectionSpec
+                       Network.BitTorrent.Exchange.DownloadSpec
                        Network.BitTorrent.Exchange.MessageSpec
                        Network.BitTorrent.Exchange.SessionSpec
-                       Network.BitTorrent.Exchange.Session.MetadataSpec
                        System.Torrent.StorageSpec
                        System.Torrent.FileMapSpec
   build-depends:       base == 4.*
