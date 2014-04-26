@@ -49,7 +49,6 @@ library
                      , RecordWildCards
   hs-source-dirs:      src
   exposed-modules:     Data.Torrent
-
                        Network.BitTorrent
                        Network.BitTorrent.Address
                        Network.BitTorrent.Client
