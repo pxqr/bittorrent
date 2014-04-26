@@ -224,7 +224,6 @@ test-suite spec
                      , time
 
                        -- * Serialization
-                     , aeson
                      , cereal
 
                        -- * Monads
