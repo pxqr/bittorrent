@@ -75,6 +75,7 @@ import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Control.Monad.Trans.Resource
+import Data.Conduit.Lazy
 import Data.Default
 import Data.Fixed
 import Data.Hashable
@@ -256,7 +257,7 @@ newtype DHT ip a = DHT { unDHT :: ReaderT (Node ip) IO a }
   deriving ( Functor, Applicative, Monad
            , MonadIO, MonadBase IO
            , MonadReader (Node ip)
-           , MonadThrow, MonadUnsafeIO
+           , MonadThrow
            )
 
 instance MonadBaseControl IO (DHT ip) where

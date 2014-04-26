@@ -33,19 +33,7 @@ withUpdates m = do
   undefined
 
 simulateFetch :: InfoDict -> Updates s (Maybe InfoDict)
-simulateFetch dict = go
-  where
-    blocks = chunkBy metadataPieceSize (BL.toStrict (BE.encode dict))
-    packPiece ix = Torrent.Piece ix (blocks !! ix)
-    ih     = idInfoHash dict
-
-    go = do
-      mix <- scheduleBlock undefined undefined
-      case mix of
-        Nothing -> return Nothing
-        Just ix -> do
-          mdict <- pushBlock undefined (packPiece ix)
-          maybe go (return . Just) mdict
+simulateFetch dict = undefined
 
 spec :: Spec
 spec = do

@@ -5,6 +5,7 @@ import Control.Concurrent
 import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
+import Data.Conduit.Lazy
 import Data.Default
 import Data.List as L
 import Test.Hspec

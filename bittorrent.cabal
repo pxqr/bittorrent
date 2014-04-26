@@ -117,8 +117,8 @@ library
                      , stm           >= 2.4
 
                        -- Streaming
-                     , conduit          >= 1.0
-                     , network-conduit  >= 1.0
+                     , conduit          >= 1.1
+                     , conduit-extra    >= 1.1
                      , cereal-conduit   >= 0.5
 
                        -- * Logging
@@ -230,6 +230,7 @@ test-suite spec
                      , mtl
                      , resourcet
                      , conduit
+                     , conduit-extra
                      , monad-loops
                      , monad-logger
 

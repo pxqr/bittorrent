@@ -100,7 +100,7 @@ externalAddr Client {..} = PeerAddr
 newtype BitTorrent a = BitTorrent
   { unBitTorrent :: ReaderT Client IO a
   } deriving ( Functor, Applicative, Monad
-             , MonadIO, MonadThrow, MonadUnsafeIO, MonadBase IO
+             , MonadIO, MonadThrow, MonadBase IO
              )
 
 class MonadBitTorrent m where

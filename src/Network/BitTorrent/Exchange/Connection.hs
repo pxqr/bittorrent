@@ -112,6 +112,7 @@ import Control.Concurrent hiding (yield)
 import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Trans.Resource
 import Control.Lens
 import Data.ByteString as BS
 import Data.ByteString.Lazy as BSL
