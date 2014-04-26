@@ -1,4 +1,0 @@
-* TODO Rename Ext,Extension -> Cap
-* TODO Proper handling of transaction ids in UDP tracker
-
-Just like the krpc package does.
