@@ -254,10 +254,8 @@ data Node ip = Node
 -- | DHT keep track current session and proper resource allocation for
 -- safe multithreading.
 newtype DHT ip a = DHT { unDHT :: ReaderT (Node ip) IO a }
-  deriving ( Functor, Applicative, Monad
-           , MonadIO, MonadBase IO
-           , MonadReader (Node ip)
-           , MonadThrow
+  deriving ( Functor, Applicative, Monad, MonadIO
+           , MonadBase IO, MonadReader (Node ip), MonadThrow
            )
 
 instance MonadBaseControl IO (DHT ip) where
