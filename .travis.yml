@@ -13,7 +13,8 @@ install:
   - ./dev/update-dependencies.sh
 
 script:
-  - cabal configure --enable-tests --enable-benchmark && cabal build && ./dist/build/spec/spec
+  - cabal configure && cabal build
+  - cabal configure -ftesting --enable-tests --enable-benchmark && cabal build && ./dist/build/spec/spec
 
 notifications:
   email:

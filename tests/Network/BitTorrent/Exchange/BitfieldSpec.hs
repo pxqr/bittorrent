@@ -1,10 +1,10 @@
 {-# OPTIONS -fno-warn-orphans #-}
-module Data.Torrent.BitfieldSpec (spec) where
+module Network.BitTorrent.Exchange.BitfieldSpec (spec) where
 import Control.Applicative
 import Test.Hspec
 import Test.QuickCheck
 
-import Data.Torrent.Bitfield
+import Network.BitTorrent.Exchange.Bitfield
 
 instance Arbitrary Bitfield where
   arbitrary = fromBitmap <$> arbitrary

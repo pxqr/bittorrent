@@ -3,7 +3,7 @@ module Network.BitTorrent.DHT.TestData
        , testTorrents
        ) where
 
-import Data.Torrent.InfoHash
+import Data.Torrent
 
 data TestEntry = TestEntry
   { entryName  :: String

@@ -33,7 +33,7 @@ import System.IO.Unsafe
 import Test.Hspec
 
 import Data.Torrent
-import Network.BitTorrent.Core (IP, PeerAddr (PeerAddr), genPeerId)
+import Network.BitTorrent.Address (IP, PeerAddr (PeerAddr), genPeerId)
 
 
 type ClientName = String

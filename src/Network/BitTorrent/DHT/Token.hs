@@ -50,7 +50,7 @@ import Data.String
 import Data.Time
 import System.Random
 
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 
 -- TODO use ShortByteString
 

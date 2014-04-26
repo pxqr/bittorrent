@@ -26,8 +26,6 @@ import Data.List as L
 import Data.HashMap.Strict as HM
 
 import Data.Torrent
-import Data.Torrent.InfoHash
-import Data.Torrent.Magnet
 import Network.BitTorrent.Client.Types as Types
 import Network.BitTorrent.DHT      as DHT
 import Network.BitTorrent.Exchange as Exchange

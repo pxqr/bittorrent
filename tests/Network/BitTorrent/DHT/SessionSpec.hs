@@ -5,17 +5,18 @@ import Control.Concurrent
 import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
+import Data.Conduit.Lazy
 import Data.Default
 import Data.List as L
 import Test.Hspec
 import Test.QuickCheck
 
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Session
 
-import Data.Torrent.InfoHashSpec ()
+import Data.TorrentSpec ()
 import Network.BitTorrent.CoreSpec ()
 import Network.BitTorrent.DHT.TokenSpec ()
 

@@ -112,6 +112,7 @@ import Control.Concurrent hiding (yield)
 import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Trans.Resource
 import Control.Lens
 import Data.ByteString as BS
 import Data.ByteString.Lazy as BSL
@@ -135,10 +136,10 @@ import Text.Show.Functions ()
 import System.Log.FastLogger (ToLogStr(..))
 import System.Timeout
 
-import Data.Torrent.Bitfield as BF
-import Data.Torrent.InfoHash
-import Network.BitTorrent.Core
-import Network.BitTorrent.Exchange.Message as Msg
+import Data.Torrent
+import Network.BitTorrent.Address
+import Network.BitTorrent.Exchange.Bitfield as BF
+import Network.BitTorrent.Exchange.Message  as Msg
 
 -- TODO handle port message?
 -- TODO handle limits?

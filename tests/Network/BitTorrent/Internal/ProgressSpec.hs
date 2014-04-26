@@ -1,9 +1,9 @@
 {-# OPTIONS -fno-warn-orphans #-}
-module Data.Torrent.ProgressSpec (spec) where
+module Network.BitTorrent.Internal.ProgressSpec (spec) where
 import Control.Applicative
 import Test.Hspec
 import Test.QuickCheck
-import Data.Torrent.Progress
+import Network.BitTorrent.Internal.Progress
 
 
 instance Arbitrary Progress where

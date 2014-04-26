@@ -61,11 +61,9 @@ import Data.Text
 import Network
 
 import           Data.Torrent
-import           Data.Torrent.InfoHash
-import           Data.Torrent.Magnet
+import           Network.BitTorrent.Address
 import           Network.BitTorrent.Client.Types
 import           Network.BitTorrent.Client.Handle
-import           Network.BitTorrent.Core
 import           Network.BitTorrent.DHT      as DHT      hiding (Options)
 import           Network.BitTorrent.Tracker  as Tracker  hiding (Options)
 import           Network.BitTorrent.Exchange as Exchange hiding (Options)

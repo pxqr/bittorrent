@@ -56,9 +56,7 @@ import Data.Conduit.List as C
 import Data.Typeable
 
 import Data.Torrent
-import Data.Torrent.Bitfield as BF
-import Data.Torrent.Layout
-import Data.Torrent.Piece
+import Network.BitTorrent.Exchange.Bitfield as BF
 import System.Torrent.FileMap as FM
 
 

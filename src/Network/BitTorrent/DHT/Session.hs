@@ -75,6 +75,7 @@ import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Control.Monad.Trans.Resource
+import Data.Conduit.Lazy
 import Data.Default
 import Data.Fixed
 import Data.Hashable
@@ -91,11 +92,11 @@ import System.Random (randomIO)
 import Text.PrettyPrint as PP hiding ((<>), ($$))
 import Text.PrettyPrint.Class
 
-import Data.Torrent.InfoHash
+import Data.Torrent as Torrent
 import Network.KRPC hiding (Options, def)
 import qualified Network.KRPC as KRPC (def)
-import Network.BitTorrent.Core
-import Network.BitTorrent.Core.PeerAddr as P
+import Network.BitTorrent.Address
+import Network.BitTorrent.DHT.ContactInfo as P
 import Network.BitTorrent.DHT.Message
 import Network.BitTorrent.DHT.Routing as R
 import Network.BitTorrent.DHT.Token   as T
@@ -253,10 +254,8 @@ data Node ip = Node
 -- | DHT keep track current session and proper resource allocation for
 -- safe multithreading.
 newtype DHT ip a = DHT { unDHT :: ReaderT (Node ip) IO a }
-  deriving ( Functor, Applicative, Monad
-           , MonadIO, MonadBase IO
-           , MonadReader (Node ip)
-           , MonadThrow, MonadUnsafeIO
+  deriving ( Functor, Applicative, Monad, MonadIO
+           , MonadBase IO, MonadReader (Node ip), MonadThrow
            )
 
 instance MonadBaseControl IO (DHT ip) where

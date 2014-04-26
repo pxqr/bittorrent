@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module Network.BitTorrent.Exchange.Session.MetadataSpec (spec) where
+module Network.BitTorrent.Exchange.DownloadSpec (spec) where
 import Control.Concurrent
 import Data.ByteString as BS
 import Data.ByteString.Lazy as BL
@@ -7,11 +7,10 @@ import Test.Hspec
 import Test.QuickCheck
 
 import Data.BEncode as BE
-import Data.Torrent
-import Data.Torrent.Piece as P
-import Network.BitTorrent.Core
+import Data.Torrent as Torrent
+import Network.BitTorrent.Address
+import Network.BitTorrent.Exchange.Download
 import Network.BitTorrent.Exchange.Message
-import Network.BitTorrent.Exchange.Session.Metadata
 
 import Config
 import Network.BitTorrent.CoreSpec ()
@@ -25,27 +24,16 @@ chunkBy s bs
   | BS.null bs = []
   | otherwise  = BS.take s bs : chunkBy s (BS.drop s bs)
 
-withUpdates :: Updates a -> IO a
+withUpdates :: Updates s a -> IO a
 withUpdates m = do
   Torrent {..} <- getTestTorrent
   let infoDictLen = fromIntegral $ BL.length $ BE.encode tInfoDict
-  mvar <- newMVar (nullStatus infoDictLen)
-  runUpdates mvar placeholderAddr m
+  --mvar <- newMVar (nullStatus infoDictLen)
+  --runUpdates mvar placeholderAddr m
+  undefined
 
-simulateFetch :: InfoDict -> Updates (Maybe InfoDict)
-simulateFetch dict = go
-  where
-    blocks = chunkBy metadataPieceSize (BL.toStrict (BE.encode dict))
-    packPiece ix = P.Piece ix (blocks !! ix)
-    ih     = idInfoHash dict
-
-    go = do
-      mix <- scheduleBlock
-      case mix of
-        Nothing -> return Nothing
-        Just ix -> do
-          mdict <- pushBlock (packPiece ix) ih
-          maybe go (return . Just) mdict
+simulateFetch :: InfoDict -> Updates s (Maybe InfoDict)
+simulateFetch dict = undefined
 
 spec :: Spec
 spec = do

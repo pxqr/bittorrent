@@ -9,7 +9,7 @@ import Data.Default
 import Data.List as L
 import Test.Hspec
 
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT
 import Network.BitTorrent.DHT.Session
 import Network.BitTorrent.DHT.Query

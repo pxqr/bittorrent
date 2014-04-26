@@ -57,8 +57,8 @@ import Data.Time
 import Data.Traversable
 import Network.URI
 
-import Data.Torrent.InfoHash
-import Network.BitTorrent.Core
+import Data.Torrent
+import Network.BitTorrent.Address
 import Network.BitTorrent.Internal.Cache
 import Network.BitTorrent.Internal.Types
 import Network.BitTorrent.Tracker.List as TL

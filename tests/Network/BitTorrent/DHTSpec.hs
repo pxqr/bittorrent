@@ -6,7 +6,7 @@ import Data.List as L
 import Test.Hspec
 import System.Timeout
 
-import Data.Torrent.InfoHash
+import Data.Torrent
 import Network.BitTorrent.DHT
 
 

@@ -7,7 +7,7 @@ import Data.String
 import Test.Hspec
 import Test.QuickCheck
 
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.CoreSpec ()
 import Network.BitTorrent.DHT.Token as T
 

@@ -8,7 +8,7 @@ import Data.ByteString.Lazy as BL
 import Data.Default
 import Data.List as L
 import Data.Maybe
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT.Message
 import qualified Network.KRPC as KRPC (def)
 import Network.KRPC hiding (def)
@@ -17,9 +17,9 @@ import Test.Hspec
 import Test.QuickCheck
 import System.Timeout
 
+import Data.TorrentSpec                 ()
 import Network.BitTorrent.CoreSpec      ()
 import Network.BitTorrent.DHT.TokenSpec ()
-import Data.Torrent.InfoHashSpec        ()
 
 
 instance MonadLogger IO where

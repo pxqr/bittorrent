@@ -3,7 +3,7 @@ module Network.BitTorrent.Exchange.SessionSpec (spec) where
 import Test.Hspec
 
 import Data.Torrent
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.Exchange.Session
 
 import Config

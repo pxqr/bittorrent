@@ -5,7 +5,7 @@ import Data.Default
 import Data.List as L
 import Test.Hspec
 
-import Data.Torrent.Progress
+import Network.BitTorrent.Internal.Progress
 import Network.BitTorrent.Tracker.Message as Message
 import Network.BitTorrent.Tracker.RPC.HTTP
 

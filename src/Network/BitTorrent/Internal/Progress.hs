@@ -13,7 +13,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
 {-# OPTIONS -fno-warn-orphans #-}
-module Data.Torrent.Progress
+module Network.BitTorrent.Internal.Progress
        ( -- * Progress
          Progress (..)
 
@@ -39,7 +39,6 @@ import Control.Lens hiding ((%=))
 import Data.ByteString.Lazy.Builder  as BS
 import Data.ByteString.Lazy.Builder.ASCII as BS
 import Data.Default
-import Data.List as L
 import Data.Monoid
 import Data.Serialize as S
 import Data.Ratio

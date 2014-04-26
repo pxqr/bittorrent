@@ -9,7 +9,7 @@ import System.FilePath
 import System.IO.Unsafe
 import Test.Hspec
 
-import Data.Torrent.Layout
+import Data.Torrent
 import System.Torrent.FileMap as FM
 
 

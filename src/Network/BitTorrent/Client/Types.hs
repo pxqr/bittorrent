@@ -34,9 +34,9 @@ import Data.Ord
 import Network
 import System.Log.FastLogger
 
-import Data.Torrent.InfoHash
+import Data.Torrent
+import Network.BitTorrent.Address
 import Network.BitTorrent.Internal.Types as Types
-import Network.BitTorrent.Core
 import Network.BitTorrent.DHT      as DHT
 import Network.BitTorrent.Exchange as Exchange
 import Network.BitTorrent.Tracker  as Tracker hiding (Event)
@@ -100,7 +100,7 @@ externalAddr Client {..} = PeerAddr
 newtype BitTorrent a = BitTorrent
   { unBitTorrent :: ReaderT Client IO a
   } deriving ( Functor, Applicative, Monad
-             , MonadIO, MonadThrow, MonadUnsafeIO, MonadBase IO
+             , MonadIO, MonadThrow, MonadBase IO
              )
 
 class MonadBitTorrent m where

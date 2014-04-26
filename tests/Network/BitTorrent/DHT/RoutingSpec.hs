@@ -8,7 +8,7 @@ import Data.Maybe
 import Test.Hspec
 import Test.QuickCheck
 
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT.Routing as T
 
 import Network.BitTorrent.CoreSpec hiding (spec)

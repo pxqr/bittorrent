@@ -45,18 +45,14 @@ import Text.PrettyPrint.Class
 import System.Log.FastLogger (LogStr, ToLogStr (..))
 
 import Data.BEncode as BE
-import Data.Torrent (InfoDict (..))
-import Data.Torrent.Bitfield as BF
-import Data.Torrent.InfoHash
-import Data.Torrent.Piece
-import qualified Data.Torrent.Piece as Torrent (Piece ())
+import Data.Torrent as Torrent
 import Network.BitTorrent.Internal.Types
-import Network.BitTorrent.Core
+import Network.BitTorrent.Address
+import Network.BitTorrent.Exchange.Bitfield as BF
 import Network.BitTorrent.Exchange.Block   as Block
 import Network.BitTorrent.Exchange.Connection
+import Network.BitTorrent.Exchange.Download as D
 import Network.BitTorrent.Exchange.Message as Message
-import Network.BitTorrent.Exchange.Session.Metadata as Metadata
-import Network.BitTorrent.Exchange.Session.Status   as SS
 import System.Torrent.Storage
 
 {-----------------------------------------------------------------------
@@ -93,13 +89,13 @@ type LogFun = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
 data SessionState
   = WaitingMetadata
-    { metadataDownload  :: MVar Metadata.Status
+    { metadataDownload  :: MVar MetadataDownload
     , metadataCompleted :: MVar InfoDict -- ^ used to unblock waiters
     , contentRootPath   :: FilePath
     }
   | HavingMetadata
     { metadataCache     :: Cached InfoDict
-    , contentDownload   :: MVar SessionStatus
+    , contentDownload   :: MVar ContentDownload
     , contentStorage    :: Storage
     }
 
@@ -108,8 +104,9 @@ newSessionState rootPath (Left  ih  ) = do
   WaitingMetadata <$> newMVar def <*> newEmptyMVar <*> pure rootPath
 newSessionState rootPath (Right dict) = do
   storage     <- openInfoDict ReadWriteEx rootPath dict
-  download    <- newMVar $ sessionStatus (BF.haveNone (totalPieces storage))
-                                        (piPieceLength (idPieceInfo dict))
+  download    <- newMVar $ D.contentDownload (BF.haveNone (totalPieces storage))
+                                           (piPieceLength (idPieceInfo dict))
+                                           storage
   return $ HavingMetadata (cache dict) download storage
 
 closeSessionState :: SessionState -> IO ()
@@ -119,8 +116,9 @@ closeSessionState HavingMetadata  {..} = close contentStorage
 haveMetadata :: InfoDict -> SessionState -> IO SessionState
 haveMetadata dict WaitingMetadata {..} = do
   storage     <- openInfoDict ReadWriteEx contentRootPath dict
-  download    <- newMVar $ sessionStatus (BF.haveNone (totalPieces storage))
-                                        (piPieceLength (idPieceInfo dict))
+  download    <- newMVar $ D.contentDownload (BF.haveNone (totalPieces storage))
+                                           (piPieceLength (idPieceInfo dict))
+                                            storage
   return HavingMetadata
     { metadataCache   = cache dict
     , contentDownload = download

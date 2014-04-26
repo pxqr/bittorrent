@@ -2,7 +2,7 @@ module Network.BitTorrent.Client.HandleSpec (spec) where
 import Data.Default
 import Test.Hspec
 
-import Data.Torrent.Magnet
+import Data.Torrent
 import Network.BitTorrent.Client
 import Network.BitTorrent.Client.Handle
 

@@ -34,6 +34,10 @@ source-repository this
   branch:              master
   tag:                 v0.0.0.3
 
+flag testing
+  description:         Whether to build tests.
+  default:             False
+
 flag examples
   description:         Whether to build examples.
   default:             False
@@ -45,22 +49,11 @@ library
                      , RecordWildCards
   hs-source-dirs:      src
   exposed-modules:     Data.Torrent
-                       Data.Torrent.Bitfield
-                       Data.Torrent.InfoHash
-                       Data.Torrent.Layout
-                       Data.Torrent.Magnet
-                       Data.Torrent.Piece
-                       Data.Torrent.Progress
-                       Data.Torrent.Tree
                        Network.BitTorrent
+                       Network.BitTorrent.Address
                        Network.BitTorrent.Client
                        Network.BitTorrent.Client.Types
                        Network.BitTorrent.Client.Handle
-                       Network.BitTorrent.Core
-                       Network.BitTorrent.Core.Fingerprint
-                       Network.BitTorrent.Core.NodeInfo
-                       Network.BitTorrent.Core.PeerId
-                       Network.BitTorrent.Core.PeerAddr
                        Network.BitTorrent.DHT
                        Network.BitTorrent.DHT.ContactInfo
                        Network.BitTorrent.DHT.Message
@@ -69,17 +62,13 @@ library
                        Network.BitTorrent.DHT.Session
                        Network.BitTorrent.DHT.Token
                        Network.BitTorrent.Exchange
-                       Network.BitTorrent.Exchange.Assembler
+                       Network.BitTorrent.Exchange.Bitfield
                        Network.BitTorrent.Exchange.Block
                        Network.BitTorrent.Exchange.Connection
+                       Network.BitTorrent.Exchange.Download
                        Network.BitTorrent.Exchange.Manager
                        Network.BitTorrent.Exchange.Message
-                       Network.BitTorrent.Exchange.Selection
                        Network.BitTorrent.Exchange.Session
-                       Network.BitTorrent.Exchange.Session.Metadata
-                       Network.BitTorrent.Exchange.Session.Status
-                       Network.BitTorrent.Internal.Cache
-                       Network.BitTorrent.Internal.Types
                        Network.BitTorrent.Tracker
                        Network.BitTorrent.Tracker.List
                        Network.BitTorrent.Tracker.Message
@@ -87,9 +76,23 @@ library
                        Network.BitTorrent.Tracker.RPC.HTTP
                        Network.BitTorrent.Tracker.RPC.UDP
                        Network.BitTorrent.Tracker.Session
-                       System.Torrent.FileMap
                        System.Torrent.Storage
   other-modules:       Paths_bittorrent
+  if flag(testing)
+    exposed-modules:
+                       Network.BitTorrent.Internal.Cache
+                       Network.BitTorrent.Internal.Progress
+                       Network.BitTorrent.Internal.Types
+                       System.Torrent.FileMap
+                       System.Torrent.Tree
+  else
+    other-modules:
+                       Network.BitTorrent.Internal.Cache
+                       Network.BitTorrent.Internal.Progress
+                       Network.BitTorrent.Internal.Types
+                       System.Torrent.FileMap
+                       System.Torrent.Tree
+
   build-depends:       base       == 4.*
                      , lifted-base
                      , bits-extras  >= 0.1.2
@@ -113,8 +116,8 @@ library
                      , stm           >= 2.4
 
                        -- Streaming
-                     , conduit          >= 1.0
-                     , network-conduit  >= 1.0
+                     , conduit          >= 1.1
+                     , conduit-extra    >= 1.1
                      , cereal-conduit   >= 0.5
 
                        -- * Logging
@@ -180,19 +183,9 @@ test-suite spec
   other-modules:       Spec
                        Config
 
-                       Data.Torrent.BitfieldSpec
-                       Data.Torrent.InfoHashSpec
-                       Data.Torrent.LayoutSpec
-                       Data.Torrent.MagnetSpec
-                       Data.Torrent.MetainfoSpec
-                       Data.Torrent.PieceSpec
-                       Data.Torrent.ProgressSpec
+                       Data.TorrentSpec
                        Network.BitTorrent.Client.HandleSpec
                        Network.BitTorrent.CoreSpec
-                       Network.BitTorrent.Core.FingerprintSpec
-                       Network.BitTorrent.Core.NodeInfoSpec
-                       Network.BitTorrent.Core.PeerAddrSpec
-                       Network.BitTorrent.Core.PeerIdSpec
                        Network.BitTorrent.DHTSpec
                        Network.BitTorrent.DHT.TestData
                        Network.BitTorrent.DHT.MessageSpec
@@ -201,6 +194,7 @@ test-suite spec
                        Network.BitTorrent.DHT.SessionSpec
                        Network.BitTorrent.DHT.TokenSpec
                        Network.BitTorrent.Internal.CacheSpec
+                       Network.BitTorrent.Internal.ProgressSpec
                        Network.BitTorrent.Tracker.TestData
                        Network.BitTorrent.Tracker.ListSpec
                        Network.BitTorrent.Tracker.MessageSpec
@@ -208,10 +202,11 @@ test-suite spec
                        Network.BitTorrent.Tracker.RPC.HTTPSpec
                        Network.BitTorrent.Tracker.RPC.UDPSpec
                        Network.BitTorrent.Tracker.SessionSpec
+                       Network.BitTorrent.Exchange.BitfieldSpec
                        Network.BitTorrent.Exchange.ConnectionSpec
+                       Network.BitTorrent.Exchange.DownloadSpec
                        Network.BitTorrent.Exchange.MessageSpec
                        Network.BitTorrent.Exchange.SessionSpec
-                       Network.BitTorrent.Exchange.Session.MetadataSpec
                        System.Torrent.StorageSpec
                        System.Torrent.FileMapSpec
   build-depends:       base == 4.*
@@ -228,13 +223,13 @@ test-suite spec
                      , time
 
                        -- * Serialization
-                     , aeson
                      , cereal
 
                        -- * Monads
                      , mtl
                      , resourcet
                      , conduit
+                     , conduit-extra
                      , monad-loops
                      , monad-logger
 
