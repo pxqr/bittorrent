@@ -27,6 +27,7 @@ module Network.BitTorrent.Exchange
 
          -- * Connections
        , connect
+       , connectSink
        ) where
 
 import Network.BitTorrent.Exchange.Manager

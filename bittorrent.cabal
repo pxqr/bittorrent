@@ -289,7 +289,7 @@ executable mktorrent
                      , mtl
                      , conduit
                      , lens
-                     , async
+                     , lifted-async
                      , parallel-io
 
                      , network

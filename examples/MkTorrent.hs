@@ -6,13 +6,14 @@ module Main (main) where
 
 import Prelude as P
 import Control.Concurrent
-import Control.Concurrent.Async
+import Control.Concurrent.Async.Lifted
 import Control.Concurrent.ParallelIO
 import Control.Exception
 import Control.Lens hiding (argument, (<.>))
-import Control.Monad
+import Control.Monad as M
 import Control.Monad.Trans
 import Data.Conduit as C
+import Data.Conduit.List as C
 import Data.List as L
 import Data.Maybe as L
 import Data.Monoid
@@ -31,17 +32,14 @@ import Text.Read
 import Text.PrettyPrint.Class
 
 import Paths_bittorrent (version)
-import Data.Torrent
-import Data.Torrent.Bitfield as BF
-import Data.Torrent.InfoHash
-import Data.Torrent.Piece
-import Data.Torrent.Layout
-import Data.Torrent.Magnet hiding (Magnet)
-import Network.BitTorrent.Core
+import Data.Torrent hiding (Magnet (Magnet))
+import Network.BitTorrent.Address
 import Network.BitTorrent.DHT.Session hiding (Options, options)
 import Network.BitTorrent.DHT as DHT  hiding (Options)
-import Network.BitTorrent.Exchange.Message
+import Network.BitTorrent.Exchange.Bitfield as BF
 import Network.BitTorrent.Exchange.Connection hiding (Options)
+import Network.BitTorrent.Exchange.Message
+import Network.BitTorrent.Exchange.Session
 import System.Torrent.Storage
 
 
@@ -356,43 +354,17 @@ getInfo = info (helper <*> paramsParser)
   <> header   "get torrent file by infohash"
    )
 
-exchangeTorrent :: InfoHash -> PeerAddr IP -> IO InfoDict
-exchangeTorrent ih addr = do
-  pid <- genPeerId
-  var <- newEmptyMVar
-  let hs = Handshake def (toCaps [ExtExtended]) ih pid
-  chan <- newChan
-  connectWire () hs addr (toCaps [ExtMetadata]) chan $ do
-    infodict <- undefined -- getMetadata
-    liftIO $ putMVar var infodict
-  takeMVar var
-
-exchangeConc :: InfoHash -> [PeerAddr IP] -> IO (Maybe InfoDict)
-exchangeConc ih peers = do
-  workers <- forM peers $ async . exchangeTorrent ih
-  (_, result) <- waitAnyCatchCancel workers
-  return $ either (const Nothing) Just result
-
-sinkInfoDict :: InfoHash -> Sink [PeerAddr IPv4] (DHT ip) InfoDict
-sinkInfoDict ih = do
-  m <- await
-  case m of
-    Nothing -> liftIO $ throwIO $ userError "impossible: end of peer stream"
-    Just peers -> do
-      minfodict <- liftIO $ exchangeConc ih (fmap IPv4 <$> peers)
-      maybe (sinkInfoDict ih) return minfodict
-
  -- TODO add tNodes, tCreated, etc?
 getTorrent :: GetOpts -> IO ()
 getTorrent GetOpts {..} = do
-  infoM "get" "starting..."
+  infoM "get" "searching for peers..."
+  s <- newSession (\ _ _ _ _ -> return ()) (PeerAddr Nothing Nothing 7000) "/tmp" (Left topic)
   dht (def { optBucketCount = buckets }) (NodeAddr "0.0.0.0" servPort) $ do
     bootstrap [bootNode]
-    liftIO $ infoM "get" "searching for peers..."
-    infodict <- DHT.lookup topic $$ sinkInfoDict topic
-    liftIO $ infoM "get" "saving torrent file..."
+    infodict <- withAsync (DHT.lookup topic $$ connectSink s)
+                          (const (liftIO $ waitMetadata s))
     liftIO $ toFile (show topic <.> torrentExt) $ nullTorrent infodict
-  infoM "get" "done"
+  infoM "get" "saved torrent file"
 
 {-----------------------------------------------------------------------
 --  Command

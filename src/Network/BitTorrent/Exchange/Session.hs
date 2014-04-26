@@ -16,6 +16,7 @@ module Network.BitTorrent.Exchange.Session
 
          -- * Connection Set
        , connect
+       , connectSink
        , establish
 
          -- * Query
@@ -29,12 +30,13 @@ import Control.Concurrent.Chan.Split as CS
 import Control.Concurrent.STM
 import Control.Exception hiding (Handler)
 import Control.Lens
+import Control.Monad as M
 import Control.Monad.Logger
 import Control.Monad.Reader
 import Data.ByteString as BS
 import Data.ByteString.Lazy as BL
-import Data.Conduit
-import Data.Conduit.List as CL (iterM)
+import Data.Conduit as C
+import Data.Conduit.List as C
 import Data.Map as M
 import Data.Monoid
 import Data.Set  as S
@@ -332,6 +334,12 @@ connect addr = runConnection (connectWire addr) (return ()) addr
 establish :: PendingConnection -> Session -> IO ()
 establish conn = runConnection (acceptWire conn) (closePending conn)
                  (pendingPeer conn)
+
+-- | Conduit version of 'connect'.
+connectSink :: MonadIO m => Session -> Sink [PeerAddr IPv4] m ()
+connectSink s = C.mapM_ (liftIO . connectBatch)
+  where
+    connectBatch = M.mapM_ (\ addr -> connect (IPv4 <$> addr) s)
 
 -- | Why do we need this message?
 type BroadcastMessage = ExtendedCaps -> Message
