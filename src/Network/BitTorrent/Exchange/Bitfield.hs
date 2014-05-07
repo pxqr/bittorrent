@@ -7,22 +7,23 @@
 --
 --   This modules provides all necessary machinery to work with
 --   bitfields. Bitfields are used to keep track indices of complete
---   pieces either peer have or client have.
+--   pieces either this peer have or remote peer have.
 --
 --   There are also commonly used piece seletion algorithms
 --   which used to find out which one next piece to download.
 --   Selectors considered to be used in the following order:
 --
---     * Random first - at the start.
+--     * 'randomFirst' - at the start of download.
 --
---     * Rarest first selection - performed to avoid situation when
+--     * 'rarestFirst' - performed to avoid situation when
 --     rarest piece is unaccessible.
 --
---     * /End game/ seletion - performed after a peer has requested all
+--     * 'endGame' - performed after a peer has requested all
 --     the subpieces of the content.
 --
---   Note that BitTorrent applies the strict priority policy for
---   /subpiece/ or /blocks/ selection.
+--   Note that BitTorrent protocol recommend (TODO link?) the
+--   'strictFirst' priority policy for /subpiece/ or /blocks/
+--   selection.
 --
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
