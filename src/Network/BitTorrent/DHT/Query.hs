@@ -127,17 +127,13 @@ findNodeQ key NodeInfo {..} = do
   NodeFound closest <- FindNode (toNodeId key) <@> nodeAddr
   return $ Right closest
 
-isLeft :: Either a b -> Bool
-isLeft (Right _) = False
-isLeft (Left  _) = True
-
 getPeersQ :: Address ip => InfoHash -> Iteration ip PeerAddr
 getPeersQ topic NodeInfo {..} = do
   GotPeers {..} <- GetPeers topic <@> nodeAddr
   let dist = distance (toNodeId topic) nodeId
   $(logInfoS) "getPeersQ" $ T.pack
          $ "distance: " <> render (pretty dist) <> " , result: "
-        <> if isLeft peers then "NODES" else "PEERS"
+        <> case peers of { Left _ -> "NODES"; Right _ -> "PEERS" }
   return peers
 
 announceQ :: Address ip => InfoHash -> PortNumber -> Iteration ip NodeAddr
