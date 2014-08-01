@@ -123,10 +123,14 @@ checkOptions Options {..} = do
     throwIO $ userError "optMinTimeout must be positive"
 
   unless (optMaxTimeout > 0) $ do
+    throwIO $ userError "optMaxTimeout must be positive"
+
+  unless (optMultiplier > 0) $ do
+    throwIO $ userError "optMultiplier must be positive"
+
+  unless (optMaxTimeout > optMinTimeout) $ do
     throwIO $ userError "optMaxTimeout must be greater than optMinTimeout"
 
-  unless (optMinTimeout > 0) $ do
-    throwIO $ userError "optMinTimeout must be positive"
 
 {-----------------------------------------------------------------------
 --  Manager state
