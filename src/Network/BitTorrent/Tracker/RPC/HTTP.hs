@@ -37,7 +37,7 @@ import Data.ByteString.Lazy  as BL
 import Data.Default
 import Data.List as L
 import Data.Monoid
-import Data.Typeable
+import Data.Typeable hiding (Proxy)
 import Network.URI
 import           Network.HTTP.Conduit hiding
                  (Manager, newManager, closeManager, withManager)
