@@ -6,26 +6,26 @@ import Data.List as L
 import Data.ByteString.Lazy as BL
 import System.Directory
 import System.FilePath
-import System.IO.Unsafe
+import System.IO.Temp
 import Test.Hspec
 
 import Data.Torrent
 import System.Torrent.FileMap as FM
 
 
-layout :: FileLayout FileSize
-layout =
-  [ (dir </> "a", 2)
-  , (dir </> "b", 3)
-  , (dir </> "c", 2)
-  ]
-  where
-    dir = unsafePerformIO $ getTemporaryDirectory
+withLayout :: (FileLayout FileSize -> IO ()) -> IO ()
+withLayout f = do
+  tmp <- getTemporaryDirectory
+  withTempDirectory tmp "bittorrentTestDir" $ \dir ->
+    f [ (dir </> "a", 2)
+      , (dir </> "b", 3)
+      , (dir </> "c", 2)
+      ] `seq` return ()
 
 spec :: Spec
 spec = do
   describe "mmapFiles" $ do
-    it "creates new files" $ do
+    it "creates new files" $ withLayout $ \layout -> do
       m <- mmapFiles ReadWriteEx layout
       unmapFiles m
 
@@ -33,7 +33,7 @@ spec = do
         `shouldReturn` True
 
   describe "size" $ do
-    it "is equal to the layout size" $ do
+    it "is equal to the layout size" $ withLayout $ \layout -> do
       m <- mmapFiles ReadOnly layout
       FM.size m `shouldBe` L.sum (L.map snd layout)
       unmapFiles m
@@ -45,13 +45,13 @@ spec = do
       readBytes 3 15 m `shouldReturn` "this is test"
       unmapFiles m
 
-    it "ignore underflow reads" $ do
+    it "ignore underflow reads" $ withLayout $ \layout -> do
       m <- mmapFiles ReadOnly layout
       readBytes (-1) 1  m `shouldReturn` ""
       readBytes (-5) 12 m `shouldReturn` ""
       unmapFiles m
 
-    it "crop overflow reads" $ do
+    it "crop overflow reads" $ withLayout $ \layout -> do
       _m <- mmapFiles ReadWrite layout
       writeBytes 5 "cc" _m
       unmapFiles _m
@@ -61,7 +61,7 @@ spec = do
       unmapFiles m
 
   describe "writeBytes" $ do
-    it "writes to files" $ do
+    it "writes to files" $ withLayout $ \layout -> do
       m <- mmapFiles ReadWriteEx layout
       writeBytes 0 "a"   m
       readBytes  0 1 m `shouldReturn` "a"
@@ -83,17 +83,17 @@ spec = do
     let max_page_size = 4 * 1024 * 1024
     let long_bs = BL.replicate (fromIntegral max_page_size) 0
 
-    it "no buffer underflow errors" $ do
+    it "no buffer underflow errors" $ withLayout $ \layout -> do
       m <- mmapFiles ReadWrite layout
       writeBytes (1 - max_page_size) long_bs m
       unmapFiles m
 
-    it "no buffer overflow errors" $ do
+    it "no buffer overflow errors" $ withLayout $ \layout -> do
       m <- mmapFiles ReadWrite layout
       writeBytes 5 long_bs m
       unmapFiles m
 
-    it "ignore underflow writes" $ do
+    it "ignore underflow writes" $ withLayout $ \layout -> do
       _m <- mmapFiles ReadWrite layout
       writeBytes 0 "aa" _m
       unmapFiles _m
@@ -103,14 +103,14 @@ spec = do
       unmapFiles m
       BL.readFile (fst (layout !! 0)) `shouldReturn` "aa"
 
-    it "crop overflow writes" $ do
+    it "crop overflow writes" $ withLayout $ \layout -> do
       m <- mmapFiles ReadWrite layout
       writeBytes 5 "ddddddddd" m
       unmapFiles m
       BL.readFile (fst (layout !! 2)) `shouldReturn` "dd"
 
   describe "from/to lazy bytestring" $ do
-    it "isomorphic to lazy bytestring" $ do
+    it "isomorphic to lazy bytestring" $ withLayout $ \layout -> do
       m <- mmapFiles ReadOnly layout
       fromLazyByteString (toLazyByteString m) `shouldBe` m
       unmapFiles m

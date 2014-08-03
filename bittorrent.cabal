@@ -253,6 +253,7 @@ test-suite spec
                      , bencoding
                      , krpc  >= 0.6.1
                      , bittorrent
+                     , temporary
   ghc-options:         -Wall -fno-warn-orphans
 
 
