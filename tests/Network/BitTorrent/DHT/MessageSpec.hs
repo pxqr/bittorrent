@@ -203,6 +203,9 @@ spec = do
         Response _ GotPeers {..} <- query remoteAddr (Query nid (GetPeers def))
         let _ = peers :: Either [NodeInfo IPv4] [PeerAddr IPv4]
         let invalidToken = ""
-        query remoteAddr (Query nid (Announce False def thisPort invalidToken)))
+        let q :: MonadKRPC h m => SockAddr -> Query Announce
+              -> m (Response Announced)
+            q = query
+        q remoteAddr (Query nid (Announce False def thisPort invalidToken)))
           `shouldThrow` isQueryError
       return ()
