@@ -67,7 +67,7 @@ spec = parallel $ do
       let opts = def { optMinTimeout = 2, optMaxTimeout = 1 }
       newManager opts `shouldThrow` isSomeException
 
-    it "should throw exception on  optMultiplier" $ do
+    it "should throw exception on zero optMultiplier" $ do
       let opts = def { optMultiplier = 0 }
       newManager opts `shouldThrow` isSomeException
 
